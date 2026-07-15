@@ -9,11 +9,11 @@ import com.fiberhome.ml.raha.data.RahaDataset;
 import com.fiberhome.ml.raha.data.StrategyFamily;
 import com.fiberhome.ml.raha.error.RahaErrorCode;
 import com.fiberhome.ml.raha.error.RahaException;
+import com.fiberhome.ml.raha.security.ResultValueProtectionPolicy;
 import com.fiberhome.ml.raha.strategy.SparkStrategySupport;
 import com.fiberhome.ml.raha.strategy.StrategyConfigurationKeys;
 import com.fiberhome.ml.raha.strategy.StrategyHit;
 import com.fiberhome.ml.raha.strategy.StrategyPlan;
-import com.fiberhome.ml.raha.util.ValueProtectionUtils;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -51,13 +51,22 @@ public final class FeatureAssembler {
     private final FeatureDictionaryVersioner versioner;
     /** 提供可测试字典创建时间的时钟。 */
     private final Clock clock;
+    /** 敏感字段展示值保护策略。 */
+    private final ResultValueProtectionPolicy valueProtectionPolicy;
 
     public FeatureAssembler(FeatureDictionaryVersioner versioner, Clock clock) {
-        if (versioner == null || clock == null) {
+        this(versioner, clock, ResultValueProtectionPolicy.configuredDefaults());
+    }
+
+    public FeatureAssembler(FeatureDictionaryVersioner versioner,
+                            Clock clock,
+                            ResultValueProtectionPolicy valueProtectionPolicy) {
+        if (versioner == null || clock == null || valueProtectionPolicy == null) {
             throw new IllegalArgumentException("特征组装器依赖不能为空");
         }
         this.versioner = versioner;
         this.clock = clock;
+        this.valueProtectionPolicy = valueProtectionPolicy;
     }
 
     /**
@@ -169,11 +178,11 @@ public final class FeatureAssembler {
         specs.put(name, new FeatureSpec(name, type, "value_context"));
     }
 
-    private static List<MutableCellFeatures> buildCells(RahaDataset dataset,
-                                                        ColumnMetadata column,
-                                                        Map<String, FeatureSpec> specs,
-                                                        Map<String, List<StrategyHit>> hitsByCell,
-                                                        FeatureConfig config) {
+    private List<MutableCellFeatures> buildCells(RahaDataset dataset,
+                                                 ColumnMetadata column,
+                                                 Map<String, FeatureSpec> specs,
+                                                 Map<String, List<StrategyHit>> hitsByCell,
+                                                 FeatureConfig config) {
         Column raw = SparkStrategySupport.quotedColumn(column.getName());
         Column text = raw.cast("string");
         Column hashInput = when(raw.isNull(), lit("<null>")).otherwise(text);
@@ -189,7 +198,8 @@ public final class FeatureAssembler {
                 .collectAsList();
         ColumnProfile profile = dataset.getProfiles().get(column.getName());
         long totalCount = profile == null ? rows.size() : profile.getTotalCount();
-        long rareThreshold = Math.max(1L, (long) Math.floor(totalCount * 0.01d));
+        long rareThreshold = Math.max(1L, (long) Math.floor(
+                totalCount * config.getRareValueRatio()));
         List<MutableCellFeatures> cells = new ArrayList<MutableCellFeatures>(rows.size());
         for (Row row : rows) {
             String rowId = row.getAs("row_id");
@@ -199,8 +209,8 @@ public final class FeatureAssembler {
             long frequency = ((Number) row.getAs("value_frequency")).longValue();
             CellCoordinate coordinate = new CellCoordinate(dataset.getDatasetId(),
                     dataset.getSnapshotId(), rowId, column.getName());
-            String maskedValue = column.isSensitive() && originalText != null
-                    ? ValueProtectionUtils.mask(originalText, 1, 1) : null;
+            String maskedValue = column.isSensitive()
+                    ? valueProtectionPolicy.protectedRawValue(originalText) : null;
             MutableCellFeatures cell = new MutableCellFeatures(
                     coordinate, valueHash, maskedValue);
             List<StrategyHit> cellHits = hitsByCell.containsKey(coordinate.toCellId())

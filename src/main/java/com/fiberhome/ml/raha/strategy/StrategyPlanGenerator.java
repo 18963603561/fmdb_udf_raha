@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.strategy;
 
 import com.fiberhome.ml.raha.config.StrategyConfig;
+import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.data.ColumnMetadata;
 import com.fiberhome.ml.raha.data.ColumnProfile;
 import com.fiberhome.ml.raha.data.RahaDataset;
@@ -24,14 +25,19 @@ public final class StrategyPlanGenerator {
 
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(StrategyPlanGenerator.class);
-    /** 默认少数模式比例。 */
-    private static final String DEFAULT_MINORITY_RATIO = "0.1";
-    /** 默认四分位距倍数。 */
-    private static final String DEFAULT_IQR_MULTIPLIER = "1.5";
-    /** 默认格式适用最小匹配比例。 */
-    private static final String DEFAULT_FORMAT_MIN_RATIO = "0.8";
-    /** 空值和特殊占位值集合。 */
-    private static final String DEFAULT_PLACEHOLDERS = "N/A,NULL,NONE,UNKNOWN,-,--,?";
+    /** 策略生成阈值、占位值和默认优先级。 */
+    private final StrategyGenerationConfig generationConfig;
+
+    public StrategyPlanGenerator() {
+        this(RahaDefaultConfigProvider.factory().strategyGenerationConfig());
+    }
+
+    public StrategyPlanGenerator(StrategyGenerationConfig generationConfig) {
+        if (generationConfig == null) {
+            throw new IllegalArgumentException("策略生成配置不能为空");
+        }
+        this.generationConfig = generationConfig;
+    }
 
     /**
      * 为一个数据集生成确定性策略计划。
@@ -84,16 +90,19 @@ public final class StrategyPlanGenerator {
         return Collections.unmodifiableList(plans);
     }
 
-    private static void addOdPlans(List<StrategyPlan> plans,
-                                   ColumnMetadata column,
-                                   ColumnProfile profile,
-                                   StrategyConfig config) {
+    private void addOdPlans(List<StrategyPlan> plans,
+                            ColumnMetadata column,
+                            ColumnProfile profile,
+                            StrategyConfig config) {
         Map<String, String> frequency = base(StrategyTypes.OD_LOW_FREQUENCY);
         frequency.put(StrategyConfigurationKeys.MAX_FREQUENCY,
-                String.valueOf(Math.max(1L, (long) Math.floor(profile.getNonNullCount() * 0.01d))));
-        addPlan(plans, StrategyFamily.OD, column, frequency, 100, config);
+                String.valueOf(Math.max(1L, (long) Math.floor(
+                        profile.getNonNullCount()
+                                * generationConfig.getLowFrequencyRatio()))));
+        addPlan(plans, StrategyFamily.OD, column, frequency,
+                generationConfig.getOdLowFrequencyPriority(), config);
 
-        if (profile.getNumericCount() >= 3L
+        if (profile.getNumericCount() >= generationConfig.getMinimumNumericCount()
                 && profile.getNumericMean() != null
                 && profile.getNumericStandardDeviation() != null
                 && profile.getNumericStandardDeviation() > 0.0d) {
@@ -102,10 +111,12 @@ public final class StrategyPlanGenerator {
                     formatDouble(profile.getNumericMean()));
             distance.put(StrategyConfigurationKeys.NUMERIC_STANDARD_DEVIATION,
                     formatDouble(profile.getNumericStandardDeviation()));
-            distance.put(StrategyConfigurationKeys.Z_THRESHOLD, "3.0");
-            addPlan(plans, StrategyFamily.OD, column, distance, 110, config);
+            distance.put(StrategyConfigurationKeys.Z_THRESHOLD,
+                    formatDouble(generationConfig.getZThreshold()));
+            addPlan(plans, StrategyFamily.OD, column, distance,
+                    generationConfig.getOdNumericDistancePriority(), config);
         }
-        if (profile.getNumericCount() >= 4L
+        if (profile.getNumericCount() >= generationConfig.getMinimumQuantileCount()
                 && profile.getNumericQ1() != null
                 && profile.getNumericQ3() != null
                 && profile.getNumericQ3() > profile.getNumericQ1()) {
@@ -114,50 +125,63 @@ public final class StrategyPlanGenerator {
                     formatDouble(profile.getNumericQ1()));
             quantile.put(StrategyConfigurationKeys.NUMERIC_Q3,
                     formatDouble(profile.getNumericQ3()));
-            quantile.put(StrategyConfigurationKeys.IQR_MULTIPLIER, DEFAULT_IQR_MULTIPLIER);
-            addPlan(plans, StrategyFamily.OD, column, quantile, 120, config);
+            quantile.put(StrategyConfigurationKeys.IQR_MULTIPLIER,
+                    formatDouble(generationConfig.getIqrMultiplier()));
+            addPlan(plans, StrategyFamily.OD, column, quantile,
+                    generationConfig.getOdQuantilePriority(), config);
         }
     }
 
-    private static void addPvdPlans(List<StrategyPlan> plans,
-                                    ColumnMetadata column,
-                                    ColumnProfile profile,
-                                    StrategyConfig config) {
+    private void addPvdPlans(List<StrategyPlan> plans,
+                             ColumnMetadata column,
+                             ColumnProfile profile,
+                             StrategyConfig config) {
         Map<String, String> character = base(StrategyTypes.PVD_CHARACTER_SET);
-        character.put(StrategyConfigurationKeys.MINORITY_RATIO, DEFAULT_MINORITY_RATIO);
-        addPlan(plans, StrategyFamily.PVD, column, character, 200, config);
+        character.put(StrategyConfigurationKeys.MINORITY_RATIO,
+                formatDouble(generationConfig.getMinorityRatio()));
+        addPlan(plans, StrategyFamily.PVD, column, character,
+                generationConfig.getPvdCharacterSetPriority(), config);
 
         if (profile.getMinLength() >= 0 && profile.getMaxLength() > profile.getMinLength()) {
             Map<String, String> length = base(StrategyTypes.PVD_LENGTH);
-            length.put(StrategyConfigurationKeys.MINORITY_RATIO, DEFAULT_MINORITY_RATIO);
-            length.put(StrategyConfigurationKeys.IQR_MULTIPLIER, DEFAULT_IQR_MULTIPLIER);
-            addPlan(plans, StrategyFamily.PVD, column, length, 210, config);
+            length.put(StrategyConfigurationKeys.MINORITY_RATIO,
+                    formatDouble(generationConfig.getMinorityRatio()));
+            length.put(StrategyConfigurationKeys.IQR_MULTIPLIER,
+                    formatDouble(generationConfig.getIqrMultiplier()));
+            addPlan(plans, StrategyFamily.PVD, column, length,
+                    generationConfig.getPvdLengthPriority(), config);
         }
         addNullPlaceholderPlan(plans, column, profile, config);
 
         Map<String, String> typeFormat = base(StrategyTypes.PVD_TYPE_FORMAT);
-        typeFormat.put(StrategyConfigurationKeys.MINORITY_RATIO, DEFAULT_MINORITY_RATIO);
-        typeFormat.put(StrategyConfigurationKeys.FORMAT_TYPE, "AUTO");
-        typeFormat.put(StrategyConfigurationKeys.FORMAT_MIN_RATIO, DEFAULT_FORMAT_MIN_RATIO);
-        addPlan(plans, StrategyFamily.PVD, column, typeFormat, 230, config);
+        typeFormat.put(StrategyConfigurationKeys.MINORITY_RATIO,
+                formatDouble(generationConfig.getMinorityRatio()));
+        typeFormat.put(StrategyConfigurationKeys.FORMAT_TYPE,
+                generationConfig.getFormatType());
+        typeFormat.put(StrategyConfigurationKeys.FORMAT_MIN_RATIO,
+                formatDouble(generationConfig.getFormatMinRatio()));
+        addPlan(plans, StrategyFamily.PVD, column, typeFormat,
+                generationConfig.getPvdTypeFormatPriority(), config);
     }
 
-    private static void addNullPlaceholderPlan(List<StrategyPlan> plans,
-                                               ColumnMetadata column,
-                                               ColumnProfile profile,
-                                               StrategyConfig config) {
+    private void addNullPlaceholderPlan(List<StrategyPlan> plans,
+                                        ColumnMetadata column,
+                                        ColumnProfile profile,
+                                        StrategyConfig config) {
         if (!config.getStrategyFamilies().contains(StrategyFamily.PVD)
                 || profile == null || profile.getTotalCount() == 0L) {
             return;
         }
         Map<String, String> nullPlaceholder = base(StrategyTypes.PVD_NULL_PLACEHOLDER);
-        nullPlaceholder.put(StrategyConfigurationKeys.PLACEHOLDERS, DEFAULT_PLACEHOLDERS);
-        addPlan(plans, StrategyFamily.PVD, column, nullPlaceholder, 220, config);
+        nullPlaceholder.put(StrategyConfigurationKeys.PLACEHOLDERS,
+                generationConfig.getPlaceholders());
+        addPlan(plans, StrategyFamily.PVD, column, nullPlaceholder,
+                generationConfig.getPvdNullPlaceholderPriority(), config);
     }
 
-    private static void addRvdPlans(List<StrategyPlan> plans,
-                                    RahaDataset dataset,
-                                    StrategyConfig config) {
+    private void addRvdPlans(List<StrategyPlan> plans,
+                             RahaDataset dataset,
+                             StrategyConfig config) {
         if (!isStrategyTypeEnabled(StrategyTypes.RVD_ONE_TO_MANY, config)) {
             return;
         }
@@ -184,7 +208,8 @@ public final class StrategyPlanGenerator {
                 Map<String, String> configuration = base(StrategyTypes.RVD_ONE_TO_MANY);
                 configuration.put(StrategyConfigurationKeys.LEFT_COLUMN, left.getName());
                 configuration.put(StrategyConfigurationKeys.RIGHT_COLUMN, right.getName());
-                addPairPlan(plans, left, right, configuration, 300, config);
+                addPairPlan(plans, left, right, configuration,
+                        generationConfig.getRvdOneToManyPriority(), config);
                 generated++;
             }
         }

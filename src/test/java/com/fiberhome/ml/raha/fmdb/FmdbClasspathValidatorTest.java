@@ -26,7 +26,6 @@ class FmdbClasspathValidatorTest {
         assertEquals(manifest.getRequiredJars().size(), validated.size());
         assertEquals("3.3.1", manifest.getSparkVersion());
         assertEquals("2.12", manifest.getScalaBinaryVersion());
-        assertEquals("lib", manifest.getSourceDirectory());
     }
 
     @Test
@@ -44,7 +43,7 @@ class FmdbClasspathValidatorTest {
     }
 
     @Test
-    void shouldRejectLib212AndIncompatibleScala() {
+    void shouldIgnoreJarDirectoryAndRejectIncompatibleScala() {
         FmdbClasspathManifest manifest = FmdbClasspathManifest.loadDefault();
         List<Path> ignoredDirectory = requiredPaths(manifest, "F:/runtime/lib/");
         ignoredDirectory.set(0, Paths.get("F:/runtime/lib2.12/"
@@ -52,10 +51,8 @@ class FmdbClasspathValidatorTest {
         List<Path> incompatible = requiredPaths(manifest, "F:/runtime/lib/");
         incompatible.add(Paths.get("F:/runtime/lib/spark-sql_2.13-4.0.0.jar"));
 
-        FmdbClasspathException directoryException = assertThrows(
-                FmdbClasspathException.class,
-                () -> new FmdbClasspathValidator(manifest).validate(ignoredDirectory));
-        assertTrue(directoryException.getMessage().contains("lib2.12"));
+        assertEquals(manifest.getRequiredJars().size(),
+                new FmdbClasspathValidator(manifest).validate(ignoredDirectory).size());
         assertThrows(FmdbClasspathException.class,
                 () -> new FmdbClasspathValidator(manifest).validate(incompatible));
     }

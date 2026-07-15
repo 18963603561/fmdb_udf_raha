@@ -19,7 +19,7 @@ public final class FailureToleranceConfig {
     }
 
     public static FailureToleranceConfig defaults() {
-        return new FailureToleranceConfig(false, 0.1d, 1);
+        return RahaDefaultConfigProvider.factory().failureToleranceConfig();
     }
 
     public boolean isFailFast() {

@@ -102,6 +102,30 @@ class StrategyPlanGeneratorTest {
         assertTrue(new StrategyPlanGenerator().generate(dataset, config).isEmpty());
     }
 
+    @Test
+    void shouldApplyInjectedGenerationThresholdsAndPriorities() {
+        StrategyGenerationConfig generationConfig = new StrategyGenerationConfig(
+                0.2d, 3, 4.5d, 4, 2.5d, 0.2d, "AUTO", 0.9d,
+                "NULL,N/A", 11, 12, 13, 21, 22, 23, 24, 31);
+
+        List<StrategyPlan> plans = new StrategyPlanGenerator(generationConfig)
+                .generate(dataset(false), StrategyConfig.defaults());
+        Map<String, StrategyPlan> byType = plansByType(plans);
+
+        assertEquals("20", byType.get(StrategyTypes.OD_LOW_FREQUENCY)
+                .getConfiguration().get(StrategyConfigurationKeys.MAX_FREQUENCY));
+        assertEquals("4.5", byType.get(StrategyTypes.OD_NUMERIC_DISTANCE)
+                .getConfiguration().get(StrategyConfigurationKeys.Z_THRESHOLD));
+        assertEquals("2.5", byType.get(StrategyTypes.OD_QUANTILE)
+                .getConfiguration().get(StrategyConfigurationKeys.IQR_MULTIPLIER));
+        assertEquals("0.2", byType.get(StrategyTypes.PVD_CHARACTER_SET)
+                .getConfiguration().get(StrategyConfigurationKeys.MINORITY_RATIO));
+        assertEquals("NULL,N/A", byType.get(StrategyTypes.PVD_NULL_PLACEHOLDER)
+                .getConfiguration().get(StrategyConfigurationKeys.PLACEHOLDERS));
+        assertEquals(11, byType.get(StrategyTypes.OD_LOW_FREQUENCY).getPriority());
+        assertEquals(24, byType.get(StrategyTypes.PVD_TYPE_FORMAT).getPriority());
+    }
+
     private static RahaDataset dataset(boolean reverseProfiles) {
         List<ColumnMetadata> columns = Arrays.asList(
                 new ColumnMetadata("id", 0, "string", false, false, false),
@@ -145,5 +169,14 @@ class StrategyPlanGeneratorTest {
             types.add(plan.getConfiguration().get(StrategyConfigurationKeys.STRATEGY_TYPE));
         }
         return types;
+    }
+
+    private static Map<String, StrategyPlan> plansByType(List<StrategyPlan> plans) {
+        Map<String, StrategyPlan> result = new LinkedHashMap<String, StrategyPlan>();
+        for (StrategyPlan plan : plans) {
+            result.put(plan.getConfiguration().get(
+                    StrategyConfigurationKeys.STRATEGY_TYPE), plan);
+        }
+        return result;
     }
 }

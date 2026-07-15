@@ -17,6 +17,8 @@ public final class FeatureConfig {
     private final boolean removeConstantFeatures;
     /** 单列允许保留的最大特征数量。 */
     private final int maxFeatureCount;
+    /** 判定列内稀有值的频率比例。 */
+    private final double rareValueRatio;
 
     public FeatureConfig(boolean trimValue,
                          boolean lowerCaseValue,
@@ -24,16 +26,29 @@ public final class FeatureConfig {
                          boolean contextFeaturesEnabled,
                          boolean removeConstantFeatures,
                          int maxFeatureCount) {
+        this(trimValue, lowerCaseValue, normalizeWidth, contextFeaturesEnabled,
+                removeConstantFeatures, maxFeatureCount,
+                RahaDefaultConfigProvider.factory().featureRareValueRatio());
+    }
+
+    public FeatureConfig(boolean trimValue,
+                         boolean lowerCaseValue,
+                         boolean normalizeWidth,
+                         boolean contextFeaturesEnabled,
+                         boolean removeConstantFeatures,
+                         int maxFeatureCount,
+                         double rareValueRatio) {
         this.trimValue = trimValue;
         this.lowerCaseValue = lowerCaseValue;
         this.normalizeWidth = normalizeWidth;
         this.contextFeaturesEnabled = contextFeaturesEnabled;
         this.removeConstantFeatures = removeConstantFeatures;
         this.maxFeatureCount = maxFeatureCount;
+        this.rareValueRatio = rareValueRatio;
     }
 
     public static FeatureConfig defaults() {
-        return new FeatureConfig(true, false, true, true, true, 10000);
+        return RahaDefaultConfigProvider.factory().featureConfig();
     }
 
     public boolean isTrimValue() {
@@ -60,12 +75,17 @@ public final class FeatureConfig {
         return maxFeatureCount;
     }
 
+    public double getRareValueRatio() {
+        return rareValueRatio;
+    }
+
     String toCanonicalString() {
         return ConfigTextUtils.token(trimValue)
                 + ConfigTextUtils.token(lowerCaseValue)
                 + ConfigTextUtils.token(normalizeWidth)
                 + ConfigTextUtils.token(contextFeaturesEnabled)
                 + ConfigTextUtils.token(removeConstantFeatures)
-                + ConfigTextUtils.token(maxFeatureCount);
+                + ConfigTextUtils.token(maxFeatureCount)
+                + ConfigTextUtils.token(rareValueRatio);
     }
 }

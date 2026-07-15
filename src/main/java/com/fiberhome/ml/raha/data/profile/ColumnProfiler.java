@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.data.profile;
 
+import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.data.ColumnMetadata;
 import com.fiberhome.ml.raha.data.ColumnProfile;
 import com.fiberhome.ml.raha.data.RahaDataset;
@@ -36,7 +37,11 @@ public final class ColumnProfiler {
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(ColumnProfiler.class);
     /** 单列最多采集的高频值哈希数量。 */
-    private static final int MAX_VALUE_FREQUENCY_COUNT = 20;
+    private static final int MAX_VALUE_FREQUENCY_COUNT =
+            RahaDefaultConfigProvider.factory().profileMaxValueFrequencyCount();
+    /** Spark 近似分位数计算精度。 */
+    private static final int QUANTILE_ACCURACY =
+            RahaDefaultConfigProvider.factory().profileQuantileAccuracy();
     /** 支持整数和小数的数值文本模式。 */
     private static final String NUMERIC_PATTERN = "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)$";
     /** 整数文本模式。 */
@@ -94,7 +99,8 @@ public final class ColumnProfiler {
                 max(col("numeric_value")).alias("numeric_max"),
                 avg(col("numeric_value")).alias("numeric_mean"),
                 expr("stddev_pop(numeric_value)").alias("numeric_stddev"),
-                expr("percentile_approx(numeric_value, array(0.25, 0.5, 0.75), 10000)")
+                expr("percentile_approx(numeric_value, array(0.25, 0.5, 0.75), "
+                        + QUANTILE_ACCURACY + ")")
                         .alias("numeric_quantiles"),
                 sum(countWhen(matches("text_value", INTEGER_PATTERN))).alias("integer_count"),
                 sum(countWhen(matches("text_value", NUMERIC_PATTERN)

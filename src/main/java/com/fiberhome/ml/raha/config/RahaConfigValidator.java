@@ -24,6 +24,8 @@ public final class RahaConfigValidator {
         requireNotBlank(config.getDatasetId(), ConfigErrorCode.DATASET_ID_REQUIRED, "数据集标识不能为空");
         requireNotBlank(config.getInputReference(), ConfigErrorCode.INPUT_REFERENCE_REQUIRED, "输入数据引用不能为空");
         requireNotBlank(config.getRowIdColumn(), ConfigErrorCode.ROW_ID_COLUMN_REQUIRED, "行标识字段不能为空");
+        requireNotBlank(config.getExecutionConfigFingerprint(),
+                ConfigErrorCode.CONFIG_REQUIRED, "执行配置指纹不能为空");
         if (config.getResultRetentionDays() <= 0) {
             fail(ConfigErrorCode.RESULT_RETENTION_INVALID, "结果保留天数必须大于 0");
         }
@@ -79,8 +81,12 @@ public final class RahaConfigValidator {
     }
 
     private void validateFeature(FeatureConfig config) {
-        if (config == null || config.getMaxFeatureCount() <= 0) {
-            fail(ConfigErrorCode.FEATURE_CONFIG_INVALID, "特征配置不能为空，最大特征数量必须大于 0");
+        if (config == null || config.getMaxFeatureCount() <= 0
+                || Double.isNaN(config.getRareValueRatio())
+                || config.getRareValueRatio() < 0.0d
+                || config.getRareValueRatio() > 1.0d) {
+            fail(ConfigErrorCode.FEATURE_CONFIG_INVALID,
+                    "特征配置不能为空，最大特征数量和稀有值比例必须有效");
         }
     }
 
@@ -105,6 +111,20 @@ public final class RahaConfigValidator {
                     || entry.getValue() > 1.0d) {
                 fail(ConfigErrorCode.MODEL_THRESHOLD_INVALID,
                         "策略族可靠度权重必须位于 0 到 1 之间");
+            }
+        }
+        double[] scoringWeights = new double[]{
+                config.getDefaultStrategyFamilyWeight(),
+                config.getRareContextSignalWeight(),
+                config.getRvdConflictContextSignalWeight(),
+                config.getNullContextSignalWeight(),
+                config.getBlankContextSignalWeight(),
+                config.getMixedContextSignalWeight()};
+        for (double scoringWeight : scoringWeights) {
+            if (Double.isNaN(scoringWeight) || scoringWeight < 0.0d
+                    || scoringWeight > 1.0d) {
+                fail(ConfigErrorCode.MODEL_THRESHOLD_INVALID,
+                        "规则评分权重必须位于 0 到 1 之间");
             }
         }
     }
@@ -138,9 +158,11 @@ public final class RahaConfigValidator {
 
     private void validateSampling(SamplingConfig config) {
         if (config == null || config.getLabelingBudget() <= 0
-                || config.getTaskTtlMillis() <= 0L) {
+                || config.getTaskTtlMillis() <= 0L
+                || Double.isNaN(config.getCoverageScoreExponentCap())
+                || config.getCoverageScoreExponentCap() <= 0.0d) {
             fail(ConfigErrorCode.SAMPLING_CONFIG_INVALID,
-                    "采样预算和标注任务有效期必须大于 0");
+                    "采样预算、标注任务有效期和覆盖分数上限必须大于 0");
         }
     }
 

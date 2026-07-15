@@ -50,12 +50,6 @@ public final class FmdbClasspathValidator {
             if (path == null || path.getFileName() == null) {
                 throw new FmdbClasspathException("FMDB jar 路径不能包含空值");
             }
-            String normalizedPath = path.toString().replace('\\', '/');
-            // lib2.12 明确不属于本工程依赖来源，防止 Spark 4 和 Scala 2.13 混入。
-            if (containsDirectory(normalizedPath, manifest.getIgnoredDirectory())) {
-                throw new FmdbClasspathException("禁止从 "
-                        + manifest.getIgnoredDirectory() + " 加载依赖");
-            }
             String fileName = ValueUtils.requireNotBlank(
                     path.getFileName().toString(), "FMDB jar 文件名");
             if (!fileNames.add(fileName)) {
@@ -111,11 +105,6 @@ public final class FmdbClasspathValidator {
                 throw new FmdbClasspathException("FMDB classpath 同时包含互斥组件：" + matched);
             }
         }
-    }
-
-    private static boolean containsDirectory(String normalizedPath, String directory) {
-        return normalizedPath.startsWith(directory + "/")
-                || normalizedPath.contains("/" + directory + "/");
     }
 
     private static String componentName(String fileName) {

@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.udf;
 
+import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.service.RahaTaskType;
 import com.fiberhome.ml.raha.util.FormDataCodec;
@@ -18,7 +19,7 @@ public final class RahaUdfRequestParser implements Serializable {
     /** Java 序列化版本。 */
     private static final long serialVersionUID = 1L;
     /** 单次 UDF 请求允许的最大字符数。 */
-    private static final int MAX_REQUEST_LENGTH = 65536;
+    private final int maxRequestLength;
 
     /** 所有允许的请求字段。 */
     private static final Set<String> ALLOWED_KEYS = new LinkedHashSet<String>(Arrays.asList(
@@ -26,8 +27,19 @@ public final class RahaUdfRequestParser implements Serializable {
             "idempotencyKey", "caller", "resultTable", "annotationReference",
             "modelVersion", "labelingBudget"));
 
+    public RahaUdfRequestParser() {
+        this(RahaDefaultConfigProvider.factory().udfConfig().getMaxRequestLength());
+    }
+
+    public RahaUdfRequestParser(int maxRequestLength) {
+        if (maxRequestLength <= 0) {
+            throw new IllegalArgumentException("UDF 请求长度上限必须大于 0");
+        }
+        this.maxRequestLength = maxRequestLength;
+    }
+
     public RahaUdfRequest parse(RahaTaskType taskType, String encodedRequest) {
-        if (encodedRequest != null && encodedRequest.length() > MAX_REQUEST_LENGTH) {
+        if (encodedRequest != null && encodedRequest.length() > maxRequestLength) {
             throw new RahaUdfException("INVALID_UDF_ARGUMENT",
                     "UDF 请求长度超过上限");
         }

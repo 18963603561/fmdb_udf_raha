@@ -22,9 +22,23 @@ public final class ModelConfig {
     private final Map<StrategyFamily, Double> strategyFamilyWeights;
     /** 上下文异常信号的最大融合权重。 */
     private final double contextWeight;
+    /** 未明确配置策略族时使用的默认可靠度权重。 */
+    private final double defaultStrategyFamilyWeight;
+    /** 稀有值上下文信号权重。 */
+    private final double rareContextSignalWeight;
+    /** RVD 冲突上下文信号权重。 */
+    private final double rvdConflictContextSignalWeight;
+    /** 空值上下文信号权重。 */
+    private final double nullContextSignalWeight;
+    /** 空白值上下文信号权重。 */
+    private final double blankContextSignalWeight;
+    /** 混合类型上下文信号权重。 */
+    private final double mixedContextSignalWeight;
 
     public ModelConfig(ClassifierType classifierType, double threshold, boolean fallbackEnabled) {
-        this(classifierType, threshold, fallbackEnabled, defaultWeights(), 0.2d);
+        this(classifierType, threshold, fallbackEnabled,
+                RahaDefaultConfigProvider.factory().modelStrategyFamilyWeights(),
+                RahaDefaultConfigProvider.factory().modelContextWeight());
     }
 
     public ModelConfig(ClassifierType classifierType,
@@ -32,6 +46,27 @@ public final class ModelConfig {
                        boolean fallbackEnabled,
                        Map<StrategyFamily, Double> strategyFamilyWeights,
                        double contextWeight) {
+        this(classifierType, threshold, fallbackEnabled, strategyFamilyWeights,
+                contextWeight,
+                RahaDefaultConfigProvider.factory().modelDefaultStrategyFamilyWeight(),
+                RahaDefaultConfigProvider.factory().modelRareContextSignalWeight(),
+                RahaDefaultConfigProvider.factory().modelRvdConflictContextSignalWeight(),
+                RahaDefaultConfigProvider.factory().modelNullContextSignalWeight(),
+                RahaDefaultConfigProvider.factory().modelBlankContextSignalWeight(),
+                RahaDefaultConfigProvider.factory().modelMixedContextSignalWeight());
+    }
+
+    public ModelConfig(ClassifierType classifierType,
+                       double threshold,
+                       boolean fallbackEnabled,
+                       Map<StrategyFamily, Double> strategyFamilyWeights,
+                       double contextWeight,
+                       double defaultStrategyFamilyWeight,
+                       double rareContextSignalWeight,
+                       double rvdConflictContextSignalWeight,
+                       double nullContextSignalWeight,
+                       double blankContextSignalWeight,
+                       double mixedContextSignalWeight) {
         this.classifierType = classifierType;
         this.threshold = threshold;
         this.fallbackEnabled = fallbackEnabled;
@@ -42,10 +77,16 @@ public final class ModelConfig {
         }
         this.strategyFamilyWeights = Collections.unmodifiableMap(weights);
         this.contextWeight = contextWeight;
+        this.defaultStrategyFamilyWeight = defaultStrategyFamilyWeight;
+        this.rareContextSignalWeight = rareContextSignalWeight;
+        this.rvdConflictContextSignalWeight = rvdConflictContextSignalWeight;
+        this.nullContextSignalWeight = nullContextSignalWeight;
+        this.blankContextSignalWeight = blankContextSignalWeight;
+        this.mixedContextSignalWeight = mixedContextSignalWeight;
     }
 
     public static ModelConfig defaults() {
-        return new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, true);
+        return RahaDefaultConfigProvider.factory().modelConfig();
     }
 
     public ClassifierType getClassifierType() {
@@ -68,22 +109,27 @@ public final class ModelConfig {
         return contextWeight;
     }
 
+    public double getDefaultStrategyFamilyWeight() { return defaultStrategyFamilyWeight; }
+    public double getRareContextSignalWeight() { return rareContextSignalWeight; }
+    public double getRvdConflictContextSignalWeight() {
+        return rvdConflictContextSignalWeight;
+    }
+    public double getNullContextSignalWeight() { return nullContextSignalWeight; }
+    public double getBlankContextSignalWeight() { return blankContextSignalWeight; }
+    public double getMixedContextSignalWeight() { return mixedContextSignalWeight; }
+
     String toCanonicalString() {
         return ConfigTextUtils.token(classifierType)
                 + ConfigTextUtils.token(threshold)
                 + ConfigTextUtils.token(fallbackEnabled)
                 + ConfigTextUtils.sortedMapTokens(strategyFamilyWeights)
-                + ConfigTextUtils.token(contextWeight);
+                + ConfigTextUtils.token(contextWeight)
+                + ConfigTextUtils.token(defaultStrategyFamilyWeight)
+                + ConfigTextUtils.token(rareContextSignalWeight)
+                + ConfigTextUtils.token(rvdConflictContextSignalWeight)
+                + ConfigTextUtils.token(nullContextSignalWeight)
+                + ConfigTextUtils.token(blankContextSignalWeight)
+                + ConfigTextUtils.token(mixedContextSignalWeight);
     }
 
-    private static Map<StrategyFamily, Double> defaultWeights() {
-        Map<StrategyFamily, Double> weights =
-                new EnumMap<StrategyFamily, Double>(StrategyFamily.class);
-        weights.put(StrategyFamily.OD, 0.8d);
-        weights.put(StrategyFamily.PVD, 0.7d);
-        weights.put(StrategyFamily.RVD, 1.0d);
-        weights.put(StrategyFamily.KBVD, 1.0d);
-        weights.put(StrategyFamily.TFIDF, 0.5d);
-        return weights;
-    }
 }

@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.sampling;
 
 import com.fiberhome.ml.raha.cluster.ClusterAssignment;
+import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.data.LabelSource;
 import com.fiberhome.ml.raha.label.CellLabel;
 
@@ -29,8 +30,19 @@ public final class ClusterCoverageScorer {
     public List<TupleSamplingScore> score(List<ClusterAssignment> assignments,
                                           List<CellLabel> labels,
                                           Set<String> excludedRowIds) {
+        return score(assignments, labels, excludedRowIds,
+                RahaDefaultConfigProvider.factory().samplingCoverageScoreExponentCap());
+    }
+
+    public List<TupleSamplingScore> score(List<ClusterAssignment> assignments,
+                                          List<CellLabel> labels,
+                                          Set<String> excludedRowIds,
+                                          double exponentCap) {
         if (assignments == null || labels == null || excludedRowIds == null) {
             throw new IllegalArgumentException("聚类覆盖评分参数不能为空");
+        }
+        if (Double.isNaN(exponentCap) || exponentCap <= 0.0d) {
+            throw new IllegalArgumentException("聚类覆盖指数上限必须大于 0");
         }
         Map<String, ClusterAssignment> assignmentsByCell =
                 new HashMap<String, ClusterAssignment>();
@@ -83,7 +95,7 @@ public final class ClusterCoverageScorer {
                 contributions.put(assignment.getColumnName(), contribution);
             }
             // 对累积覆盖再次指数放大，与 Python demo 的 tuple_score 语义保持一致。
-            double score = Math.exp(Math.min(20.0d, coverageScore));
+            double score = Math.exp(Math.min(exponentCap, coverageScore));
             scores.add(new TupleSamplingScore(entry.getKey(), score, coverageScore,
                     coveredClusters, contributions));
         }

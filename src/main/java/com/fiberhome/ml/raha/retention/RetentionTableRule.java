@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.retention;
 
+import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.fmdb.SparkSqlFmdbTableGateway;
 
 /**
@@ -15,6 +16,11 @@ public final class RetentionTableRule {
     private final String timestampColumn;
     /** 数据保留天数。 */
     private final int retentionDays;
+
+    public RetentionTableRule(String tableName, String timestampColumn) {
+        this(tableName, timestampColumn,
+                RahaDefaultConfigProvider.factory().intermediateRetentionDays());
+    }
 
     public RetentionTableRule(String tableName,
                               String timestampColumn,

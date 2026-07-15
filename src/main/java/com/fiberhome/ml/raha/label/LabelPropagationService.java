@@ -219,7 +219,7 @@ public final class LabelPropagationService {
             double confidence = decision.majorityRatio == null
                     ? 1.0d : decision.majorityRatio;
             double weight = Math.min(config.getPropagatedWeight() * confidence,
-                    decision.minDirectWeight * 0.5d);
+                    decision.minDirectWeight * config.getMaxDirectWeightRatio());
             String labelId = HashUtils.sha256Hex(member.getCellId() + "|"
                     + member.getClusterVersion() + "|" + member.getClusterId()
                     + "|" + method.name() + "|" + sourceFingerprint);

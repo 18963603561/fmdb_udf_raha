@@ -83,7 +83,8 @@ public final class SamplingService {
         Set<String> excludedRowIds = excludedRows(assignments, labels,
                 existingTasks, config.isReviewEnabled());
         List<TupleSamplingScore> coverageScores = scorer.score(
-                assignments, labels, excludedRowIds);
+                assignments, labels, excludedRowIds,
+                config.getCoverageScoreExponentCap());
         List<TupleSamplingScore> effectiveScores = config.isClusteringBasedSampling()
                 ? coverageScores : uniformScores(coverageScores);
         List<TupleSamplingScore> selected = sampler.select(effectiveScores,

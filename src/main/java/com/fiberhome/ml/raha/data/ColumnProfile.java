@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.data;
 
+import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.util.ValueUtils;
 
 import java.util.Collections;
@@ -12,7 +13,8 @@ import java.util.Map;
 public final class ColumnProfile {
 
     /** 单列最多保存的高频值哈希数量，避免高基数字段占用过多内存。 */
-    private static final int MAX_VALUE_FREQUENCY_COUNT = 20;
+    private static final int MAX_VALUE_FREQUENCY_COUNT =
+            RahaDefaultConfigProvider.factory().profileMaxValueFrequencyCount();
     /** 画像对应的字段名称。 */
     private final String columnName;
     /** 字段总单元格数量。 */
@@ -186,7 +188,8 @@ public final class ColumnProfile {
                 ? Collections.<String, Long>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, Long>(valueHashFrequencies));
         if (this.valueHashFrequencies.size() > MAX_VALUE_FREQUENCY_COUNT) {
-            throw new IllegalArgumentException("列画像高频值摘要不能超过 20 项");
+            throw new IllegalArgumentException("列画像高频值摘要不能超过配置上限："
+                    + MAX_VALUE_FREQUENCY_COUNT);
         }
         for (Map.Entry<String, Long> entry : this.valueHashFrequencies.entrySet()) {
             // 频率摘要只能保存值哈希，禁止原始敏感值进入画像对象。

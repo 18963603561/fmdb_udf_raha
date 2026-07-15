@@ -84,7 +84,7 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
                                     FmdbTableGateway tableGateway,
                                     Clock clock) {
         this(sparkSession, tableGateway, clock,
-                ResultValueProtectionPolicy.preserveExistingMaskedValue());
+                ResultValueProtectionPolicy.configuredDefaults());
     }
 
     public SparkSqlFmdbResultWriter(SparkSession sparkSession,

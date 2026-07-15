@@ -79,9 +79,7 @@ public final class StrategyConfig {
      * @return 默认策略配置
      */
     public static StrategyConfig defaults() {
-        return new StrategyConfig(EnumSet.of(StrategyFamily.OD, StrategyFamily.PVD, StrategyFamily.RVD),
-                1000, Collections.<String>emptySet(), Collections.<String>emptySet(),
-                500, 300000L, false);
+        return RahaDefaultConfigProvider.factory().strategyConfig();
     }
 
     public Set<StrategyFamily> getStrategyFamilies() {

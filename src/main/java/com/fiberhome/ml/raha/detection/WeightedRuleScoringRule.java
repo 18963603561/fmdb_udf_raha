@@ -32,7 +32,8 @@ public final class WeightedRuleScoringRule implements DetectionScoringRule {
         for (StrategyHit hit : hits) {
             double reliability = hit.getStrategyScore() == null ? 1.0d : hit.getStrategyScore();
             double familyWeight = config.getStrategyFamilyWeights().containsKey(hit.getStrategyFamily())
-                    ? config.getStrategyFamilyWeights().get(hit.getStrategyFamily()) : 0.5d;
+                    ? config.getStrategyFamilyWeights().get(hit.getStrategyFamily())
+                    : config.getDefaultStrategyFamilyWeight();
             double signal = bounded(reliability * familyWeight);
             Double existing = strongestByStrategy.get(hit.getStrategyId());
             if (existing == null || signal > existing) {
@@ -48,7 +49,7 @@ public final class WeightedRuleScoringRule implements DetectionScoringRule {
         }
         double strategyScore = bounded(1.0d - strategyComplement);
         Map<String, Double> featureValues = featureValues(row, dictionary);
-        double contextSignal = contextSignal(featureValues);
+        double contextSignal = contextSignal(featureValues, config);
         double contextContribution = bounded(config.getContextWeight() * contextSignal);
         double score = bounded(1.0d - (1.0d - strategyScore) * (1.0d - contextContribution));
         return new DetectionScore(score, strategyScore, contextSignal, familySignals);
@@ -65,13 +66,19 @@ public final class WeightedRuleScoringRule implements DetectionScoringRule {
         return values;
     }
 
-    private static double contextSignal(Map<String, Double> values) {
+    private static double contextSignal(Map<String, Double> values,
+                                        ModelConfig config) {
         double signal = 0.0d;
-        signal = Math.max(signal, binary(values, "context.column.frequency_bucket.rare"));
-        signal = Math.max(signal, positive(values, "context.neighbor.rvd.conflict_count"));
-        signal = Math.max(signal, 0.5d * binary(values, "context.value.is_null"));
-        signal = Math.max(signal, 0.5d * binary(values, "context.value.is_blank"));
-        signal = Math.max(signal, 0.5d * binary(values, "context.value.type.mixed"));
+        signal = Math.max(signal, config.getRareContextSignalWeight()
+                * binary(values, "context.column.frequency_bucket.rare"));
+        signal = Math.max(signal, config.getRvdConflictContextSignalWeight()
+                * positive(values, "context.neighbor.rvd.conflict_count"));
+        signal = Math.max(signal, config.getNullContextSignalWeight()
+                * binary(values, "context.value.is_null"));
+        signal = Math.max(signal, config.getBlankContextSignalWeight()
+                * binary(values, "context.value.is_blank"));
+        signal = Math.max(signal, config.getMixedContextSignalWeight()
+                * binary(values, "context.value.type.mixed"));
         return bounded(signal);
     }
 

@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.security;
 
+import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.data.DetectionResult;
 import com.fiberhome.ml.raha.util.ValueProtectionUtils;
 
@@ -50,6 +51,20 @@ public final class ResultValueProtectionPolicy {
                 Collections.<String>emptySet(), ResultValueMode.HASH_ONLY, 0, 0);
     }
 
+    public static ResultValueProtectionPolicy configuredDefaults() {
+        return RahaDefaultConfigProvider.factory().resultValueProtectionPolicy();
+    }
+
+    /**
+     * 根据当前模式保护一个敏感原始展示值，仅哈希模式返回空。
+     */
+    public String protectedRawValue(String rawValue) {
+        if (mode == ResultValueMode.HASH_ONLY || rawValue == null) {
+            return null;
+        }
+        return ValueProtectionUtils.mask(rawValue, visiblePrefix, visibleSuffix);
+    }
+
     /**
      * 返回允许落库的展示值，原始值不在本策略对象中传播。
      */
@@ -62,13 +77,13 @@ public final class ResultValueProtectionPolicy {
         if (!sensitive) {
             return result.getMaskedValue();
         }
-        if (mode == ResultValueMode.HASH_ONLY || result.getMaskedValue() == null) {
-            return null;
-        }
         // 对上游展示值再次脱敏，防止调用方误将完整原值写入 maskedValue 字段。
-        return ValueProtectionUtils.mask(
-                result.getMaskedValue(), visiblePrefix, visibleSuffix);
+        return protectedRawValue(result.getMaskedValue());
     }
 
     public ResultValueMode getMode() { return mode; }
+    public boolean isAllColumnsSensitive() { return allColumnsSensitive; }
+    public Set<String> getSensitiveColumns() { return sensitiveColumns; }
+    public int getVisiblePrefix() { return visiblePrefix; }
+    public int getVisibleSuffix() { return visibleSuffix; }
 }

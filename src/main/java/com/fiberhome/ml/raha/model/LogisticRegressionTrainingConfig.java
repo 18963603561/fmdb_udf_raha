@@ -1,5 +1,7 @@
 package com.fiberhome.ml.raha.model;
 
+import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
+
 /**
  * 控制逻辑回归迭代次数、正则化和类别平衡行为。
  */
@@ -30,7 +32,7 @@ public final class LogisticRegressionTrainingConfig {
     }
 
     public static LogisticRegressionTrainingConfig defaults() {
-        return new LogisticRegressionTrainingConfig(true, 100, 0.0d, 0.0d);
+        return RahaDefaultConfigProvider.factory().logisticRegressionTrainingConfig();
     }
 
     public boolean isClassBalanceEnabled() { return classBalanceEnabled; }

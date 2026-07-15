@@ -37,6 +37,8 @@ public final class RahaJobConfig {
     private final ResourceConfig resourceConfig;
     /** 失败容忍和重试配置。 */
     private final FailureToleranceConfig failureToleranceConfig;
+    /** 影响执行语义的资源配置指纹。 */
+    private final String executionConfigFingerprint;
 
     public RahaJobConfig(JobType jobType,
                          String datasetId,
@@ -73,6 +75,29 @@ public final class RahaJobConfig {
                          SamplingConfig samplingConfig,
                          ResourceConfig resourceConfig,
                          FailureToleranceConfig failureToleranceConfig) {
+        this(jobType, datasetId, snapshotId, inputReference, rowIdColumn,
+                saveIntermediate, randomSeed, resultRetentionDays,
+                strategyConfig, featureConfig, modelConfig, clusteringConfig,
+                samplingConfig, resourceConfig, failureToleranceConfig,
+                RahaDefaultConfigProvider.factory().executionFingerprint());
+    }
+
+    public RahaJobConfig(JobType jobType,
+                         String datasetId,
+                         String snapshotId,
+                         String inputReference,
+                         String rowIdColumn,
+                         boolean saveIntermediate,
+                         long randomSeed,
+                         int resultRetentionDays,
+                         StrategyConfig strategyConfig,
+                         FeatureConfig featureConfig,
+                         ModelConfig modelConfig,
+                         ClusteringConfig clusteringConfig,
+                         SamplingConfig samplingConfig,
+                         ResourceConfig resourceConfig,
+                         FailureToleranceConfig failureToleranceConfig,
+                         String executionConfigFingerprint) {
         this.jobType = jobType;
         this.datasetId = datasetId;
         this.snapshotId = snapshotId;
@@ -88,6 +113,7 @@ public final class RahaJobConfig {
         this.samplingConfig = samplingConfig;
         this.resourceConfig = resourceConfig;
         this.failureToleranceConfig = failureToleranceConfig;
+        this.executionConfigFingerprint = executionConfigFingerprint;
     }
 
     /**
@@ -103,9 +129,8 @@ public final class RahaJobConfig {
                                          String datasetId,
                                          String inputReference,
                                          String rowIdColumn) {
-        return new RahaJobConfig(jobType, datasetId, null, inputReference, rowIdColumn,
-                false, 20260714L, 30, StrategyConfig.defaults(), FeatureConfig.defaults(),
-                ModelConfig.defaults(), ResourceConfig.defaults(), FailureToleranceConfig.defaults());
+        return RahaDefaultConfigProvider.factory().jobConfig(
+                jobType, datasetId, inputReference, rowIdColumn);
     }
 
     public JobType getJobType() {
@@ -168,6 +193,10 @@ public final class RahaJobConfig {
         return failureToleranceConfig;
     }
 
+    public String getExecutionConfigFingerprint() {
+        return executionConfigFingerprint;
+    }
+
     String toCanonicalString() {
         return ConfigTextUtils.token(jobType)
                 + ConfigTextUtils.token(datasetId)
@@ -186,6 +215,7 @@ public final class RahaJobConfig {
                 ? null : samplingConfig.toCanonicalString())
                 + ConfigTextUtils.token(resourceConfig == null ? null : resourceConfig.toCanonicalString())
                 + ConfigTextUtils.token(failureToleranceConfig == null
-                ? null : failureToleranceConfig.toCanonicalString());
+                ? null : failureToleranceConfig.toCanonicalString())
+                + ConfigTextUtils.token(executionConfigFingerprint);
     }
 }

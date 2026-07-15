@@ -13,19 +13,31 @@ public final class SamplingConfig {
     private final boolean reviewEnabled;
     /** 待标注任务有效期，单位毫秒。 */
     private final long taskTtlMillis;
+    /** 聚类覆盖累计分数进入指数函数前的上限。 */
+    private final double coverageScoreExponentCap;
 
     public SamplingConfig(int labelingBudget,
                           boolean clusteringBasedSampling,
                           boolean reviewEnabled,
                           long taskTtlMillis) {
+        this(labelingBudget, clusteringBasedSampling, reviewEnabled, taskTtlMillis,
+                RahaDefaultConfigProvider.factory().samplingCoverageScoreExponentCap());
+    }
+
+    public SamplingConfig(int labelingBudget,
+                          boolean clusteringBasedSampling,
+                          boolean reviewEnabled,
+                          long taskTtlMillis,
+                          double coverageScoreExponentCap) {
         this.labelingBudget = labelingBudget;
         this.clusteringBasedSampling = clusteringBasedSampling;
         this.reviewEnabled = reviewEnabled;
         this.taskTtlMillis = taskTtlMillis;
+        this.coverageScoreExponentCap = coverageScoreExponentCap;
     }
 
     public static SamplingConfig defaults() {
-        return new SamplingConfig(20, true, false, 7L * 24L * 60L * 60L * 1000L);
+        return RahaDefaultConfigProvider.factory().samplingConfig();
     }
 
     public int getLabelingBudget() {
@@ -44,10 +56,15 @@ public final class SamplingConfig {
         return taskTtlMillis;
     }
 
+    public double getCoverageScoreExponentCap() {
+        return coverageScoreExponentCap;
+    }
+
     String toCanonicalString() {
         return ConfigTextUtils.token(labelingBudget)
                 + ConfigTextUtils.token(clusteringBasedSampling)
                 + ConfigTextUtils.token(reviewEnabled)
-                + ConfigTextUtils.token(taskTtlMillis);
+                + ConfigTextUtils.token(taskTtlMillis)
+                + ConfigTextUtils.token(coverageScoreExponentCap);
     }
 }

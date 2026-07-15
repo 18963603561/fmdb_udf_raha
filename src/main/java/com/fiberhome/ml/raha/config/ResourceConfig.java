@@ -24,7 +24,9 @@ public final class ResourceConfig {
                           String cacheStorageLevel,
                           long stageTimeoutMillis) {
         this(maxParallelStrategies, maxParallelColumns, broadcastThresholdBytes,
-                cacheStorageLevel, 512L * 1024L * 1024L, stageTimeoutMillis);
+                cacheStorageLevel,
+                RahaDefaultConfigProvider.factory().resourceCacheThresholdBytes(),
+                stageTimeoutMillis);
     }
 
     public ResourceConfig(int maxParallelStrategies,
@@ -42,8 +44,7 @@ public final class ResourceConfig {
     }
 
     public static ResourceConfig defaults() {
-        return new ResourceConfig(4, 4, 10L * 1024L * 1024L,
-                "MEMORY_AND_DISK", 512L * 1024L * 1024L, 1800000L);
+        return RahaDefaultConfigProvider.factory().resourceConfig();
     }
 
     public int getMaxParallelStrategies() {

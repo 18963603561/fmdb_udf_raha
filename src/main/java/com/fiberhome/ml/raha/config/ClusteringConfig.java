@@ -23,7 +23,7 @@ public final class ClusteringConfig {
     }
 
     public static ClusteringConfig defaults() {
-        return new ClusteringConfig(ClusteringDistanceMetric.COSINE, 2, 500);
+        return RahaDefaultConfigProvider.factory().clusteringConfig();
     }
 
     public ClusteringDistanceMetric getDistanceMetric() {
