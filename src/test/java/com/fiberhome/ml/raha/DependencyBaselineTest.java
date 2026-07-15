@@ -33,5 +33,7 @@ class DependencyBaselineTest {
         assertEquals("2.12", properties.getProperty("scala.binary.version"));
         assertEquals("confirmed", properties.getProperty("mllib.status"));
         assertEquals("spark-mllib_2.12", properties.getProperty("mllib.artifact"));
+        assertEquals("confirmed", properties.getProperty("fmdb.status"));
+        assertEquals("provided", properties.getProperty("fmdb.dependency.scope"));
     }
 }

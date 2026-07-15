@@ -1,6 +1,8 @@
 package com.fiberhome.ml.raha.fmdb;
 
 import com.fiberhome.ml.raha.util.ValueUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,6 +18,9 @@ import java.util.Set;
  */
 public final class FmdbClasspathManifest {
 
+    /** 日志记录器。 */
+    private static final Logger LOGGER = LoggerFactory.getLogger(
+            FmdbClasspathManifest.class);
     /** 默认 classpath 清单资源。 */
     private static final String DEFAULT_RESOURCE = "raha-fmdb-classpath.properties";
     /** Spark 版本。 */
@@ -59,6 +64,8 @@ public final class FmdbClasspathManifest {
             properties.load(input);
             return new FmdbClasspathManifest(properties);
         } catch (IOException exception) {
+            LOGGER.error("读取 FMDB classpath 清单失败，resource={}",
+                    DEFAULT_RESOURCE, exception);
             throw new FmdbClasspathException("读取 FMDB classpath 清单失败："
                     + exception.getClass().getSimpleName());
         }

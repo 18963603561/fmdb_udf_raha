@@ -1,8 +1,18 @@
 package com.fiberhome.ml.raha.model;
 
+import com.fiberhome.ml.raha.audit.RahaAuditAction;
+import com.fiberhome.ml.raha.audit.RahaAuditService;
+import com.fiberhome.ml.raha.audit.RahaAuditStatus;
 import com.fiberhome.ml.raha.data.ModelStatus;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
 import com.fiberhome.ml.raha.repository.ModelMetadataRepository;
+import com.fiberhome.ml.raha.security.AllowAllRahaPermissionChecker;
+import com.fiberhome.ml.raha.security.RahaAccessController;
+import com.fiberhome.ml.raha.security.RahaAccessDeniedException;
+import com.fiberhome.ml.raha.security.RahaPermissionAction;
+import com.fiberhome.ml.raha.security.RahaPermissionChecker;
+import com.fiberhome.ml.raha.security.RahaPermissionRequest;
+import com.fiberhome.ml.raha.security.RahaResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,13 +33,28 @@ public final class ModelReleaseManager {
     private final ModelMetadataRepository repository;
     /** 提供可测试状态更新时间的时钟。 */
     private final Clock clock;
+    /** 模型操作访问控制器。 */
+    private final RahaAccessController accessController;
+    /** 模型生命周期审计服务。 */
+    private final RahaAuditService auditService;
 
     public ModelReleaseManager(ModelMetadataRepository repository, Clock clock) {
-        if (repository == null || clock == null) {
+        this(repository, clock, AllowAllRahaPermissionChecker.getInstance(),
+                RahaAuditService.noOp(clock));
+    }
+
+    public ModelReleaseManager(ModelMetadataRepository repository,
+                               Clock clock,
+                               RahaPermissionChecker permissionChecker,
+                               RahaAuditService auditService) {
+        if (repository == null || clock == null || permissionChecker == null
+                || auditService == null) {
             throw new IllegalArgumentException("模型发布管理器依赖不能为空");
         }
         this.repository = repository;
         this.clock = clock;
+        this.accessController = new RahaAccessController(permissionChecker);
+        this.auditService = auditService;
     }
 
     public RahaColumnModel markCandidate(RahaColumnModel model,
@@ -50,6 +75,39 @@ public final class ModelReleaseManager {
                                    String columnName,
                                    String modelVersion,
                                    ArtifactVersion version) {
+        return publish(datasetId, columnName, modelVersion, version, "SYSTEM");
+    }
+
+    public RahaColumnModel publish(String datasetId,
+                                   String columnName,
+                                   String modelVersion,
+                                   ArtifactVersion version,
+                                   String actor) {
+        String resourceName = modelResource(columnName, modelVersion);
+        try {
+            authorize(actor, RahaPermissionAction.PUBLISH, resourceName, datasetId);
+            RahaColumnModel published = publishAuthorized(
+                    datasetId, columnName, modelVersion, version);
+            auditModel(actor, RahaAuditAction.MODEL_PUBLISH,
+                    RahaAuditStatus.SUCCEEDED, resourceName, datasetId,
+                    modelVersion, "列级模型发布成功");
+            return published;
+        } catch (RahaAccessDeniedException exception) {
+            auditModel(actor, RahaAuditAction.MODEL_PUBLISH,
+                    RahaAuditStatus.DENIED, resourceName, datasetId,
+                    modelVersion, "列级模型发布权限校验拒绝");
+            throw exception;
+        } catch (RuntimeException exception) {
+            auditFailureSafely(actor, RahaAuditAction.MODEL_PUBLISH,
+                    resourceName, datasetId, modelVersion, "列级模型发布失败");
+            throw exception;
+        }
+    }
+
+    private RahaColumnModel publishAuthorized(String datasetId,
+                                              String columnName,
+                                              String modelVersion,
+                                              ArtifactVersion version) {
         LOGGER.info("开始发布列级模型，datasetId={}，columnName={}，modelVersion={}",
                 datasetId, columnName, modelVersion);
         RahaColumnModel target = repository.find(datasetId, columnName, modelVersion)
@@ -74,6 +132,39 @@ public final class ModelReleaseManager {
                                    String columnName,
                                    String modelVersion,
                                    ArtifactVersion version) {
+        return disable(datasetId, columnName, modelVersion, version, "SYSTEM");
+    }
+
+    public RahaColumnModel disable(String datasetId,
+                                   String columnName,
+                                   String modelVersion,
+                                   ArtifactVersion version,
+                                   String actor) {
+        String resourceName = modelResource(columnName, modelVersion);
+        try {
+            authorize(actor, RahaPermissionAction.DISABLE, resourceName, datasetId);
+            RahaColumnModel disabled = disableAuthorized(
+                    datasetId, columnName, modelVersion, version);
+            auditModel(actor, RahaAuditAction.MODEL_DISABLE,
+                    RahaAuditStatus.SUCCEEDED, resourceName, datasetId,
+                    modelVersion, "列级模型停用成功");
+            return disabled;
+        } catch (RahaAccessDeniedException exception) {
+            auditModel(actor, RahaAuditAction.MODEL_DISABLE,
+                    RahaAuditStatus.DENIED, resourceName, datasetId,
+                    modelVersion, "列级模型停用权限校验拒绝");
+            throw exception;
+        } catch (RuntimeException exception) {
+            auditFailureSafely(actor, RahaAuditAction.MODEL_DISABLE,
+                    resourceName, datasetId, modelVersion, "列级模型停用失败");
+            throw exception;
+        }
+    }
+
+    private RahaColumnModel disableAuthorized(String datasetId,
+                                              String columnName,
+                                              String modelVersion,
+                                              ArtifactVersion version) {
         LOGGER.info("开始停用列级模型，datasetId={}，columnName={}，modelVersion={}",
                 datasetId, columnName, modelVersion);
         RahaColumnModel model = repository.find(datasetId, columnName, modelVersion)
@@ -88,6 +179,36 @@ public final class ModelReleaseManager {
     public RahaColumnModel rollback(String datasetId,
                                     String columnName,
                                     ArtifactVersion version) {
+        return rollback(datasetId, columnName, version, "SYSTEM");
+    }
+
+    public RahaColumnModel rollback(String datasetId,
+                                    String columnName,
+                                    ArtifactVersion version,
+                                    String actor) {
+        String resourceName = modelResource(columnName, "published-history");
+        try {
+            authorize(actor, RahaPermissionAction.ROLLBACK, resourceName, datasetId);
+            RahaColumnModel restored = rollbackAuthorized(datasetId, columnName, version);
+            auditModel(actor, RahaAuditAction.MODEL_ROLLBACK,
+                    RahaAuditStatus.SUCCEEDED, resourceName, datasetId,
+                    restored.getModelVersion(), "列级模型回滚成功");
+            return restored;
+        } catch (RahaAccessDeniedException exception) {
+            auditModel(actor, RahaAuditAction.MODEL_ROLLBACK,
+                    RahaAuditStatus.DENIED, resourceName, datasetId,
+                    null, "列级模型回滚权限校验拒绝");
+            throw exception;
+        } catch (RuntimeException exception) {
+            auditFailureSafely(actor, RahaAuditAction.MODEL_ROLLBACK,
+                    resourceName, datasetId, null, "列级模型回滚失败");
+            throw exception;
+        }
+    }
+
+    private RahaColumnModel rollbackAuthorized(String datasetId,
+                                               String columnName,
+                                               ArtifactVersion version) {
         LOGGER.info("开始回滚列级模型，datasetId={}，columnName={}", datasetId, columnName);
         RahaColumnModel current = repository.findPublished(datasetId, columnName)
                 .orElseThrow(() -> new IllegalStateException("当前字段没有已发布模型"));
@@ -118,6 +239,44 @@ public final class ModelReleaseManager {
         LOGGER.info("列级模型回滚完成，datasetId={}，columnName={}，fromVersion={}，toVersion={}",
                 datasetId, columnName, current.getModelVersion(), restored.getModelVersion());
         return restored;
+    }
+
+    private void authorize(String actor,
+                           RahaPermissionAction action,
+                           String resourceName,
+                           String datasetId) {
+        accessController.requireAllowed(new RahaPermissionRequest(actor, action,
+                RahaResourceType.MODEL, resourceName, datasetId));
+    }
+
+    private void auditModel(String actor,
+                            RahaAuditAction action,
+                            RahaAuditStatus status,
+                            String resourceName,
+                            String datasetId,
+                            String modelVersion,
+                            String summary) {
+        auditService.record(actor, action, status, RahaResourceType.MODEL,
+                resourceName, datasetId, null, modelVersion, summary);
+    }
+
+    private void auditFailureSafely(String actor,
+                                    RahaAuditAction action,
+                                    String resourceName,
+                                    String datasetId,
+                                    String modelVersion,
+                                    String summary) {
+        try {
+            auditModel(actor, action, RahaAuditStatus.FAILED, resourceName,
+                    datasetId, modelVersion, summary);
+        } catch (RuntimeException auditException) {
+            LOGGER.error("模型操作失败审计写入异常，action={}，datasetId={}，resourceName={}",
+                    action, datasetId, resourceName, auditException);
+        }
+    }
+
+    private static String modelResource(String columnName, String modelVersion) {
+        return columnName + ":" + modelVersion;
     }
 
     private static boolean isPublishedBefore(RahaColumnModel candidate,

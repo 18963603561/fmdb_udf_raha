@@ -5,6 +5,7 @@ package com.fiberhome.ml.raha.fmdb;
  */
 public final class FmdbClasspathException extends RuntimeException {
 
+    /** Java 序列化版本。 */
     private static final long serialVersionUID = 1L;
 
     public FmdbClasspathException(String message) {

@@ -58,6 +58,9 @@ public final class FileRahaDatasetLoader implements RahaDatasetLoader {
         if (request == null) {
             throw new IllegalArgumentException("数据加载请求不能为空");
         }
+        if (!request.getFormat().isFileFormat()) {
+            throw new IllegalArgumentException("文件加载器不支持 FMDB 表或 SQL 数据源");
+        }
         LOGGER.info("开始读取外部文件数据，datasetId={}，format={}，optionKeys={}",
                 request.getDatasetId(), request.getFormat(), request.getOptions().keySet());
         try {
