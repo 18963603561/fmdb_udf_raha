@@ -13,6 +13,8 @@ public final class ResourceConfig {
     private final long broadcastThresholdBytes;
     /** Spark 缓存级别名称。 */
     private final String cacheStorageLevel;
+    /** 允许缓存的数据最大估算字节数。 */
+    private final long cacheThresholdBytes;
     /** 单阶段最大运行时间，单位毫秒。 */
     private final long stageTimeoutMillis;
 
@@ -21,15 +23,27 @@ public final class ResourceConfig {
                           long broadcastThresholdBytes,
                           String cacheStorageLevel,
                           long stageTimeoutMillis) {
+        this(maxParallelStrategies, maxParallelColumns, broadcastThresholdBytes,
+                cacheStorageLevel, 512L * 1024L * 1024L, stageTimeoutMillis);
+    }
+
+    public ResourceConfig(int maxParallelStrategies,
+                          int maxParallelColumns,
+                          long broadcastThresholdBytes,
+                          String cacheStorageLevel,
+                          long cacheThresholdBytes,
+                          long stageTimeoutMillis) {
         this.maxParallelStrategies = maxParallelStrategies;
         this.maxParallelColumns = maxParallelColumns;
         this.broadcastThresholdBytes = broadcastThresholdBytes;
         this.cacheStorageLevel = cacheStorageLevel;
+        this.cacheThresholdBytes = cacheThresholdBytes;
         this.stageTimeoutMillis = stageTimeoutMillis;
     }
 
     public static ResourceConfig defaults() {
-        return new ResourceConfig(4, 4, 10L * 1024L * 1024L, "MEMORY_AND_DISK", 1800000L);
+        return new ResourceConfig(4, 4, 10L * 1024L * 1024L,
+                "MEMORY_AND_DISK", 512L * 1024L * 1024L, 1800000L);
     }
 
     public int getMaxParallelStrategies() {
@@ -48,6 +62,10 @@ public final class ResourceConfig {
         return cacheStorageLevel;
     }
 
+    public long getCacheThresholdBytes() {
+        return cacheThresholdBytes;
+    }
+
     public long getStageTimeoutMillis() {
         return stageTimeoutMillis;
     }
@@ -57,6 +75,7 @@ public final class ResourceConfig {
                 + ConfigTextUtils.token(maxParallelColumns)
                 + ConfigTextUtils.token(broadcastThresholdBytes)
                 + ConfigTextUtils.token(cacheStorageLevel)
+                + ConfigTextUtils.token(cacheThresholdBytes)
                 + ConfigTextUtils.token(stageTimeoutMillis);
     }
 }

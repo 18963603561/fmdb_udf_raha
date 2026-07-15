@@ -114,10 +114,17 @@ public final class RahaConfigValidator {
                 || config.getMaxParallelStrategies() <= 0
                 || config.getMaxParallelColumns() <= 0
                 || config.getBroadcastThresholdBytes() <= 0L
+                || config.getCacheThresholdBytes() <= 0L
                 || config.getStageTimeoutMillis() <= 0L
-                || isBlank(config.getCacheStorageLevel())) {
+                || !isSupportedStorageLevel(config.getCacheStorageLevel())) {
             fail(ConfigErrorCode.RESOURCE_CONFIG_INVALID, "资源并发、广播阈值、缓存级别和阶段超时必须有效");
         }
+    }
+
+    private static boolean isSupportedStorageLevel(String value) {
+        return "MEMORY_ONLY".equals(value)
+                || "MEMORY_AND_DISK".equals(value)
+                || "DISK_ONLY".equals(value);
     }
 
     private void validateClustering(ClusteringConfig config) {

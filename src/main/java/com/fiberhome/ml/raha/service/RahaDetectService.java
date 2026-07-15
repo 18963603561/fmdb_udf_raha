@@ -9,6 +9,10 @@ import com.fiberhome.ml.raha.model.ColumnModelPredictor;
 import com.fiberhome.ml.raha.model.ColumnPrediction;
 import com.fiberhome.ml.raha.model.PublishedColumnModelLoader;
 import com.fiberhome.ml.raha.repository.DetectionResultRepository;
+import com.fiberhome.ml.raha.parallel.BoundedParallelExecutor;
+import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
+import com.fiberhome.ml.raha.parallel.ParallelFailure;
+import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,18 +40,33 @@ public final class RahaDetectService {
     private final DetectionResultRepository repository;
     /** 提供可测试检测时间的时钟。 */
     private final Clock clock;
+    /** 受限列预测并行执行器。 */
+    private final BoundedParallelExecutor parallelExecutor;
 
     public RahaDetectService(PublishedColumnModelLoader modelLoader,
                              ColumnModelPredictor predictor,
                              DetectionResultRepository repository,
                              Clock clock) {
+        this(modelLoader, predictor, repository, clock,
+                new BoundedParallelExecutor());
+    }
+
+    public RahaDetectService(PublishedColumnModelLoader modelLoader,
+                             ColumnModelPredictor predictor,
+                             DetectionResultRepository repository,
+                             Clock clock,
+                             BoundedParallelExecutor parallelExecutor) {
         if (modelLoader == null || predictor == null || repository == null || clock == null) {
             throw new IllegalArgumentException("检测服务依赖不能为空");
+        }
+        if (parallelExecutor == null) {
+            throw new IllegalArgumentException("检测并行执行器不能为空");
         }
         this.modelLoader = modelLoader;
         this.predictor = predictor;
         this.repository = repository;
         this.clock = clock;
+        this.parallelExecutor = parallelExecutor;
     }
 
     /**
@@ -68,28 +87,28 @@ public final class RahaDetectService {
         Map<String, String> modelVersions = new LinkedHashMap<String, String>();
         Map<String, String> failedColumns = new LinkedHashMap<String, String>();
         try {
+            List<ParallelWorkItem<String, DetectColumnOutcome>> items =
+                    new ArrayList<ParallelWorkItem<String, DetectColumnOutcome>>();
             for (Map.Entry<String, FeatureDictionary> entry
                     : request.getFeatures().getDictionaries().entrySet()) {
-                String columnName = entry.getKey();
-                try {
-                    ColumnModelArtifact model = modelLoader.load(
-                            request.getDataset().getDatasetId(), columnName,
-                            request.getDataset().getSchemaHash(), entry.getValue().getVersion(),
-                            request.getStrategyPlanVersion());
-                    List<SparseFeatureRow> rows = request.getFeatures()
-                            .getRowsByColumn(columnName);
-                    List<ColumnPrediction> predictions = predictor.predict(model, rows);
-                    for (int index = 0; index < rows.size(); index++) {
-                        results.add(toDetectionResult(request, entry.getValue(), rows.get(index),
-                                predictions.get(index), model, clock.millis()));
-                    }
-                    modelVersions.put(columnName, model.getModelVersion());
-                } catch (RuntimeException exception) {
-                    // 字段模型缺失或不兼容时隔离当前字段，并记录上下文和异常堆栈。
-                    failedColumns.put(columnName, exception.getClass().getSimpleName());
-                    LOGGER.error("字段已发布模型检测失败，jobId={}，columnName={}",
-                            request.getJobId(), columnName, exception);
+                items.add(new ParallelWorkItem<String, DetectColumnOutcome>(
+                        entry.getKey(), () -> detectColumn(
+                        request, entry.getKey(), entry.getValue())));
+            }
+            ParallelBatchResult<String, DetectColumnOutcome> parallel =
+                    parallelExecutor.execute(items,
+                            request.getResourceConfig().getMaxParallelColumns(),
+                            request.getResourceConfig().getStageTimeoutMillis());
+            for (String columnName : request.getFeatures().getDictionaries().keySet()) {
+                DetectColumnOutcome outcome = parallel.getSuccesses().get(columnName);
+                if (outcome != null) {
+                    results.addAll(outcome.results);
+                    modelVersions.put(columnName, outcome.modelVersion);
+                    continue;
                 }
+                ParallelFailure failure = parallel.getFailures().get(columnName);
+                failedColumns.put(columnName, failure == null
+                        ? "RuntimeException" : failure.getErrorType());
             }
             if (!results.isEmpty()) {
                 repository.saveAll(request.getJobId(), results,
@@ -114,6 +133,8 @@ public final class RahaDetectService {
             Map<String, String> details = new LinkedHashMap<String, String>();
             details.put("detectedCellCount", String.valueOf(results.size()));
             details.put("modelVersions", modelVersions.toString());
+            details.put("maxObservedColumnConcurrency",
+                    String.valueOf(parallel.getMaxObservedConcurrency()));
             RahaTaskSummary summary = new RahaTaskSummary(startedAt, clock.millis(),
                     request.getFeatures().getDictionaries().size(), modelVersions.size(),
                     0L, failedColumns.size(), details);
@@ -134,6 +155,23 @@ public final class RahaDetectService {
                     RahaTaskType.DETECT, RahaTaskStatus.FAILED, null, summary, null,
                     "DETECT_SERVICE_FAILED", exception.getClass().getSimpleName());
         }
+    }
+
+    private DetectColumnOutcome detectColumn(RahaDetectRequest request,
+                                             String columnName,
+                                             FeatureDictionary dictionary) {
+        ColumnModelArtifact model = modelLoader.load(
+                request.getDataset().getDatasetId(), columnName,
+                request.getDataset().getSchemaHash(), dictionary.getVersion(),
+                request.getStrategyPlanVersion());
+        List<SparseFeatureRow> rows = request.getFeatures().getRowsByColumn(columnName);
+        List<ColumnPrediction> predictions = predictor.predict(model, rows);
+        List<DetectionResult> results = new ArrayList<DetectionResult>(rows.size());
+        for (int index = 0; index < rows.size(); index++) {
+            results.add(toDetectionResult(request, dictionary, rows.get(index),
+                    predictions.get(index), model, clock.millis()));
+        }
+        return new DetectColumnOutcome(results, model.getModelVersion());
     }
 
     private static DetectionResult toDetectionResult(RahaDetectRequest request,
@@ -166,5 +204,18 @@ public final class RahaDetectService {
             }
         }
         return Collections.unmodifiableList(new ArrayList<String>(ids));
+    }
+
+    private static final class DetectColumnOutcome {
+        /** 当前字段全部检测结果。 */
+        private final List<DetectionResult> results;
+        /** 当前字段已发布模型版本。 */
+        private final String modelVersion;
+
+        private DetectColumnOutcome(List<DetectionResult> results,
+                                    String modelVersion) {
+            this.results = results;
+            this.modelVersion = modelVersion;
+        }
     }
 }

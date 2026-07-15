@@ -8,6 +8,8 @@ public enum RepositoryNamespace {
     JOB,
     /** 任务阶段状态。 */
     STAGE,
+    /** 可恢复阶段检查点和尝试记录。 */
+    STAGE_CHECKPOINT,
     /** 列画像。 */
     COLUMN_PROFILE,
     /** 策略计划。 */

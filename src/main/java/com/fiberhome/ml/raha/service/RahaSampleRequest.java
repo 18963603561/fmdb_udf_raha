@@ -2,6 +2,7 @@ package com.fiberhome.ml.raha.service;
 
 import com.fiberhome.ml.raha.config.ClusteringConfig;
 import com.fiberhome.ml.raha.config.SamplingConfig;
+import com.fiberhome.ml.raha.config.ResourceConfig;
 import com.fiberhome.ml.raha.feature.FeatureAssemblyResult;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
@@ -32,6 +33,8 @@ public final class RahaSampleRequest {
     private final long randomSeed;
     /** 采样服务仓储业务版本。 */
     private final ArtifactVersion artifactVersion;
+    /** 列并发和阶段超时资源配置。 */
+    private final ResourceConfig resourceConfig;
 
     public RahaSampleRequest(String jobId,
                              FeatureAssemblyResult features,
@@ -41,10 +44,23 @@ public final class RahaSampleRequest {
                              int samplingRound,
                              long randomSeed,
                              ArtifactVersion artifactVersion) {
+        this(jobId, features, labels, clusteringConfig, samplingConfig,
+                samplingRound, randomSeed, artifactVersion, ResourceConfig.defaults());
+    }
+
+    public RahaSampleRequest(String jobId,
+                             FeatureAssemblyResult features,
+                             List<CellLabel> labels,
+                             ClusteringConfig clusteringConfig,
+                             SamplingConfig samplingConfig,
+                             int samplingRound,
+                             long randomSeed,
+                             ArtifactVersion artifactVersion,
+                             ResourceConfig resourceConfig) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "采样任务标识");
         if (features == null || labels == null || clusteringConfig == null
                 || samplingConfig == null || samplingRound <= 0
-                || artifactVersion == null) {
+                || artifactVersion == null || resourceConfig == null) {
             throw new IllegalArgumentException("采样服务输入、轮次和版本必须有效");
         }
         this.features = features;
@@ -54,6 +70,7 @@ public final class RahaSampleRequest {
         this.samplingRound = samplingRound;
         this.randomSeed = randomSeed;
         this.artifactVersion = artifactVersion;
+        this.resourceConfig = resourceConfig;
     }
 
     public String getJobId() { return jobId; }
@@ -64,4 +81,5 @@ public final class RahaSampleRequest {
     public int getSamplingRound() { return samplingRound; }
     public long getRandomSeed() { return randomSeed; }
     public ArtifactVersion getArtifactVersion() { return artifactVersion; }
+    public ResourceConfig getResourceConfig() { return resourceConfig; }
 }

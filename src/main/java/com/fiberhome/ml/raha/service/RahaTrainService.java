@@ -19,6 +19,10 @@ import com.fiberhome.ml.raha.model.ColumnTrainingDataBuilder;
 import com.fiberhome.ml.raha.model.ColumnTrainingDataset;
 import com.fiberhome.ml.raha.model.ModelReleaseManager;
 import com.fiberhome.ml.raha.model.RahaColumnModel;
+import com.fiberhome.ml.raha.parallel.BoundedParallelExecutor;
+import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
+import com.fiberhome.ml.raha.parallel.ParallelFailure;
+import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
 import com.fiberhome.ml.raha.strategy.StrategyBatchResult;
 import com.fiberhome.ml.raha.strategy.StrategyExecutionService;
 import com.fiberhome.ml.raha.strategy.StrategyPlan;
@@ -63,6 +67,8 @@ public final class RahaTrainService {
     private final ModelReleaseManager releaseManager;
     /** 提供可测试任务时间的时钟。 */
     private final Clock clock;
+    /** 受限列训练并行执行器。 */
+    private final BoundedParallelExecutor parallelExecutor;
 
     public RahaTrainService(StrategyPlanService planService,
                             StrategyExecutionService executionService,
@@ -75,10 +81,28 @@ public final class RahaTrainService {
                             ColumnModelMetadataFactory metadataFactory,
                             ModelReleaseManager releaseManager,
                             Clock clock) {
+        this(planService, executionService, featureService, clusteringService,
+                propagationService, dataBuilder, trainer, modelStore,
+                metadataFactory, releaseManager, clock, new BoundedParallelExecutor());
+    }
+
+    public RahaTrainService(StrategyPlanService planService,
+                            StrategyExecutionService executionService,
+                            FeatureService featureService,
+                            ColumnClusteringService clusteringService,
+                            LabelPropagationService propagationService,
+                            ColumnTrainingDataBuilder dataBuilder,
+                            ColumnModelTrainer trainer,
+                            ColumnModelStore modelStore,
+                            ColumnModelMetadataFactory metadataFactory,
+                            ModelReleaseManager releaseManager,
+                            Clock clock,
+                            BoundedParallelExecutor parallelExecutor) {
         if (planService == null || executionService == null || featureService == null
                 || clusteringService == null || propagationService == null
                 || dataBuilder == null || trainer == null || modelStore == null
-                || metadataFactory == null || releaseManager == null || clock == null) {
+                || metadataFactory == null || releaseManager == null || clock == null
+                || parallelExecutor == null) {
             throw new IllegalArgumentException("训练服务依赖不能为空");
         }
         this.planService = planService;
@@ -92,6 +116,7 @@ public final class RahaTrainService {
         this.metadataFactory = metadataFactory;
         this.releaseManager = releaseManager;
         this.clock = clock;
+        this.parallelExecutor = parallelExecutor;
     }
 
     /**
@@ -116,15 +141,21 @@ public final class RahaTrainService {
                     request.getJobId(), request.getStageId() + "-strategy",
                     request.getDataset(), plans,
                     request.getConfig().getStrategyConfig().getStrategyTimeoutMillis(),
-                    request.getArtifactVersion());
-            FeatureAssemblyResult features = featureService.assembleAndSave(
+                    request.getArtifactVersion(),
+                    request.getConfig().getResourceConfig().getMaxParallelStrategies(),
+                    request.getConfig().getResourceConfig().getStageTimeoutMillis());
+            FeatureAssemblyResult features = featureService.assembleAndSaveParallel(
                     request.getJobId(), request.getDataset(), plans,
                     strategyBatch.getHits(), request.getConfig().getFeatureConfig(),
-                    request.getArtifactVersion());
-            ClusteringBatchResult clustering = clusteringService.clusterAndSave(
+                    request.getArtifactVersion(),
+                    request.getConfig().getResourceConfig().getMaxParallelColumns(),
+                    request.getConfig().getResourceConfig().getStageTimeoutMillis());
+            ClusteringBatchResult clustering = clusteringService.clusterAndSaveParallel(
                     request.getJobId(), features,
                     request.getConfig().getClusteringConfig(),
-                    request.getConfig().getRandomSeed(), request.getArtifactVersion());
+                    request.getConfig().getRandomSeed(), request.getArtifactVersion(),
+                    request.getConfig().getResourceConfig().getMaxParallelColumns(),
+                    request.getConfig().getResourceConfig().getStageTimeoutMillis());
             LabelPropagationResult propagation = propagationService.propagateAndSave(
                     request.getJobId(), assignments(clustering), request.getDirectLabels(),
                     request.getPropagationMethod(), request.getPropagationConfig(),
@@ -136,28 +167,34 @@ public final class RahaTrainService {
                     new LinkedHashMap<String, RahaColumnModel>();
             long skippedCount = 0L;
             long failedCount = 0L;
+            List<ParallelWorkItem<String, ColumnTrainingOutcome>> trainingItems =
+                    new ArrayList<ParallelWorkItem<String, ColumnTrainingOutcome>>();
             for (Map.Entry<String, FeatureDictionary> entry
                     : features.getDictionaries().entrySet()) {
-                String columnName = entry.getKey();
-                ColumnTrainingDataset trainingDataset = dataBuilder.build(
-                        columnName, entry.getValue(), features.getRowsByColumn(columnName),
-                        propagation.getLabels(),
-                        request.getTrainingConfig().isClassBalanceEnabled());
-                ColumnModelTrainingRequest trainingRequest = new ColumnModelTrainingRequest(
-                        request.getModelNamePrefix() + "-" + columnName,
-                        request.getDataset().getDatasetId(),
-                        request.getDataset().getSchemaHash(), planVersion, trainingDataset,
-                        request.getConfig().getModelConfig(), request.getTrainingConfig());
-                ColumnModelTrainingResult trainingResult = trainer.train(trainingRequest);
-                trainingResults.put(columnName, trainingResult);
-                if (trainingResult.getStatus() == ColumnModelTrainingStatus.TRAINED) {
-                    String modelPath = modelStore.save(trainingResult.getArtifact());
-                    RahaColumnModel draft = metadataFactory.create(
-                            trainingRequest, trainingResult, modelPath);
-                    candidates.put(columnName, releaseManager.markCandidate(
-                            draft, request.getArtifactVersion()));
-                } else if (trainingResult.getStatus() == ColumnModelTrainingStatus.FAILED
-                        || trainingResult.getStatus()
+                trainingItems.add(new ParallelWorkItem<String, ColumnTrainingOutcome>(
+                        entry.getKey(), () -> trainColumn(request, features,
+                        propagation, planVersion, entry.getKey(), entry.getValue())));
+            }
+            ParallelBatchResult<String, ColumnTrainingOutcome> parallelTraining =
+                    parallelExecutor.execute(trainingItems,
+                            request.getConfig().getResourceConfig().getMaxParallelColumns(),
+                            request.getConfig().getResourceConfig().getStageTimeoutMillis());
+            for (String columnName : features.getDictionaries().keySet()) {
+                ColumnTrainingOutcome outcome = parallelTraining.getSuccesses().get(columnName);
+                if (outcome == null) {
+                    ParallelFailure failure = parallelTraining.getFailures().get(columnName);
+                    trainingResults.put(columnName, new ColumnModelTrainingResult(
+                            ColumnModelTrainingStatus.FAILED, null, false,
+                            failure == null ? "列训练调度失败" : failure.getErrorType(), null));
+                    failedCount++;
+                    continue;
+                }
+                trainingResults.put(columnName, outcome.trainingResult);
+                if (outcome.candidate != null) {
+                    candidates.put(columnName, outcome.candidate);
+                } else if (outcome.trainingResult.getStatus()
+                        == ColumnModelTrainingStatus.FAILED
+                        || outcome.trainingResult.getStatus()
                         == ColumnModelTrainingStatus.MLLIB_UNAVAILABLE) {
                     failedCount++;
                 } else {
@@ -168,7 +205,8 @@ public final class RahaTrainService {
                     clustering, propagation, trainingResults, candidates, planVersion);
             long completedAt = clock.millis();
             Map<String, String> details = details(plans, strategyBatch, features,
-                    propagation, candidates, planVersion);
+                    propagation, candidates, planVersion,
+                    parallelTraining.getMaxObservedConcurrency());
             RahaTaskSummary summary = new RahaTaskSummary(startedAt, completedAt,
                     features.getDictionaries().size(), candidates.size(), skippedCount,
                     failedCount, details);
@@ -222,13 +260,41 @@ public final class RahaTrainService {
         return HashUtils.sha256Hex(String.join("|", signatures));
     }
 
+    private ColumnTrainingOutcome trainColumn(RahaTrainRequest request,
+                                              FeatureAssemblyResult features,
+                                              LabelPropagationResult propagation,
+                                              String planVersion,
+                                              String columnName,
+                                              FeatureDictionary dictionary) {
+        ColumnTrainingDataset trainingDataset = dataBuilder.build(
+                columnName, dictionary, features.getRowsByColumn(columnName),
+                propagation.getLabels(),
+                request.getTrainingConfig().isClassBalanceEnabled());
+        ColumnModelTrainingRequest trainingRequest = new ColumnModelTrainingRequest(
+                request.getModelNamePrefix() + "-" + columnName,
+                request.getDataset().getDatasetId(),
+                request.getDataset().getSchemaHash(), planVersion, trainingDataset,
+                request.getConfig().getModelConfig(), request.getTrainingConfig());
+        ColumnModelTrainingResult trainingResult = trainer.train(trainingRequest);
+        if (trainingResult.getStatus() != ColumnModelTrainingStatus.TRAINED) {
+            return new ColumnTrainingOutcome(trainingResult, null);
+        }
+        String modelPath = modelStore.save(trainingResult.getArtifact());
+        RahaColumnModel draft = metadataFactory.create(
+                trainingRequest, trainingResult, modelPath);
+        RahaColumnModel candidate = releaseManager.markCandidate(
+                draft, request.getArtifactVersion());
+        return new ColumnTrainingOutcome(trainingResult, candidate);
+    }
+
     private static Map<String, String> details(
             List<StrategyPlan> plans,
             StrategyBatchResult strategyBatch,
             FeatureAssemblyResult features,
             LabelPropagationResult propagation,
             Map<String, RahaColumnModel> candidates,
-            String planVersion) {
+            String planVersion,
+            int maxObservedColumnConcurrency) {
         Map<String, String> details = new LinkedHashMap<String, String>();
         details.put("strategyPlanCount", String.valueOf(plans.size()));
         details.put("strategyFailureCount", String.valueOf(strategyBatch.getFailedCount()));
@@ -237,6 +303,21 @@ public final class RahaTrainService {
                 propagation.getMetrics().getPropagatedLabelCount()));
         details.put("candidateModelCount", String.valueOf(candidates.size()));
         details.put("strategyPlanVersion", planVersion);
+        details.put("maxObservedColumnConcurrency",
+                String.valueOf(maxObservedColumnConcurrency));
         return details;
+    }
+
+    private static final class ColumnTrainingOutcome {
+        /** 当前字段训练结果。 */
+        private final ColumnModelTrainingResult trainingResult;
+        /** 当前字段候选模型，不可训练或失败时为空。 */
+        private final RahaColumnModel candidate;
+
+        private ColumnTrainingOutcome(ColumnModelTrainingResult trainingResult,
+                                      RahaColumnModel candidate) {
+            this.trainingResult = trainingResult;
+            this.candidate = candidate;
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.fiberhome.ml.raha.service;
 import com.fiberhome.ml.raha.data.RahaDataset;
 import com.fiberhome.ml.raha.feature.FeatureAssemblyResult;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
+import com.fiberhome.ml.raha.config.ResourceConfig;
 import com.fiberhome.ml.raha.util.ValueUtils;
 
 /**
@@ -24,6 +25,8 @@ public final class RahaDetectRequest {
     private final String strategyPlanVersion;
     /** 检测结果仓储业务版本。 */
     private final ArtifactVersion artifactVersion;
+    /** 列预测并发和阶段超时配置。 */
+    private final ResourceConfig resourceConfig;
 
     public RahaDetectRequest(String jobId,
                              String stageId,
@@ -32,18 +35,32 @@ public final class RahaDetectRequest {
                              FeatureAssemblyResult features,
                              String strategyPlanVersion,
                              ArtifactVersion artifactVersion) {
+        this(jobId, stageId, configVersion, dataset, features,
+                strategyPlanVersion, artifactVersion, ResourceConfig.defaults());
+    }
+
+    public RahaDetectRequest(String jobId,
+                             String stageId,
+                             String configVersion,
+                             RahaDataset dataset,
+                             FeatureAssemblyResult features,
+                             String strategyPlanVersion,
+                             ArtifactVersion artifactVersion,
+                             ResourceConfig resourceConfig) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "检测任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "检测阶段标识");
         this.configVersion = ValueUtils.requireNotBlank(configVersion, "检测配置版本");
         this.strategyPlanVersion = ValueUtils.requireNotBlank(
                 strategyPlanVersion, "检测策略计划版本");
         if (dataset == null || dataset.getDataFrame() == null
-                || features == null || artifactVersion == null) {
+                || features == null || artifactVersion == null
+                || resourceConfig == null) {
             throw new IllegalArgumentException("检测数据、特征和版本不能为空");
         }
         this.dataset = dataset;
         this.features = features;
         this.artifactVersion = artifactVersion;
+        this.resourceConfig = resourceConfig;
     }
 
     public String getJobId() { return jobId; }
@@ -53,4 +70,5 @@ public final class RahaDetectRequest {
     public FeatureAssemblyResult getFeatures() { return features; }
     public String getStrategyPlanVersion() { return strategyPlanVersion; }
     public ArtifactVersion getArtifactVersion() { return artifactVersion; }
+    public ResourceConfig getResourceConfig() { return resourceConfig; }
 }

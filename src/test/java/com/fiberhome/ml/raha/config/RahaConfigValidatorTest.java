@@ -136,6 +136,21 @@ class RahaConfigValidatorTest {
     }
 
     @Test
+    void shouldRejectInvalidCacheThresholdAndStorageLevel() {
+        RahaJobConfig invalidThreshold = configWithResource(new ResourceConfig(
+                2, 2, 1024L, "MEMORY_ONLY", 0L, 1000L));
+        RahaJobConfig invalidStorageLevel = configWithResource(new ResourceConfig(
+                2, 2, 1024L, "UNSUPPORTED", 1024L, 1000L));
+
+        assertEquals(ConfigErrorCode.RESOURCE_CONFIG_INVALID,
+                assertThrows(ConfigValidationException.class,
+                        () -> validator.validate(invalidThreshold)).getErrorCode());
+        assertEquals(ConfigErrorCode.RESOURCE_CONFIG_INVALID,
+                assertThrows(ConfigValidationException.class,
+                        () -> validator.validate(invalidStorageLevel)).getErrorCode());
+    }
+
+    @Test
     void shouldRejectStrategyTypeFilterConflict() {
         Set<String> strategyTypes = Collections.singleton("PVD_TYPE_FORMAT");
         StrategyConfig strategyConfig = new StrategyConfig(
@@ -181,5 +196,12 @@ class RahaConfigValidatorTest {
                 false, 1L, 30, strategyConfig, FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, threshold, true),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
+    }
+
+    private static RahaJobConfig configWithResource(ResourceConfig resourceConfig) {
+        return new RahaJobConfig(
+                JobType.DETECTION, "dataset-1", null, "table-1", "id",
+                false, 1L, 30, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                ModelConfig.defaults(), resourceConfig, FailureToleranceConfig.defaults());
     }
 }

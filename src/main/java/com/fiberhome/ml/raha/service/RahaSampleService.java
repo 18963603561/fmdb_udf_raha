@@ -51,10 +51,12 @@ public final class RahaSampleService {
         LOGGER.info("开始 Raha 采样服务，jobId={}，samplingRound={}，labelCount={}",
                 request.getJobId(), request.getSamplingRound(), request.getLabels().size());
         try {
-            ClusteringBatchResult clustering = clusteringService.clusterAndSave(
+            ClusteringBatchResult clustering = clusteringService.clusterAndSaveParallel(
                     request.getJobId(), request.getFeatures(),
                     request.getClusteringConfig(), request.getRandomSeed(),
-                    request.getArtifactVersion());
+                    request.getArtifactVersion(),
+                    request.getResourceConfig().getMaxParallelColumns(),
+                    request.getResourceConfig().getStageTimeoutMillis());
             SamplingBatchResult sampling = samplingService.createTasks(
                     request.getJobId(), request.getSamplingRound(), clustering,
                     request.getLabels(), request.getSamplingConfig(),
