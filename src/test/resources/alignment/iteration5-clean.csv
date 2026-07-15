@@ -1,0 +1,11 @@
+id,code,city,amount,event_date,email
+1,A,武汉,10,2026-01-01,a1@example.com
+2,A,武汉,11,2026-01-02,a2@example.com
+3,B,北京,9,2026-01-03,b1@example.com
+4,I,上海,10,2026-01-04,b2@example.com
+5,C,重庆,10,2026-01-05,c1@example.com
+6,D,深圳,10,2026-01-06,d1@example.com
+7,E,广州,12,2026-01-07,e1@example.com
+8,F,南京,11,2026-01-08,f1@example.com
+9,G,杭州,10,2026-01-09,g1@example.com
+10,H,成都,10,2026-01-10,h1@example.com
