@@ -1,4 +1,4 @@
-package com.fiberhome.ml.raha.job;
+package com.fiberhome.ml.raha.job.stage;
 
 import com.fiberhome.ml.raha.data.RahaDataset;
 import com.fiberhome.ml.raha.data.StageType;
@@ -7,6 +7,9 @@ import com.fiberhome.ml.raha.feature.FeatureService;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
 import com.fiberhome.ml.raha.strategy.StrategyHit;
 import com.fiberhome.ml.raha.strategy.StrategyPlan;
+import com.fiberhome.ml.raha.job.StageAttributeKeys;
+import com.fiberhome.ml.raha.job.StageExecutionContext;
+import com.fiberhome.ml.raha.job.StageResult;
 
 import java.util.List;
 

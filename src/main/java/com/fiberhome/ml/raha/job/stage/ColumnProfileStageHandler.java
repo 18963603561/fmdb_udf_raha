@@ -1,8 +1,11 @@
-package com.fiberhome.ml.raha.job;
+package com.fiberhome.ml.raha.job.stage;
 
 import com.fiberhome.ml.raha.data.RahaDataset;
 import com.fiberhome.ml.raha.data.StageType;
 import com.fiberhome.ml.raha.data.profile.ColumnProfileService;
+import com.fiberhome.ml.raha.job.StageAttributeKeys;
+import com.fiberhome.ml.raha.job.StageExecutionContext;
+import com.fiberhome.ml.raha.job.StageResult;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
 
 /**
@@ -41,4 +44,3 @@ public final class ColumnProfileStageHandler implements StageHandler {
         return StageResult.success();
     }
 }
-

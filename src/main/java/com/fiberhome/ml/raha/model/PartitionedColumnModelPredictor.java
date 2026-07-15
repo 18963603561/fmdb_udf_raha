@@ -40,16 +40,7 @@ public final class PartitionedColumnModelPredictor {
                 || !hasColumn(featureFrame, featuresColumn)) {
             throw new IllegalArgumentException("分区预测数据集缺少标识列或特征列");
         }
-        int[] indices = new int[model.getCoefficients().size()];
-        double[] coefficients = new double[model.getCoefficients().size()];
-        int position = 0;
-        for (Map.Entry<Integer, Double> entry : model.getCoefficients().entrySet()) {
-            indices[position] = entry.getKey();
-            coefficients[position] = entry.getValue();
-            position++;
-        }
-        UDF1<Vector, Double> scorer = new LinearScoreFunction(
-                indices, coefficients, model.getIntercept(), model.getFeatureDimension());
+        UDF1<Vector, Double> scorer = scorer(model);
         Dataset<Row> partitioned = featureFrame.repartition(targetPartitionCount);
         Dataset<Row> scored = partitioned.withColumn("score", functions.udf(
                 scorer, DataTypes.DoubleType).apply(functions.col(featuresColumn)));
@@ -59,6 +50,23 @@ public final class PartitionedColumnModelPredictor {
                 .withColumn("classifier_type", functions.lit(
                         model.getClassifierType().name()))
                 .withColumn("model_version", functions.lit(model.getModelVersion()));
+    }
+
+    private static UDF1<Vector, Double> scorer(ColumnModelArtifact model) {
+        if (model.getClassifierType() == com.fiberhome.ml.raha.data.ClassifierType.DECISION_TREE
+                || model.getClassifierType() == com.fiberhome.ml.raha.data.ClassifierType.GBT) {
+            return new TreeScoreFunction(model.getModelPayload());
+        }
+        int[] indices = new int[model.getCoefficients().size()];
+        double[] coefficients = new double[model.getCoefficients().size()];
+        int position = 0;
+        for (Map.Entry<Integer, Double> entry : model.getCoefficients().entrySet()) {
+            indices[position] = entry.getKey();
+            coefficients[position] = entry.getValue();
+            position++;
+        }
+        return new LinearScoreFunction(indices, coefficients,
+                model.getIntercept(), model.getFeatureDimension());
     }
 
     private static boolean hasColumn(Dataset<Row> dataset, String columnName) {
@@ -103,6 +111,30 @@ public final class PartitionedColumnModelPredictor {
                 return 0.0d;
             }
             return 1.0d / (1.0d + Math.exp(-linear));
+        }
+    }
+
+    private static final class TreeScoreFunction
+            implements UDF1<Vector, Double>, Serializable {
+        private static final long serialVersionUID = 1L;
+        /** 树模型编码，使用懒加载避免闭包携带 Spark 训练对象。 */
+        private final String payload;
+        /** 执行器进程内缓存的解析结果。 */
+        private transient TreeModelCodec.DecodedModel decoded;
+
+        private TreeScoreFunction(String payload) {
+            if (payload == null || payload.trim().isEmpty()) {
+                throw new IllegalArgumentException("树模型编码不能为空");
+            }
+            this.payload = payload;
+        }
+
+        @Override
+        public Double call(Vector vector) {
+            if (decoded == null) {
+                decoded = TreeModelCodec.decode(payload);
+            }
+            return decoded.score(vector);
         }
     }
 }

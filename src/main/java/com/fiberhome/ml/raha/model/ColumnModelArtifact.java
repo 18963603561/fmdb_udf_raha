@@ -33,6 +33,10 @@ public final class ColumnModelArtifact {
     private final Map<Integer, Double> coefficients;
     /** 训练器或降级模式名称。 */
     private final String trainingMode;
+    /** 非线性树模型编码；线性模型为空。 */
+    private final String modelPayload;
+    /** 已解析的树模型，避免每个单元格重复解码。 */
+    private final TreeModelCodec.DecodedModel decodedTreeModel;
 
     public ColumnModelArtifact(String modelName,
                                String modelVersion,
@@ -44,13 +48,32 @@ public final class ColumnModelArtifact {
                                double intercept,
                                Map<Integer, Double> coefficients,
                                String trainingMode) {
+        this(modelName, modelVersion, columnName, classifierType,
+                featureDictionaryVersion, featureDimension, threshold, intercept,
+                coefficients, trainingMode, "");
+    }
+
+    public ColumnModelArtifact(String modelName,
+                               String modelVersion,
+                               String columnName,
+                               ClassifierType classifierType,
+                               String featureDictionaryVersion,
+                               int featureDimension,
+                               double threshold,
+                               double intercept,
+                               Map<Integer, Double> coefficients,
+                               String trainingMode,
+                               String modelPayload) {
         this.modelName = ValueUtils.requireNotBlank(modelName, "模型名称");
         this.modelVersion = ValueUtils.requireNotBlank(modelVersion, "模型版本");
         this.columnName = ValueUtils.requireNotBlank(columnName, "模型字段");
         if (classifierType == null || featureDimension <= 0
                 || Double.isNaN(threshold) || threshold < 0.0d || threshold > 1.0d
                 || Double.isNaN(intercept) || Double.isInfinite(intercept)
-                || coefficients == null) {
+                || coefficients == null || modelPayload == null
+                || ((classifierType == ClassifierType.DECISION_TREE
+                || classifierType == ClassifierType.GBT)
+                && modelPayload.trim().isEmpty())) {
             throw new IllegalArgumentException("列级模型类型、维度、阈值和参数必须有效");
         }
         for (Map.Entry<Integer, Double> entry : coefficients.entrySet()) {
@@ -69,6 +92,10 @@ public final class ColumnModelArtifact {
         this.coefficients = Collections.unmodifiableMap(
                 new LinkedHashMap<Integer, Double>(coefficients));
         this.trainingMode = ValueUtils.requireNotBlank(trainingMode, "训练模式");
+        this.modelPayload = modelPayload;
+        this.decodedTreeModel = classifierType == ClassifierType.DECISION_TREE
+                || classifierType == ClassifierType.GBT
+                ? TreeModelCodec.decode(modelPayload) : null;
     }
 
     /**
@@ -81,6 +108,10 @@ public final class ColumnModelArtifact {
         if (row == null || !columnName.equals(row.getColumnName())
                 || !featureDictionaryVersion.equals(row.getFeatureDictionaryVersion())) {
             throw new IllegalArgumentException("预测特征与模型字段或字典版本不一致");
+        }
+        if ((classifierType == ClassifierType.DECISION_TREE
+                || classifierType == ClassifierType.GBT)) {
+            return decodedTreeModel.score(row.getValues());
         }
         double linear = intercept;
         for (Map.Entry<Integer, Double> entry : row.getValues().entrySet()) {
@@ -111,6 +142,7 @@ public final class ColumnModelArtifact {
     public double getIntercept() { return intercept; }
     public Map<Integer, Double> getCoefficients() { return coefficients; }
     public String getTrainingMode() { return trainingMode; }
+    public String getModelPayload() { return modelPayload; }
 
     /**
      * 使用发布元数据中的阈值创建参数相同的预测视图。
@@ -121,6 +153,6 @@ public final class ColumnModelArtifact {
     public ColumnModelArtifact withThreshold(double selectedThreshold) {
         return new ColumnModelArtifact(modelName, modelVersion, columnName,
                 classifierType, featureDictionaryVersion, featureDimension,
-                selectedThreshold, intercept, coefficients, trainingMode);
+                selectedThreshold, intercept, coefficients, trainingMode, modelPayload);
     }
 }

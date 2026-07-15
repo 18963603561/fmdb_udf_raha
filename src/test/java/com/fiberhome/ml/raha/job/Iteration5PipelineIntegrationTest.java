@@ -1,5 +1,14 @@
 package com.fiberhome.ml.raha.job;
 
+import com.fiberhome.ml.raha.job.stage.ClusterStageHandler;
+import com.fiberhome.ml.raha.job.stage.ColumnProfileStageHandler;
+import com.fiberhome.ml.raha.job.stage.DataLoadStageHandler;
+import com.fiberhome.ml.raha.job.stage.DetectionStageHandler;
+import com.fiberhome.ml.raha.job.stage.FeatureStageHandler;
+import com.fiberhome.ml.raha.job.stage.GroundTruthLabelStageHandler;
+import com.fiberhome.ml.raha.job.stage.SamplingStageHandler;
+import com.fiberhome.ml.raha.job.stage.StrategyPlanStageHandler;
+import com.fiberhome.ml.raha.job.stage.StrategyRunStageHandler;
 import com.fiberhome.ml.raha.cluster.ClusterVersioner;
 import com.fiberhome.ml.raha.cluster.ClusteringBatchResult;
 import com.fiberhome.ml.raha.cluster.ClusteringDistanceMetric;

@@ -1,5 +1,9 @@
 package com.fiberhome.ml.raha.job;
 
+import com.fiberhome.ml.raha.job.stage.ColumnProfileStageHandler;
+import com.fiberhome.ml.raha.job.stage.DataLoadStageHandler;
+import com.fiberhome.ml.raha.job.stage.StrategyPlanStageHandler;
+import com.fiberhome.ml.raha.job.stage.StrategyRunStageHandler;
 import com.fiberhome.ml.raha.config.ConfigVersioner;
 import com.fiberhome.ml.raha.config.RahaConfigValidator;
 import com.fiberhome.ml.raha.config.RahaJobConfig;

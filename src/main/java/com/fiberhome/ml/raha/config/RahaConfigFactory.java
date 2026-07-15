@@ -6,6 +6,7 @@ import com.fiberhome.ml.raha.data.JobType;
 import com.fiberhome.ml.raha.data.StrategyFamily;
 import com.fiberhome.ml.raha.label.LabelPropagationConfig;
 import com.fiberhome.ml.raha.model.LogisticRegressionTrainingConfig;
+import com.fiberhome.ml.raha.model.TreeModelTrainingConfig;
 import com.fiberhome.ml.raha.performance.BenchmarkDatasetSpec;
 import com.fiberhome.ml.raha.performance.BenchmarkScale;
 import com.fiberhome.ml.raha.performance.CapacityBand;
@@ -155,6 +156,22 @@ public final class RahaConfigFactory {
                 properties.getInt("raha.model.logistic.max-iterations"),
                 properties.getDouble("raha.model.logistic.regularization"),
                 properties.getDouble("raha.model.logistic.elastic-net"));
+    }
+
+    /**
+     * 创建决策树和梯度提升树训练配置。
+     *
+     * @return 树模型训练配置
+     */
+    public TreeModelTrainingConfig treeModelTrainingConfig() {
+        return new TreeModelTrainingConfig(
+                properties.getInt("raha.model.tree.max-depth"),
+                properties.getInt("raha.model.tree.max-bins"),
+                properties.getInt("raha.model.tree.min-instances-per-node"),
+                properties.getDouble("raha.model.tree.min-info-gain"),
+                properties.getInt("raha.model.gbt.max-iterations"),
+                properties.getDouble("raha.model.gbt.step-size"),
+                properties.getDouble("raha.model.gbt.subsampling-rate"));
     }
 
     public StrategyGenerationConfig strategyGenerationConfig() {

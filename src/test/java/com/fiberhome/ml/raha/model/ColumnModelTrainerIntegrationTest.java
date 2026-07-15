@@ -60,6 +60,43 @@ class ColumnModelTrainerIntegrationTest {
     }
 
     @Test
+    void shouldTrainDecisionTreeAndPredictFromPortablePayload() {
+        TrainingFixture fixture = fixture();
+        ColumnModelTrainingRequest request = request(fixture.dataset,
+                ClassifierType.DECISION_TREE, false, 0.5d);
+        ColumnModelTrainingResult result = new SparkMllibDecisionTreeTrainer(
+                SparkTestSession.get(), new ColumnModelVersioner()).train(request);
+
+        assertEquals(ColumnModelTrainingStatus.TRAINED, result.getStatus());
+        assertNotNull(result.getArtifact());
+        assertEquals(ClassifierType.DECISION_TREE,
+                result.getArtifact().getClassifierType());
+        assertTrue(result.getArtifact().getModelPayload().length() > 0);
+        List<ColumnPrediction> predictions = new ColumnModelPredictor().predict(
+                result.getArtifact(), fixture.rows);
+        assertEquals(fixture.rows.size(), predictions.size());
+        assertTrue(predictions.stream().anyMatch(ColumnPrediction::isError));
+    }
+
+    @Test
+    void shouldTrainGbtAndPredictFromPortablePayload() {
+        TrainingFixture fixture = fixture();
+        ColumnModelTrainingRequest request = request(fixture.dataset,
+                ClassifierType.GBT, false, 0.5d);
+        ColumnModelTrainingResult result = new SparkMllibGbtTrainer(
+                SparkTestSession.get(), new ColumnModelVersioner()).train(request);
+
+        assertEquals(ColumnModelTrainingStatus.TRAINED, result.getStatus());
+        assertNotNull(result.getArtifact());
+        assertEquals(ClassifierType.GBT, result.getArtifact().getClassifierType());
+        assertTrue(result.getArtifact().getModelPayload().length() > 0);
+        List<ColumnPrediction> predictions = new ColumnModelPredictor().predict(
+                result.getArtifact(), fixture.rows);
+        assertEquals(fixture.rows.size(), predictions.size());
+        assertTrue(predictions.stream().anyMatch(ColumnPrediction::isError));
+    }
+
+    @Test
     void shouldFallbackToWeightedRuleWhenMllibTrainingFails() {
         TrainingFixture fixture = fixture();
         ColumnModelTrainingRequest request = request(fixture.dataset,

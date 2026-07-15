@@ -99,6 +99,7 @@ public final class FileColumnModelStore implements ColumnModelStore {
         values.put("threshold", String.valueOf(artifact.getThreshold()));
         values.put("intercept", String.valueOf(artifact.getIntercept()));
         values.put("trainingMode", artifact.getTrainingMode());
+        values.put("modelPayload", artifact.getModelPayload());
         for (Map.Entry<Integer, Double> entry : artifact.getCoefficients().entrySet()) {
             values.put("coefficient." + entry.getKey(), String.valueOf(entry.getValue()));
         }
@@ -129,7 +130,8 @@ public final class FileColumnModelStore implements ColumnModelStore {
                 required(properties, "featureDictionaryVersion"), dimension,
                 Double.parseDouble(required(properties, "threshold")),
                 Double.parseDouble(required(properties, "intercept")), coefficients,
-                required(properties, "trainingMode"));
+                required(properties, "trainingMode"),
+                properties.getProperty("modelPayload", ""));
     }
 
     private void ensureInsideRoot(Path path) {

@@ -52,6 +52,22 @@ public final class FmdbModelStore implements ColumnModelStore {
                     field("threshold", DataTypes.DoubleType, false),
                     field("intercept", DataTypes.DoubleType, false),
                     field("coefficients", DataTypes.StringType, false),
+                    field("model_payload", DataTypes.StringType, false),
+                    field("training_mode", DataTypes.StringType, false),
+                    field("stored_at", DataTypes.LongType, false)
+            });
+    /** 兼容升级前模型表的旧模式。 */
+    private static final StructType LEGACY_MODEL_SCHEMA = DataTypes.createStructType(
+            new StructField[]{
+                    field("model_version", DataTypes.StringType, false),
+                    field("model_name", DataTypes.StringType, false),
+                    field("column_name", DataTypes.StringType, false),
+                    field("classifier_type", DataTypes.StringType, false),
+                    field("dictionary_version", DataTypes.StringType, false),
+                    field("feature_dimension", DataTypes.IntegerType, false),
+                    field("threshold", DataTypes.DoubleType, false),
+                    field("intercept", DataTypes.DoubleType, false),
+                    field("coefficients", DataTypes.StringType, false),
                     field("training_mode", DataTypes.StringType, false),
                     field("stored_at", DataTypes.LongType, false)
             });
@@ -121,13 +137,26 @@ public final class FmdbModelStore implements ColumnModelStore {
         for (Map.Entry<Integer, Double> entry : artifact.getCoefficients().entrySet()) {
             coefficients.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
         }
-        Row row = RowFactory.create(artifact.getModelVersion(), artifact.getModelName(),
+        boolean legacyTable = tableGateway.tableExists(modelTable)
+                && !hasModelPayloadColumn();
+        if (legacyTable && !artifact.getModelPayload().isEmpty()) {
+            throw new IllegalStateException("FMDB 模型表缺少 model_payload 列，无法保存树模型");
+        }
+        Row row = legacyTable
+                ? RowFactory.create(artifact.getModelVersion(), artifact.getModelName(),
                 artifact.getColumnName(), artifact.getClassifierType().name(),
                 artifact.getFeatureDictionaryVersion(), artifact.getFeatureDimension(),
                 artifact.getThreshold(), artifact.getIntercept(),
-                FormDataCodec.encode(coefficients), artifact.getTrainingMode(), positiveNow());
+                FormDataCodec.encode(coefficients), artifact.getTrainingMode(), positiveNow())
+                : RowFactory.create(artifact.getModelVersion(), artifact.getModelName(),
+                artifact.getColumnName(), artifact.getClassifierType().name(),
+                artifact.getFeatureDictionaryVersion(), artifact.getFeatureDimension(),
+                artifact.getThreshold(), artifact.getIntercept(),
+                FormDataCodec.encode(coefficients), artifact.getModelPayload(),
+                artifact.getTrainingMode(), positiveNow());
         tableGateway.appendIdempotent(modelTable,
-                sparkSession.createDataFrame(Collections.singletonList(row), MODEL_SCHEMA),
+                sparkSession.createDataFrame(Collections.singletonList(row),
+                        legacyTable ? LEGACY_MODEL_SCHEMA : MODEL_SCHEMA),
                 Collections.singletonList("model_version"));
         modelCache.put(path, artifact);
         LOGGER.info("FMDB 列级模型保存完成，modelVersion={}，columnName={}",
@@ -236,7 +265,9 @@ public final class FmdbModelStore implements ColumnModelStore {
                 ClassifierType.valueOf(row.getAs("classifier_type")),
                 row.getAs("dictionary_version"), row.getAs("feature_dimension"),
                 row.getAs("threshold"), row.getAs("intercept"), coefficients,
-                row.getAs("training_mode"));
+                row.getAs("training_mode"),
+                hasColumn(rows, "model_payload")
+                        ? row.getAs("model_payload") : "");
     }
 
     private FeatureDictionary findDictionary(String version) {
@@ -303,7 +334,21 @@ public final class FmdbModelStore implements ColumnModelStore {
                 && Double.compare(first.getThreshold(), second.getThreshold()) == 0
                 && Double.compare(first.getIntercept(), second.getIntercept()) == 0
                 && first.getCoefficients().equals(second.getCoefficients())
+                && first.getModelPayload().equals(second.getModelPayload())
                 && first.getTrainingMode().equals(second.getTrainingMode());
+    }
+
+    private boolean hasModelPayloadColumn() {
+        return Arrays.asList(tableGateway.read(modelTable).columns())
+                .contains("model_payload");
+    }
+
+    private static boolean hasColumn(List<Row> rows, String columnName) {
+        if (rows == null || rows.isEmpty()) {
+            return false;
+        }
+        return rows.get(0).schema().fieldNames() != null
+                && Arrays.asList(rows.get(0).schema().fieldNames()).contains(columnName);
     }
 
     private static boolean sameDictionary(FeatureDictionary first,

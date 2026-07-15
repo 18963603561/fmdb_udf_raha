@@ -1,9 +1,12 @@
-package com.fiberhome.ml.raha.job;
+package com.fiberhome.ml.raha.job.stage;
 
 import com.fiberhome.ml.raha.data.StageType;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.LoadedDataset;
 import com.fiberhome.ml.raha.data.loader.RahaDatasetLoader;
+import com.fiberhome.ml.raha.job.StageAttributeKeys;
+import com.fiberhome.ml.raha.job.StageExecutionContext;
+import com.fiberhome.ml.raha.job.StageResult;
 
 /**
  * 执行外部数据读取并将只读数据集和快照写入阶段上下文。
@@ -36,4 +39,3 @@ public final class DataLoadStageHandler implements StageHandler {
         return StageResult.successWithSnapshot(loadedDataset.getSnapshot().getSnapshotId());
     }
 }
-

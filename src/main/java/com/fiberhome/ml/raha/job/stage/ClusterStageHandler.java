@@ -1,10 +1,13 @@
-package com.fiberhome.ml.raha.job;
+package com.fiberhome.ml.raha.job.stage;
 
 import com.fiberhome.ml.raha.cluster.ClusteringBatchResult;
 import com.fiberhome.ml.raha.cluster.ColumnClusteringService;
 import com.fiberhome.ml.raha.data.StageType;
 import com.fiberhome.ml.raha.feature.FeatureAssemblyResult;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
+import com.fiberhome.ml.raha.job.StageAttributeKeys;
+import com.fiberhome.ml.raha.job.StageExecutionContext;
+import com.fiberhome.ml.raha.job.StageResult;
 
 /**
  * 对当前任务的单列稀疏特征执行聚类并持久化成员映射。

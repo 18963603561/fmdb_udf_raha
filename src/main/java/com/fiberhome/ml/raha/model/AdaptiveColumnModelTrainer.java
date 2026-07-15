@@ -16,14 +16,27 @@ public final class AdaptiveColumnModelTrainer implements ColumnModelTrainer {
     private final ColumnModelTrainer mllibTrainer;
     /** 规则加权降级训练器。 */
     private final ColumnModelTrainer fallbackTrainer;
+    /** 决策树训练器，可为空表示当前装配未启用。 */
+    private final ColumnModelTrainer decisionTreeTrainer;
+    /** 梯度提升树训练器，可为空表示当前装配未启用。 */
+    private final ColumnModelTrainer gbtTrainer;
 
     public AdaptiveColumnModelTrainer(ColumnModelTrainer mllibTrainer,
                                       ColumnModelTrainer fallbackTrainer) {
+        this(mllibTrainer, fallbackTrainer, null, null);
+    }
+
+    public AdaptiveColumnModelTrainer(ColumnModelTrainer mllibTrainer,
+                                      ColumnModelTrainer fallbackTrainer,
+                                      ColumnModelTrainer decisionTreeTrainer,
+                                      ColumnModelTrainer gbtTrainer) {
         if (mllibTrainer == null || fallbackTrainer == null) {
             throw new IllegalArgumentException("自适应训练器依赖不能为空");
         }
         this.mllibTrainer = mllibTrainer;
         this.fallbackTrainer = fallbackTrainer;
+        this.decisionTreeTrainer = decisionTreeTrainer;
+        this.gbtTrainer = gbtTrainer;
     }
 
     @Override
@@ -51,6 +64,12 @@ public final class AdaptiveColumnModelTrainer implements ColumnModelTrainer {
                     result.getStatus());
             return fallbackTrainer.train(request);
         }
+        if (preferred == ClassifierType.DECISION_TREE && decisionTreeTrainer != null) {
+            return trainWithFallback(request, decisionTreeTrainer, "决策树");
+        }
+        if (preferred == ClassifierType.GBT && gbtTrainer != null) {
+            return trainWithFallback(request, gbtTrainer, "梯度提升树");
+        }
         if (request.getModelConfig().isFallbackEnabled()) {
             LOGGER.warn("首选分类器尚未实现，使用规则加权降级，datasetId={}，"
                             + "columnName={}，classifierType={}",
@@ -62,5 +81,19 @@ public final class AdaptiveColumnModelTrainer implements ColumnModelTrainer {
                 request.getDatasetId(), request.getDataset().getColumnName(), preferred);
         return new ColumnModelTrainingResult(ColumnModelTrainingStatus.FAILED,
                 null, false, "首选分类器未实现且禁止规则降级", null);
+    }
+
+    private ColumnModelTrainingResult trainWithFallback(ColumnModelTrainingRequest request,
+                                                        ColumnModelTrainer trainer,
+                                                        String classifierName) {
+        ColumnModelTrainingResult result = trainer.train(request);
+        if (result.getStatus() == ColumnModelTrainingStatus.TRAINED
+                || !request.getModelConfig().isFallbackEnabled()) {
+            return result;
+        }
+        LOGGER.warn("{}训练未成功，准备使用规则加权降级，datasetId={}，columnName={}，status={}",
+                classifierName, request.getDatasetId(), request.getDataset().getColumnName(),
+                result.getStatus());
+        return fallbackTrainer.train(request);
     }
 }
