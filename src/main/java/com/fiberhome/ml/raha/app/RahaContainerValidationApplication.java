@@ -100,10 +100,12 @@ public final class RahaContainerValidationApplication {
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(
             RahaContainerValidationApplication.class);
-    /** 样例数据集标识。 */
-    private static final String DATASET_ID = "raha-toy";
-    /** 样例数据快照标识。 */
-    private static final String SNAPSHOT_ID = "toy-snapshot-v1";
+    /** 当前验收数据集标识，可通过系统属性覆盖。 */
+    private static final String DATASET_ID = System.getProperty(
+            "fmdb.validation.dataset-id", "raha-toy");
+    /** 当前验收数据快照标识，可通过系统属性覆盖。 */
+    private static final String SNAPSHOT_ID = System.getProperty(
+            "fmdb.validation.snapshot-id", DATASET_ID + "-snapshot-v1");
     /** 脏表临时视图。 */
     private static final String DIRTY_TABLE = "raha_toy_dirty";
     /** 真值表临时视图。 */
@@ -114,12 +116,13 @@ public final class RahaContainerValidationApplication {
     private static final String DICTIONARY_TABLE = "raha_toy_dictionaries";
     /** 检测结果临时表。 */
     private static final String RESULT_TABLE = "raha_toy_detection_results";
-    /** 样例稳定行标识字段。 */
-    private static final String ROW_ID_COLUMN = "ID";
-    /** 训练任务标识。 */
-    private static final String TRAIN_JOB_ID = "raha-toy-train-job";
-    /** 检测任务标识。 */
-    private static final String DETECT_JOB_ID = "raha-toy-detect-job";
+    /** 当前验收稳定行标识字段，可通过系统属性覆盖。 */
+    private static final String ROW_ID_COLUMN = System.getProperty(
+            "fmdb.validation.row-id-column", "ID");
+    /** 当前训练任务标识。 */
+    private static final String TRAIN_JOB_ID = DATASET_ID + "-train-job";
+    /** 当前检测任务标识。 */
+    private static final String DETECT_JOB_ID = DATASET_ID + "-detect-job";
     /** 当前配置版本。 */
     private final String configVersion;
     /** 当前系统时钟。 */
@@ -199,7 +202,7 @@ public final class RahaContainerValidationApplication {
                     SNAPSHOT_ID);
             GroundTruthDifferenceResult truth = new GroundTruthDifferenceService(
                     new DefaultCellLabelRepository(coreStorage), clock).compareAndSave(
-                    "raha-toy-evaluation", dirtyDataset, cleanDataset,
+                    DATASET_ID + "-evaluation", dirtyDataset, cleanDataset,
                     version("ground-truth-stage"));
 
             Path queueDirectory = outputDirectory.resolve("udf-requests");
@@ -326,7 +329,7 @@ public final class RahaContainerValidationApplication {
                         jobConfig, truth.getLabels(), LabelPropagationMethod.HOMOGENEITY,
                         configFactory.labelPropagationConfig(),
                         configFactory.logisticRegressionTrainingConfig(),
-                        "raha-toy", version("train-stage")));
+                        DATASET_ID, version("train-stage")));
         if (trained.getStatus() != RahaTaskStatus.SUCCEEDED
                 || trained.getPayload() == null
                 || trained.getPayload().getCandidateModels().isEmpty()) {
@@ -435,6 +438,8 @@ public final class RahaContainerValidationApplication {
                               String detectUdfResult,
                               long elapsedMillis) {
         String summary = "{\n"
+                + "  \"datasetId\": \"" + escape(DATASET_ID) + "\",\n"
+                + "  \"rowIdColumn\": \"" + escape(ROW_ID_COLUMN) + "\",\n"
                 + "  \"sparkVersion\": \"" + escape(spark.version()) + "\",\n"
                 + "  \"sparkMaster\": \"" + escape(spark.sparkContext().master()) + "\",\n"
                 + "  \"rowCount\": " + rowCount + ",\n"

@@ -1,0 +1,246 @@
+{
+  "dataset": {
+    "rowCount": 2376,
+    "columnCount": 7,
+    "detectableColumnCount": 6,
+    "actualErrorCount": 4920
+  },
+  "python": {
+    "detectedCount": 3841,
+    "truePositive": 3606,
+    "falsePositive": 235,
+    "falseNegative": 1314,
+    "precision": 0.9388180161416297,
+    "recall": 0.7329268292682927,
+    "f1": 0.8231936993493892,
+    "strategyCount": 308,
+    "labelingBudget": 20,
+    "labeledTupleCount": 20,
+    "propagatedLabelCount": 13494
+  },
+  "java": {
+    "detectedCount": 9504,
+    "truePositive": 4920,
+    "falsePositive": 4584,
+    "falseNegative": 0,
+    "precision": 0.5176767676767676,
+    "recall": 1.0,
+    "f1": 0.6821963394342762,
+    "resultRowCount": 9504,
+    "candidateModelCount": 4,
+    "elapsedMillis": 172911
+  },
+  "overlap": {
+    "bothDetectedCount": 3841,
+    "bothTruePositive": 3606,
+    "bothFalsePositive": 235,
+    "pythonOnlyDetectedCount": 0,
+    "pythonOnlyTruePositive": 0,
+    "pythonOnlyFalsePositive": 0,
+    "javaOnlyDetectedCount": 5663,
+    "javaOnlyTruePositive": 1314,
+    "javaOnlyFalsePositive": 4349,
+    "detectedJaccard": 0.4041456228956229
+  },
+  "byColumn": {
+    "tuple_id": {
+      "actualErrorCount": 0,
+      "python": {
+        "detectedCount": 0,
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "java": {
+        "detectedCount": 0,
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "overlapDetectedCount": 0,
+      "pythonOnlyDetectedCount": 0,
+      "javaOnlyDetectedCount": 0,
+      "javaScore": null
+    },
+    "src": {
+      "actualErrorCount": 0,
+      "python": {
+        "detectedCount": 0,
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "java": {
+        "detectedCount": 0,
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "overlapDetectedCount": 0,
+      "pythonOnlyDetectedCount": 0,
+      "javaOnlyDetectedCount": 0,
+      "javaScore": null
+    },
+    "flight": {
+      "actualErrorCount": 0,
+      "python": {
+        "detectedCount": 0,
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "java": {
+        "detectedCount": 0,
+        "truePositive": 0,
+        "falsePositive": 0,
+        "falseNegative": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "overlapDetectedCount": 0,
+      "pythonOnlyDetectedCount": 0,
+      "javaOnlyDetectedCount": 0,
+      "javaScore": null
+    },
+    "sched_dep_time": {
+      "actualErrorCount": 911,
+      "python": {
+        "detectedCount": 873,
+        "truePositive": 873,
+        "falsePositive": 0,
+        "falseNegative": 38,
+        "precision": 1.0,
+        "recall": 0.9582875960482986,
+        "f1": 0.9786995515695067
+      },
+      "java": {
+        "detectedCount": 2376,
+        "truePositive": 911,
+        "falsePositive": 1465,
+        "falseNegative": 0,
+        "precision": 0.38341750841750843,
+        "recall": 1.0,
+        "f1": 0.5543048372376027
+      },
+      "overlapDetectedCount": 873,
+      "pythonOnlyDetectedCount": 0,
+      "javaOnlyDetectedCount": 1503,
+      "javaScore": {
+        "count": 2376,
+        "minimum": 1.0,
+        "maximum": 1.0,
+        "mean": 1.0,
+        "atOrAboveThreshold": 2376
+      }
+    },
+    "act_dep_time": {
+      "actualErrorCount": 1558,
+      "python": {
+        "detectedCount": 1046,
+        "truePositive": 887,
+        "falsePositive": 159,
+        "falseNegative": 671,
+        "precision": 0.8479923518164436,
+        "recall": 0.5693196405648266,
+        "f1": 0.6812596006144392
+      },
+      "java": {
+        "detectedCount": 2376,
+        "truePositive": 1558,
+        "falsePositive": 818,
+        "falseNegative": 0,
+        "precision": 0.6557239057239057,
+        "recall": 1.0,
+        "f1": 0.7920691408235893
+      },
+      "overlapDetectedCount": 1046,
+      "pythonOnlyDetectedCount": 0,
+      "javaOnlyDetectedCount": 1330,
+      "javaScore": {
+        "count": 2376,
+        "minimum": 0.9999693678188927,
+        "maximum": 1.0,
+        "mean": 0.9999999793112637,
+        "atOrAboveThreshold": 2376
+      }
+    },
+    "sched_arr_time": {
+      "actualErrorCount": 1100,
+      "python": {
+        "detectedCount": 1046,
+        "truePositive": 999,
+        "falsePositive": 47,
+        "falseNegative": 101,
+        "precision": 0.9550669216061185,
+        "recall": 0.9081818181818182,
+        "f1": 0.9310344827586208
+      },
+      "java": {
+        "detectedCount": 2376,
+        "truePositive": 1100,
+        "falsePositive": 1276,
+        "falseNegative": 0,
+        "precision": 0.46296296296296297,
+        "recall": 1.0,
+        "f1": 0.6329113924050632
+      },
+      "overlapDetectedCount": 1046,
+      "pythonOnlyDetectedCount": 0,
+      "javaOnlyDetectedCount": 1330,
+      "javaScore": {
+        "count": 2376,
+        "minimum": 1.0,
+        "maximum": 1.0,
+        "mean": 1.0,
+        "atOrAboveThreshold": 2376
+      }
+    },
+    "act_arr_time": {
+      "actualErrorCount": 1351,
+      "python": {
+        "detectedCount": 876,
+        "truePositive": 847,
+        "falsePositive": 29,
+        "falseNegative": 504,
+        "precision": 0.9668949771689498,
+        "recall": 0.6269430051813472,
+        "f1": 0.7606645711719803
+      },
+      "java": {
+        "detectedCount": 2376,
+        "truePositive": 1351,
+        "falsePositive": 1025,
+        "falseNegative": 0,
+        "precision": 0.5686026936026936,
+        "recall": 1.0,
+        "f1": 0.7249798765763348
+      },
+      "overlapDetectedCount": 876,
+      "pythonOnlyDetectedCount": 0,
+      "javaOnlyDetectedCount": 1500,
+      "javaScore": {
+        "count": 2376,
+        "minimum": 0.9999999997348634,
+        "maximum": 1.0,
+        "mean": 0.9999999999998734,
+        "atOrAboveThreshold": 2376
+      }
+    }
+  }
+}
