@@ -193,9 +193,7 @@ public final class RahaTrainService {
                 if (outcome.candidate != null) {
                     candidates.put(columnName, outcome.candidate);
                 } else if (outcome.trainingResult.getStatus()
-                        == ColumnModelTrainingStatus.FAILED
-                        || outcome.trainingResult.getStatus()
-                        == ColumnModelTrainingStatus.MLLIB_UNAVAILABLE) {
+                        == ColumnModelTrainingStatus.FAILED) {
                     failedCount++;
                 } else {
                     skippedCount++;

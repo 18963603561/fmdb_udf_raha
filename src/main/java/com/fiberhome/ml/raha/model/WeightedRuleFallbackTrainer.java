@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 在 MLlib 不可用时根据标签和特征加权均值生成可解释线性降级模型。
+ * 在 MLlib 训练失败时根据标签和特征加权均值生成可解释线性降级模型。
  */
 public final class WeightedRuleFallbackTrainer implements ColumnModelTrainer {
 

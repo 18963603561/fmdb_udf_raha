@@ -17,14 +17,14 @@ import java.util.Properties;
 import java.util.Set;
 
 /**
- * 按类路径默认值、外部文件和系统属性顺序加载 Raha 配置。
+ * 按内置默认值、外部文件和系统属性顺序加载 Raha 配置。
  */
 public final class RahaConfigLoader {
 
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(
             RahaConfigLoader.class);
-    /** 默认类路径配置文件。 */
+    /** 内置默认配置资源。 */
     public static final String DEFAULT_RESOURCE = "raha-defaults.properties";
     /** 指定外部覆盖文件的系统属性。 */
     public static final String EXTERNAL_FILE_PROPERTY = "raha.config.file";
@@ -32,7 +32,7 @@ public final class RahaConfigLoader {
     public static final String EXTERNAL_FILE_ENV = "RAHA_CONFIG_FILE";
     /** 可由系统属性直接覆盖的业务配置前缀。 */
     private static final String BUSINESS_PREFIX = "raha.";
-    /** 用于读取类路径资源的类加载器。 */
+    /** 用于读取内置资源的类加载器。 */
     private final ClassLoader classLoader;
 
     public RahaConfigLoader() {
@@ -69,7 +69,7 @@ public final class RahaConfigLoader {
     }
 
     private RahaProperties loadInternal(Path externalFile) {
-        Properties merged = loadClasspathDefaults();
+        Properties merged = loadBundledDefaults();
         Set<String> knownKeys = new LinkedHashSet<String>(
                 merged.stringPropertyNames());
         if (externalFile != null) {
@@ -82,11 +82,11 @@ public final class RahaConfigLoader {
         return new RahaProperties(merged);
     }
 
-    private Properties loadClasspathDefaults() {
+    private Properties loadBundledDefaults() {
         InputStream stream = classLoader.getResourceAsStream(DEFAULT_RESOURCE);
         if (stream == null) {
             throw new RahaConfigurationException(null,
-                    "类路径默认配置不存在：" + DEFAULT_RESOURCE);
+                    "内置默认配置不存在：" + DEFAULT_RESOURCE);
         }
         try (Reader reader = new BufferedReader(new InputStreamReader(
                 stream, StandardCharsets.UTF_8))) {
@@ -94,10 +94,10 @@ public final class RahaConfigLoader {
             properties.load(reader);
             return properties;
         } catch (IOException exception) {
-            LOGGER.error("读取类路径默认配置失败，resource={}",
+            LOGGER.error("读取内置默认配置失败，resource={}",
                     DEFAULT_RESOURCE, exception);
             throw new RahaConfigurationException(null,
-                    "读取类路径默认配置失败：" + DEFAULT_RESOURCE, exception);
+                    "读取内置默认配置失败：" + DEFAULT_RESOURCE, exception);
         }
     }
 

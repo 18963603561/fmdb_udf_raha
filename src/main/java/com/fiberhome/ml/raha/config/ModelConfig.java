@@ -16,7 +16,7 @@ public final class ModelConfig {
     private final ClassifierType classifierType;
     /** 判定疑似错误的分数阈值。 */
     private final double threshold;
-    /** 首选分类器不可用时是否允许规则加权降级。 */
+    /** 首选分类器训练失败时是否允许规则加权降级。 */
     private final boolean fallbackEnabled;
     /** 各策略族在基础检测中的可靠度权重。 */
     private final Map<StrategyFamily, Double> strategyFamilyWeights;

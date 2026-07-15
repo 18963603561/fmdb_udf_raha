@@ -34,7 +34,7 @@ class RahaConfigLoaderTest {
     Path temporaryDirectory;
 
     @Test
-    void shouldBuildAllDefaultConfigurationGroupsFromClasspath() {
+    void shouldBuildAllDefaultConfigurationGroupsFromBundledResource() {
         RahaConfigFactory factory = new RahaConfigFactory(
                 new RahaConfigLoader().load());
         RahaJobConfig job = factory.jobConfig(JobType.DETECTION,
@@ -120,7 +120,7 @@ class RahaConfigLoaderTest {
     }
 
     @Test
-    void shouldApplySystemPropertyAfterClasspathAndExternalFile() throws Exception {
+    void shouldApplySystemPropertyAfterBundledResourceAndExternalFile() throws Exception {
         String key = "raha.resource.max-parallel-columns";
         String previous = System.getProperty(key);
         Path override = temporaryDirectory.resolve("system-priority.properties");

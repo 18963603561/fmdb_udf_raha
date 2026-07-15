@@ -60,15 +60,14 @@ class ColumnModelTrainerIntegrationTest {
     }
 
     @Test
-    void shouldFallbackToWeightedRuleWhenMllibIsUnavailable() {
+    void shouldFallbackToWeightedRuleWhenMllibTrainingFails() {
         TrainingFixture fixture = fixture();
         ColumnModelTrainingRequest request = request(fixture.dataset,
                 ClassifierType.LOGISTIC_REGRESSION, true, 0.5d);
         ColumnModelTrainer adaptive = new AdaptiveColumnModelTrainer(
-                () -> false,
                 ignored -> new ColumnModelTrainingResult(
                         ColumnModelTrainingStatus.FAILED, null, false,
-                        "测试不应调用 MLlib", null),
+                        "模拟 MLlib 训练失败", null),
                 new WeightedRuleFallbackTrainer(new ColumnModelVersioner()));
 
         ColumnModelTrainingResult result = adaptive.train(request);
@@ -85,20 +84,19 @@ class ColumnModelTrainerIntegrationTest {
     }
 
     @Test
-    void shouldReturnUnavailableWithoutFallbackModel() {
+    void shouldReturnMllibFailureWhenFallbackIsDisabled() {
         TrainingFixture fixture = fixture();
         ColumnModelTrainingRequest request = request(fixture.dataset,
                 ClassifierType.LOGISTIC_REGRESSION, false, 0.5d);
         ColumnModelTrainer adaptive = new AdaptiveColumnModelTrainer(
-                () -> false,
                 ignored -> new ColumnModelTrainingResult(
                         ColumnModelTrainingStatus.FAILED, null, false,
-                        "测试不应调用 MLlib", null),
+                        "模拟 MLlib 训练失败", null),
                 new WeightedRuleFallbackTrainer(new ColumnModelVersioner()));
 
         ColumnModelTrainingResult result = adaptive.train(request);
 
-        assertEquals(ColumnModelTrainingStatus.MLLIB_UNAVAILABLE, result.getStatus());
+        assertEquals(ColumnModelTrainingStatus.FAILED, result.getStatus());
         assertNull(result.getArtifact());
     }
 

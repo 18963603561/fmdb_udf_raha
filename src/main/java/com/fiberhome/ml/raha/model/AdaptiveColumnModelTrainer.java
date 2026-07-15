@@ -5,27 +5,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 根据首选分类器和 MLlib 可用性选择逻辑回归或明确标记的降级训练器。
+ * 根据首选分类器和 MLlib 训练结果选择逻辑回归或明确标记的降级训练器。
  */
 public final class AdaptiveColumnModelTrainer implements ColumnModelTrainer {
 
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(
             AdaptiveColumnModelTrainer.class);
-    /** MLlib 运行时可用性判断器。 */
-    private final MllibAvailability availability;
     /** Spark MLlib 逻辑回归训练器。 */
     private final ColumnModelTrainer mllibTrainer;
     /** 规则加权降级训练器。 */
     private final ColumnModelTrainer fallbackTrainer;
 
-    public AdaptiveColumnModelTrainer(MllibAvailability availability,
-                                      ColumnModelTrainer mllibTrainer,
+    public AdaptiveColumnModelTrainer(ColumnModelTrainer mllibTrainer,
                                       ColumnModelTrainer fallbackTrainer) {
-        if (availability == null || mllibTrainer == null || fallbackTrainer == null) {
+        if (mllibTrainer == null || fallbackTrainer == null) {
             throw new IllegalArgumentException("自适应训练器依赖不能为空");
         }
-        this.availability = availability;
         this.mllibTrainer = mllibTrainer;
         this.fallbackTrainer = fallbackTrainer;
     }
@@ -44,7 +40,7 @@ public final class AdaptiveColumnModelTrainer implements ColumnModelTrainer {
                     request.getDatasetId(), request.getDataset().getColumnName());
             return fallbackTrainer.train(request);
         }
-        if (preferred == ClassifierType.LOGISTIC_REGRESSION && availability.isAvailable()) {
+        if (preferred == ClassifierType.LOGISTIC_REGRESSION) {
             ColumnModelTrainingResult result = mllibTrainer.train(request);
             if (result.getStatus() == ColumnModelTrainingStatus.TRAINED
                     || !request.getModelConfig().isFallbackEnabled()) {
@@ -53,15 +49,18 @@ public final class AdaptiveColumnModelTrainer implements ColumnModelTrainer {
             LOGGER.warn("MLlib 训练未成功，准备使用规则加权降级，datasetId={}，columnName={}，status={}",
                     request.getDatasetId(), request.getDataset().getColumnName(),
                     result.getStatus());
-        }
-        if (request.getModelConfig().isFallbackEnabled()) {
-            LOGGER.warn("MLlib 不可用，使用规则加权降级，datasetId={}，columnName={}",
-                    request.getDatasetId(), request.getDataset().getColumnName());
             return fallbackTrainer.train(request);
         }
-        LOGGER.warn("MLlib 不可用且禁止降级，datasetId={}，columnName={}",
-                request.getDatasetId(), request.getDataset().getColumnName());
-        return new ColumnModelTrainingResult(ColumnModelTrainingStatus.MLLIB_UNAVAILABLE,
-                null, false, "首选分类器不可用且禁止规则降级", null);
+        if (request.getModelConfig().isFallbackEnabled()) {
+            LOGGER.warn("首选分类器尚未实现，使用规则加权降级，datasetId={}，"
+                            + "columnName={}，classifierType={}",
+                    request.getDatasetId(), request.getDataset().getColumnName(), preferred);
+            return fallbackTrainer.train(request);
+        }
+        LOGGER.warn("首选分类器未实现且禁止降级，datasetId={}，columnName={}，"
+                        + "classifierType={}",
+                request.getDatasetId(), request.getDataset().getColumnName(), preferred);
+        return new ColumnModelTrainingResult(ColumnModelTrainingStatus.FAILED,
+                null, false, "首选分类器未实现且禁止规则降级", null);
     }
 }
