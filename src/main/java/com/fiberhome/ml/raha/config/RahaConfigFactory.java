@@ -91,7 +91,11 @@ public final class RahaConfigFactory {
                 modelRvdConflictContextSignalWeight(),
                 modelNullContextSignalWeight(),
                 modelBlankContextSignalWeight(),
-                modelMixedContextSignalWeight());
+                modelMixedContextSignalWeight(),
+                properties.getBoolean("raha.model.quality-gate.enabled"),
+                properties.getDouble("raha.model.quality-gate.minimum-score-stddev"),
+                properties.getDouble("raha.model.quality-gate.maximum-positive-ratio"),
+                properties.getDouble("raha.model.quality-gate.minimum-f1"));
     }
 
     public Map<StrategyFamily, Double> modelStrategyFamilyWeights() {

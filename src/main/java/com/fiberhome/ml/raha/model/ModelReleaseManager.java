@@ -64,6 +64,11 @@ public final class ModelReleaseManager {
                 model == null ? null : model.getColumnName(),
                 model == null ? null : model.getModelVersion());
         requireModelFile(model);
+        Double qualityGatePassed = model.getMetrics().get("qualityGatePassed");
+        // 新训练链路写入质量门禁结论，未通过的模型禁止进入候选状态。
+        if (qualityGatePassed != null && qualityGatePassed < 1.0d) {
+            throw new IllegalStateException("模型质量门禁未通过，禁止标记候选模型");
+        }
         RahaColumnModel candidate = model.withStatus(ModelStatus.CANDIDATE);
         repository.saveAll(Collections.singletonList(candidate), version, clock.millis());
         LOGGER.info("候选模型标记完成，datasetId={}，columnName={}，modelVersion={}",

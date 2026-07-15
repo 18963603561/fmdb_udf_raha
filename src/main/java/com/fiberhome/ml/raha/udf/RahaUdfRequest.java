@@ -138,6 +138,33 @@ public final class RahaUdfRequest {
         return FormDataCodec.encode(values);
     }
 
+    /**
+     * 生成能够由异步任务消费者重新解析的完整请求表单。
+     *
+     * @return 包含执行所需参数的表单编码文本
+     */
+    public String toEncodedRequest() {
+        Map<String, String> values = new LinkedHashMap<String, String>();
+        values.put("datasetId", datasetId);
+        values.put("inputReference", inputReference);
+        values.put("sourceType", sourceType == DataFormat.FMDB_TABLE ? "TABLE" : "SQL");
+        values.put("rowIdColumn", rowIdColumn);
+        values.put("snapshotId", snapshotId == null ? "" : snapshotId);
+        values.put("idempotencyKey", idempotencyKey);
+        values.put("caller", caller);
+        values.put("resultTable", resultTable);
+        if (annotationReference != null) {
+            values.put("annotationReference", annotationReference);
+        }
+        if (modelVersion != null) {
+            values.put("modelVersion", modelVersion);
+        }
+        if (labelingBudget > 0) {
+            values.put("labelingBudget", String.valueOf(labelingBudget));
+        }
+        return FormDataCodec.encode(values);
+    }
+
     public JobType toJobType() {
         if (taskType == RahaTaskType.TRAIN) {
             return JobType.TRAINING;

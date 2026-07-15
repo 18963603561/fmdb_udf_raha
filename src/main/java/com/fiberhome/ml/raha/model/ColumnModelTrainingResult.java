@@ -63,4 +63,19 @@ public final class ColumnModelTrainingResult {
     public boolean isFallback() { return fallback; }
     public String getMessage() { return message; }
     public Map<String, Double> getMetrics() { return metrics; }
+
+    /**
+     * 使用补充质量指标创建训练结果副本。
+     *
+     * @param additionalMetrics 需要合并的质量指标
+     * @return 指标已经合并的训练结果
+     */
+    public ColumnModelTrainingResult withMetrics(Map<String, Double> additionalMetrics) {
+        if (additionalMetrics == null) {
+            throw new IllegalArgumentException("补充训练指标不能为空");
+        }
+        Map<String, Double> merged = new LinkedHashMap<String, Double>(metrics);
+        merged.putAll(additionalMetrics);
+        return new ColumnModelTrainingResult(status, artifact, fallback, message, merged);
+    }
 }

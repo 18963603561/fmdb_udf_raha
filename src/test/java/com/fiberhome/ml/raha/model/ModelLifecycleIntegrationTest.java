@@ -118,6 +118,28 @@ class ModelLifecycleIntegrationTest {
                 second.getModelVersion()).get().getPublishedAt() > 0L);
     }
 
+    @Test
+    void shouldRejectCandidateWhenQualityGateFailed() {
+        FileColumnModelStore store = new FileColumnModelStore(temporaryDirectory);
+        ColumnModelArtifact artifact = artifact("rejected", 40.0d, 0.0d);
+        Map<String, Double> metrics = new LinkedHashMap<String, Double>();
+        metrics.put("qualityGatePassed", 0.0d);
+        RahaColumnModel model = new RahaColumnModel(artifact.getModelName(),
+                artifact.getModelVersion(), "dataset", artifact.getColumnName(),
+                "schema-v1", artifact.getClassifierType(),
+                artifact.getFeatureDictionaryVersion(), "plan-v1",
+                artifact.getThreshold(), store.save(artifact), ModelStatus.DRAFT,
+                metrics, 1000L);
+        ModelMetadataRepository repository = new DefaultModelMetadataRepository(
+                new InMemoryRahaRepository());
+
+        assertThrows(IllegalStateException.class,
+                () -> releaseManager(repository, 2000L).markCandidate(
+                        model, version("candidate-rejected")));
+        assertFalse(repository.find("dataset", "code",
+                artifact.getModelVersion()).isPresent());
+    }
+
     private static ModelReleaseManager releaseManager(ModelMetadataRepository repository,
                                                        long currentTime) {
         return new ModelReleaseManager(repository,

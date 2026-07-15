@@ -184,7 +184,9 @@ class Iteration4PipelineIntegrationTest {
                 Collections.<String>emptySet(), Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(JobType.DETECTION, "dataset", null,
                 csv.toString(), "id", true, 1L, 30,
-                strategyConfig, FeatureConfig.defaults(), ModelConfig.defaults(),
+                strategyConfig, FeatureConfig.defaults(),
+                new ModelConfig(com.fiberhome.ml.raha.data.ClassifierType.WEIGHTED_RULE,
+                        0.5d, false),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
     }
 

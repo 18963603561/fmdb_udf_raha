@@ -3,6 +3,8 @@ package com.fiberhome.ml.raha.model;
 import com.fiberhome.ml.raha.data.ModelStatus;
 
 import java.time.Clock;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 根据训练请求、模型参数和文件路径创建草稿模型元数据。
@@ -28,10 +30,13 @@ public final class ColumnModelMetadataFactory {
             throw new IllegalArgumentException("只有训练成功结果可以创建模型元数据");
         }
         ColumnModelArtifact artifact = trainingResult.getArtifact();
+        Map<String, Double> metrics = new LinkedHashMap<String, Double>(
+                trainingResult.getMetrics());
+        metrics.put("fallback", trainingResult.isFallback() ? 1.0d : 0.0d);
         return new RahaColumnModel(artifact.getModelName(), artifact.getModelVersion(),
                 request.getDatasetId(), artifact.getColumnName(), request.getSchemaHash(),
                 artifact.getClassifierType(), artifact.getFeatureDictionaryVersion(),
                 request.getStrategyPlanVersion(), artifact.getThreshold(), modelPath,
-                ModelStatus.DRAFT, trainingResult.getMetrics(), clock.millis());
+                ModelStatus.DRAFT, metrics, clock.millis());
     }
 }

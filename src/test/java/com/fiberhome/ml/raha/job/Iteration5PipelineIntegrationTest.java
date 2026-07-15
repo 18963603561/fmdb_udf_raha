@@ -211,7 +211,9 @@ class Iteration5PipelineIntegrationTest {
     private static RahaJobConfig config(Path dirtyPath) {
         return new RahaJobConfig(JobType.EVALUATION, "dataset", null,
                 dirtyPath.toString(), "id", true, 20260714L, 30,
-                StrategyConfig.defaults(), FeatureConfig.defaults(), ModelConfig.defaults(),
+                StrategyConfig.defaults(), FeatureConfig.defaults(),
+                new ModelConfig(com.fiberhome.ml.raha.data.ClassifierType.WEIGHTED_RULE,
+                        0.5d, false),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 3, 100),
                 new SamplingConfig(3, true, false, 60000L),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());

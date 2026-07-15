@@ -52,7 +52,8 @@ class BasicDetectionServiceTest {
 
         DetectionBatchResult batch = fixture.service.detectAndSave(
                 "job", "config", "detect-stage", fixture.features,
-                Collections.singletonList(fixture.hitForJob("job")), ModelConfig.defaults(),
+                Collections.singletonList(fixture.hitForJob("job")),
+                new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, false),
                 new ArtifactVersion("config", "snapshot", "detect-stage", 1));
 
         assertEquals(2, batch.getResults().size());

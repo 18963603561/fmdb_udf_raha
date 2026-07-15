@@ -18,6 +18,7 @@ import com.fiberhome.ml.raha.model.ColumnModelTrainingStatus;
 import com.fiberhome.ml.raha.model.ColumnTrainingDataBuilder;
 import com.fiberhome.ml.raha.model.ColumnTrainingDataset;
 import com.fiberhome.ml.raha.model.ModelReleaseManager;
+import com.fiberhome.ml.raha.model.ModelQualityGate;
 import com.fiberhome.ml.raha.model.RahaColumnModel;
 import com.fiberhome.ml.raha.parallel.BoundedParallelExecutor;
 import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
@@ -30,6 +31,9 @@ import com.fiberhome.ml.raha.strategy.StrategyPlanService;
 import com.fiberhome.ml.raha.util.HashUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.storage.StorageLevel;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -130,10 +134,20 @@ public final class RahaTrainService {
             throw new IllegalArgumentException("训练服务请求不能为空");
         }
         long startedAt = clock.millis();
+        Dataset<Row> inputFrame = request.getDataset().getDataFrame();
+        boolean ownsInputCache = inputFrame.storageLevel().equals(StorageLevel.NONE());
         LOGGER.info("开始 Raha 训练服务，jobId={}，datasetId={}，directLabelCount={}",
                 request.getJobId(), request.getDataset().getDatasetId(),
                 request.getDirectLabels().size());
         try {
+            if (ownsInputCache) {
+                StorageLevel storageLevel = StorageLevel.fromString(
+                        request.getConfig().getResourceConfig().getCacheStorageLevel());
+                LOGGER.info("开始缓存训练公共输入，jobId={}，storageLevel={}",
+                        request.getJobId(), storageLevel.description());
+                inputFrame.persist(storageLevel);
+                inputFrame.count();
+            }
             List<StrategyPlan> plans = planService.generateAndSave(
                     request.getDataset(), request.getConfig().getStrategyConfig(),
                     request.getArtifactVersion());
@@ -144,12 +158,10 @@ public final class RahaTrainService {
                     request.getArtifactVersion(),
                     request.getConfig().getResourceConfig().getMaxParallelStrategies(),
                     request.getConfig().getResourceConfig().getStageTimeoutMillis());
-            FeatureAssemblyResult features = featureService.assembleAndSaveParallel(
+            FeatureAssemblyResult features = featureService.assembleAndSave(
                     request.getJobId(), request.getDataset(), plans,
                     strategyBatch.getHits(), request.getConfig().getFeatureConfig(),
-                    request.getArtifactVersion(),
-                    request.getConfig().getResourceConfig().getMaxParallelColumns(),
-                    request.getConfig().getResourceConfig().getStageTimeoutMillis());
+                    request.getArtifactVersion());
             ClusteringBatchResult clustering = clusteringService.clusterAndSaveParallel(
                     request.getJobId(), features,
                     request.getConfig().getClusteringConfig(),
@@ -238,6 +250,11 @@ public final class RahaTrainService {
             return new RahaTaskResult<RahaTrainOutput>(request.getJobId(),
                     RahaTaskType.TRAIN, RahaTaskStatus.FAILED, null, summary, null,
                     "TRAIN_SERVICE_FAILED", exception.getClass().getSimpleName());
+        } finally {
+            if (ownsInputCache) {
+                inputFrame.unpersist(false);
+                LOGGER.info("训练公共输入缓存已释放，jobId={}", request.getJobId());
+            }
         }
     }
 
@@ -274,6 +291,8 @@ public final class RahaTrainService {
                 request.getDataset().getSchemaHash(), planVersion, trainingDataset,
                 request.getConfig().getModelConfig(), request.getTrainingConfig());
         ColumnModelTrainingResult trainingResult = trainer.train(trainingRequest);
+        trainingResult = ModelQualityGate.evaluate(trainingResult,
+                trainingDataset, request.getConfig().getModelConfig());
         if (trainingResult.getStatus() != ColumnModelTrainingStatus.TRAINED) {
             return new ColumnTrainingOutcome(trainingResult, null);
         }
@@ -295,6 +314,8 @@ public final class RahaTrainService {
             int maxObservedColumnConcurrency) {
         Map<String, String> details = new LinkedHashMap<String, String>();
         details.put("strategyPlanCount", String.valueOf(plans.size()));
+        details.put("strategyFamilyPlanCounts", strategyFamilyPlanCounts(plans));
+        details.put("strategyHitCount", String.valueOf(strategyBatch.getHits().size()));
         details.put("strategyFailureCount", String.valueOf(strategyBatch.getFailedCount()));
         details.put("featureRowCount", String.valueOf(features.getRows().size()));
         details.put("propagatedLabelCount", String.valueOf(
@@ -304,6 +325,16 @@ public final class RahaTrainService {
         details.put("maxObservedColumnConcurrency",
                 String.valueOf(maxObservedColumnConcurrency));
         return details;
+    }
+
+    private static String strategyFamilyPlanCounts(List<StrategyPlan> plans) {
+        Map<String, Integer> counts = new LinkedHashMap<String, Integer>();
+        for (StrategyPlan plan : plans) {
+            String family = plan.getStrategyFamily().name();
+            counts.put(family, counts.containsKey(family)
+                    ? counts.get(family) + 1 : 1);
+        }
+        return counts.toString();
     }
 
     private static final class ColumnTrainingOutcome {

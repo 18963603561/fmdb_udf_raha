@@ -76,11 +76,52 @@ class ColumnModelTrainerIntegrationTest {
         assertTrue(result.isFallback());
         assertEquals(ClassifierType.WEIGHTED_RULE,
                 result.getArtifact().getClassifierType());
-        assertEquals("fallback_weighted_feature_rule",
+        assertEquals("fallback_variance_scaled_weighted_rule",
                 result.getArtifact().getTrainingMode());
         List<ColumnPrediction> predictions = new ColumnModelPredictor().predict(
                 result.getArtifact(), fixture.rows);
         assertTrue(predictions.get(5).getScore() > predictions.get(0).getScore());
+    }
+
+    @Test
+    void shouldKeepWeightedRuleFiniteForLargeCountFeatures() {
+        TrainingFixture fixture = fixture(new double[]{1.0d, 2.0d, 3.0d,
+                1000.0d, 1500.0d, 2000.0d});
+        ColumnModelTrainingResult result = new WeightedRuleFallbackTrainer(
+                new ColumnModelVersioner()).train(request(fixture.dataset,
+                ClassifierType.WEIGHTED_RULE, false, 0.5d));
+
+        assertEquals(ColumnModelTrainingStatus.TRAINED, result.getStatus());
+        List<ColumnPrediction> predictions = new ColumnModelPredictor().predict(
+                result.getArtifact(), fixture.rows);
+        long positiveCount = predictions.stream().filter(
+                ColumnPrediction::isError).count();
+        assertTrue(positiveCount > 0L);
+        assertTrue(positiveCount < predictions.size());
+        assertTrue(predictions.get(5).getScore() > predictions.get(0).getScore());
+    }
+
+    @Test
+    void shouldRejectConstantAllPositiveModelAtQualityGate() {
+        TrainingFixture fixture = fixture();
+        ColumnModelArtifact artifact = new ColumnModelArtifact("raha-code",
+                "constant-model", "code", ClassifierType.WEIGHTED_RULE,
+                fixture.dataset.getFeatureDictionaryVersion(),
+                fixture.dataset.getFeatureDimension(), 0.5d, 40.0d,
+                Collections.<Integer, Double>emptyMap(), "constant-test");
+        ColumnModelTrainingResult trained = new ColumnModelTrainingResult(
+                ColumnModelTrainingStatus.TRAINED, artifact, true,
+                "模拟恒定分数模型", Collections.<String, Double>emptyMap());
+
+        ColumnModelTrainingResult assessed = ModelQualityGate.evaluate(
+                trained, fixture.dataset,
+                new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, false)
+                        .withQualityGateEnabled(true));
+
+        assertEquals(ColumnModelTrainingStatus.FAILED, assessed.getStatus());
+        assertNull(assessed.getArtifact());
+        assertEquals(0.0d, assessed.getMetrics().get("qualityGatePassed"),
+                0.000001d);
     }
 
     @Test
@@ -111,10 +152,13 @@ class ColumnModelTrainerIntegrationTest {
     }
 
     private static TrainingFixture fixture() {
+        return fixture(new double[]{0.1d, 0.2d, 0.3d, 3.0d, 4.0d, 5.0d});
+    }
+
+    private static TrainingFixture fixture(double[] signals) {
         FeatureDictionary dictionary = dictionary();
         List<SparseFeatureRow> rows = new ArrayList<SparseFeatureRow>();
         List<CellLabel> labels = new ArrayList<CellLabel>();
-        double[] signals = new double[]{0.1d, 0.2d, 0.3d, 3.0d, 4.0d, 5.0d};
         for (int index = 0; index < signals.length; index++) {
             String cellId = "c" + (index + 1);
             Map<Integer, Double> values = new LinkedHashMap<Integer, Double>();

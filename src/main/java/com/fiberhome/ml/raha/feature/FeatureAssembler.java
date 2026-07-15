@@ -93,6 +93,7 @@ public final class FeatureAssembler {
         long candidateFeatureCount = 0L;
         long retainedFeatureCount = 0L;
         long removedConstantFeatureCount = 0L;
+        Map<String, List<Row>> rowsByColumn = buildCellRows(dataset);
         LOGGER.info("开始生成单元格特征，datasetId={}，snapshotId={}，planCount={}，hitCount={}",
                 dataset.getDatasetId(), dataset.getSnapshotId(), plans.size(), hits.size());
         for (ColumnMetadata column : dataset.getColumns()) {
@@ -101,7 +102,8 @@ public final class FeatureAssembler {
             }
             LinkedHashMap<String, FeatureSpec> specs = featureSpecs(column.getName(), plans, config);
             List<MutableCellFeatures> cells = buildCells(
-                    dataset, column, specs, hitsByCell, config);
+                    dataset, column, specs, hitsByCell, config,
+                    rowsByColumn.get(column.getName()));
             cellCount += cells.size();
             candidateFeatureCount += specs.size();
             List<FeatureSpec> retained = retainFeatures(specs, cells, config);
@@ -182,20 +184,10 @@ public final class FeatureAssembler {
                                                  ColumnMetadata column,
                                                  Map<String, FeatureSpec> specs,
                                                  Map<String, List<StrategyHit>> hitsByCell,
-                                                 FeatureConfig config) {
-        Column raw = SparkStrategySupport.quotedColumn(column.getName());
-        Column text = raw.cast("string");
-        Column hashInput = when(raw.isNull(), lit("<null>")).otherwise(text);
-        Dataset<Row> values = dataset.getDataFrame().select(
-                SparkStrategySupport.quotedColumn(dataset.getRowIdColumn())
-                        .cast("string").alias("row_id"),
-                raw.alias("raw_value"), text.alias("text_value"),
-                sha2(hashInput, 256).alias("value_hash"));
-        Dataset<Row> frequencies = values.groupBy("value_hash").agg(
-                count(lit(1)).alias("value_frequency"));
-        List<Row> rows = values.join(frequencies, "value_hash")
-                .select("row_id", "raw_value", "text_value", "value_hash", "value_frequency")
-                .collectAsList();
+                                                 FeatureConfig config,
+                                                 List<Row> preparedRows) {
+        List<Row> rows = preparedRows == null
+                ? Collections.<Row>emptyList() : preparedRows;
         ColumnProfile profile = dataset.getProfiles().get(column.getName());
         long totalCount = profile == null ? rows.size() : profile.getTotalCount();
         long rareThreshold = Math.max(1L, (long) Math.floor(
@@ -223,6 +215,59 @@ public final class FeatureAssembler {
             cells.add(cell);
         }
         return cells;
+    }
+
+    private static Map<String, List<Row>> buildCellRows(RahaDataset dataset) {
+        List<String> detectableColumns = new ArrayList<String>();
+        for (ColumnMetadata column : dataset.getColumns()) {
+            if (column.isDetectable()) {
+                detectableColumns.add(column.getName());
+            }
+        }
+        if (detectableColumns.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        StringBuilder stack = new StringBuilder("stack(")
+                .append(detectableColumns.size());
+        for (String columnName : detectableColumns) {
+            stack.append(", '").append(columnName.replace("'", "''"))
+                    .append("', cast(").append(quoted(columnName))
+                    .append(" as string)");
+        }
+        stack.append(") as (column_name, text_value)");
+        Dataset<Row> values = dataset.getDataFrame().selectExpr(
+                "cast(" + quoted(dataset.getRowIdColumn()) + " as string) as row_id",
+                stack.toString())
+                .withColumn("value_hash", sha2(when(col("text_value").isNull(),
+                        lit("<null>")).otherwise(col("text_value")), 256));
+        Dataset<Row> frequencies = values.groupBy("column_name", "value_hash").agg(
+                count(lit(1)).alias("value_frequency"));
+        Dataset<Row> valueRows = values.alias("v");
+        Dataset<Row> frequencyRows = frequencies.alias("f");
+        List<Row> rows = valueRows.join(frequencyRows,
+                        col("v.column_name").equalTo(col("f.column_name"))
+                                .and(col("v.value_hash").equalTo(col("f.value_hash"))))
+                .select(col("v.column_name").alias("column_name"),
+                        col("v.row_id").alias("row_id"),
+                        col("v.text_value").alias("text_value"),
+                        col("v.value_hash").alias("value_hash"),
+                        col("f.value_frequency").alias("value_frequency"))
+                .collectAsList();
+        Map<String, List<Row>> rowsByColumn = new LinkedHashMap<String, List<Row>>();
+        for (String columnName : detectableColumns) {
+            rowsByColumn.put(columnName, new ArrayList<Row>());
+        }
+        for (Row row : rows) {
+            rowsByColumn.get((String) row.getAs("column_name")).add(row);
+        }
+        return rowsByColumn;
+    }
+
+    private static String quoted(String columnName) {
+        if (columnName == null || columnName.trim().isEmpty()) {
+            throw new IllegalArgumentException("字段名称不能为空");
+        }
+        return "`" + columnName.replace("`", "``") + "`";
     }
 
     private static void addStrategyValues(MutableCellFeatures cell,

@@ -52,6 +52,13 @@ class RahaConfigLoaderTest {
                 .contains(StrategyFamily.RVD));
         assertEquals(0.01d, job.getFeatureConfig().getRareValueRatio(), 0.000001d);
         assertEquals(0.5d, job.getModelConfig().getThreshold(), 0.000001d);
+        assertEquals(com.fiberhome.ml.raha.data.ClassifierType.LOGISTIC_REGRESSION,
+                job.getModelConfig().getClassifierType());
+        assertFalse(job.getModelConfig().isFallbackEnabled());
+        assertTrue(job.getModelConfig().isQualityGateEnabled());
+        assertEquals(0.000001d,
+                job.getModelConfig().getMinimumScoreStandardDeviation(), 0.0000001d);
+        assertEquals(0.98d, job.getModelConfig().getMaximumPositiveRatio(), 0.000001d);
         assertEquals(4, job.getResourceConfig().getMaxParallelColumns());
         assertEquals(20, job.getSamplingConfig().getLabelingBudget());
         assertEquals(100, factory.logisticRegressionTrainingConfig()

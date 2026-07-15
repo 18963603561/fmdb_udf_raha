@@ -104,6 +104,17 @@ public final class RahaConfigValidator {
                 || config.getContextWeight() > 1.0d) {
             fail(ConfigErrorCode.MODEL_THRESHOLD_INVALID, "上下文权重必须位于 0 到 1 之间");
         }
+        if (Double.isNaN(config.getMinimumScoreStandardDeviation())
+                || config.getMinimumScoreStandardDeviation() < 0.0d
+                || Double.isNaN(config.getMaximumPositiveRatio())
+                || config.getMaximumPositiveRatio() <= 0.5d
+                || config.getMaximumPositiveRatio() >= 1.0d
+                || Double.isNaN(config.getMinimumF1())
+                || config.getMinimumF1() < 0.0d
+                || config.getMinimumF1() > 1.0d) {
+            fail(ConfigErrorCode.MODEL_THRESHOLD_INVALID,
+                    "模型质量门禁阈值范围非法");
+        }
         for (java.util.Map.Entry<com.fiberhome.ml.raha.data.StrategyFamily, Double> entry
                 : config.getStrategyFamilyWeights().entrySet()) {
             if (entry.getKey() == null || entry.getValue() == null

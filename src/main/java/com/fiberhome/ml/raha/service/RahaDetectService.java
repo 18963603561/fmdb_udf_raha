@@ -133,6 +133,7 @@ public final class RahaDetectService {
             Map<String, String> details = new LinkedHashMap<String, String>();
             details.put("detectedCellCount", String.valueOf(results.size()));
             details.put("modelVersions", modelVersions.toString());
+            details.put("scoreDiagnostics", scoreDiagnostics(results));
             details.put("maxObservedColumnConcurrency",
                     String.valueOf(parallel.getMaxObservedConcurrency()));
             RahaTaskSummary summary = new RahaTaskSummary(startedAt, clock.millis(),
@@ -206,6 +207,23 @@ public final class RahaDetectService {
         return Collections.unmodifiableList(new ArrayList<String>(ids));
     }
 
+    private static String scoreDiagnostics(List<DetectionResult> results) {
+        Map<String, ScoreAccumulator> byColumn =
+                new LinkedHashMap<String, ScoreAccumulator>();
+        for (DetectionResult result : results) {
+            String columnName = result.getCoordinate().getColumnName();
+            if (!byColumn.containsKey(columnName)) {
+                byColumn.put(columnName, new ScoreAccumulator());
+            }
+            byColumn.get(columnName).add(result.getScore(), result.isError());
+        }
+        Map<String, String> summaries = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, ScoreAccumulator> entry : byColumn.entrySet()) {
+            summaries.put(entry.getKey(), entry.getValue().summary());
+        }
+        return summaries.toString();
+    }
+
     private static final class DetectColumnOutcome {
         /** 当前字段全部检测结果。 */
         private final List<DetectionResult> results;
@@ -216,6 +234,38 @@ public final class RahaDetectService {
                                     String modelVersion) {
             this.results = results;
             this.modelVersion = modelVersion;
+        }
+    }
+
+    /** 累计单字段分数范围和预测正例比例。 */
+    private static final class ScoreAccumulator {
+        /** 预测数量。 */
+        private long count;
+        /** 预测正例数量。 */
+        private long positiveCount;
+        /** 最小分数。 */
+        private double minimum = Double.POSITIVE_INFINITY;
+        /** 最大分数。 */
+        private double maximum = Double.NEGATIVE_INFINITY;
+        /** 分数总和。 */
+        private double sum;
+
+        private void add(double score, boolean positive) {
+            count++;
+            if (positive) {
+                positiveCount++;
+            }
+            minimum = Math.min(minimum, score);
+            maximum = Math.max(maximum, score);
+            sum += score;
+        }
+
+        private String summary() {
+            double mean = count == 0L ? 0.0d : sum / count;
+            double positiveRatio = count == 0L ? 0.0d
+                    : (double) positiveCount / count;
+            return "count=" + count + ",min=" + minimum + ",max=" + maximum
+                    + ",mean=" + mean + ",positiveRatio=" + positiveRatio;
         }
     }
 }
