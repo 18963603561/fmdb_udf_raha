@@ -272,8 +272,7 @@ public final class RahaTrainService {
                 request.getModelNamePrefix() + "-" + columnName,
                 request.getDataset().getDatasetId(),
                 request.getDataset().getSchemaHash(), planVersion, trainingDataset,
-                request.getConfig().getModelConfig(), request.getTrainingConfig(),
-                request.getTreeTrainingConfig());
+                request.getConfig().getModelConfig(), request.getTrainingConfig());
         ColumnModelTrainingResult trainingResult = trainer.train(trainingRequest);
         if (trainingResult.getStatus() != ColumnModelTrainingStatus.TRAINED) {
             return new ColumnTrainingOutcome(trainingResult, null);

@@ -7,7 +7,6 @@ import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.label.LabelPropagationConfig;
 import com.fiberhome.ml.raha.label.LabelPropagationMethod;
 import com.fiberhome.ml.raha.model.LogisticRegressionTrainingConfig;
-import com.fiberhome.ml.raha.model.TreeModelTrainingConfig;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
 import com.fiberhome.ml.raha.util.ValueUtils;
 
@@ -36,8 +35,6 @@ public final class RahaTrainRequest {
     private final LabelPropagationConfig propagationConfig;
     /** 逻辑回归优化配置。 */
     private final LogisticRegressionTrainingConfig trainingConfig;
-    /** 决策树和梯度提升树训练配置。 */
-    private final TreeModelTrainingConfig treeTrainingConfig;
     /** 模型逻辑名称前缀。 */
     private final String modelNamePrefix;
     /** 训练服务仓储业务版本。 */
@@ -53,29 +50,12 @@ public final class RahaTrainRequest {
                             LogisticRegressionTrainingConfig trainingConfig,
                             String modelNamePrefix,
                             ArtifactVersion artifactVersion) {
-        this(jobId, stageId, dataset, config, directLabels, propagationMethod,
-                propagationConfig, trainingConfig, TreeModelTrainingConfig.defaults(),
-                modelNamePrefix, artifactVersion);
-    }
-
-    public RahaTrainRequest(String jobId,
-                            String stageId,
-                            RahaDataset dataset,
-                            RahaJobConfig config,
-                            List<CellLabel> directLabels,
-                            LabelPropagationMethod propagationMethod,
-                            LabelPropagationConfig propagationConfig,
-                            LogisticRegressionTrainingConfig trainingConfig,
-                            TreeModelTrainingConfig treeTrainingConfig,
-                            String modelNamePrefix,
-                            ArtifactVersion artifactVersion) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "训练任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "训练阶段标识");
         this.modelNamePrefix = ValueUtils.requireNotBlank(modelNamePrefix, "模型名称前缀");
         if (dataset == null || dataset.getDataFrame() == null || config == null
                 || directLabels == null || propagationMethod == null
                 || propagationConfig == null || trainingConfig == null
-                || treeTrainingConfig == null
                 || artifactVersion == null) {
             throw new IllegalArgumentException("训练服务输入、配置和版本不能为空");
         }
@@ -94,7 +74,6 @@ public final class RahaTrainRequest {
         this.propagationMethod = propagationMethod;
         this.propagationConfig = propagationConfig;
         this.trainingConfig = trainingConfig;
-        this.treeTrainingConfig = treeTrainingConfig;
         this.artifactVersion = artifactVersion;
     }
 
@@ -106,7 +85,6 @@ public final class RahaTrainRequest {
     public LabelPropagationMethod getPropagationMethod() { return propagationMethod; }
     public LabelPropagationConfig getPropagationConfig() { return propagationConfig; }
     public LogisticRegressionTrainingConfig getTrainingConfig() { return trainingConfig; }
-    public TreeModelTrainingConfig getTreeTrainingConfig() { return treeTrainingConfig; }
     public String getModelNamePrefix() { return modelNamePrefix; }
     public ArtifactVersion getArtifactVersion() { return artifactVersion; }
 }

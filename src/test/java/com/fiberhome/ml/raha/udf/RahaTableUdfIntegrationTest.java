@@ -141,6 +141,8 @@ class RahaTableUdfIntegrationTest {
     @Test
     void shouldRegisterAndExecuteAsSparkSqlUdf() {
         new RahaUdfRegistrar().register(spark, new SerializableStaticSubmitter());
+        // 清理驱动进程静态状态，验证执行器使用随 UDF 序列化的提交器。
+        RahaUdfRuntime.clear();
         Dataset<Row> requests = spark.createDataset(Collections.singletonList(
                 request(RahaTaskType.DETECT, "spark-sql-key")), Encoders.STRING())
                 .toDF("request");

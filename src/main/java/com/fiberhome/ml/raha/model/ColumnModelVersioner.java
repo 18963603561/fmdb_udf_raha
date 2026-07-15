@@ -36,27 +36,4 @@ public final class ColumnModelVersioner {
         }
         return HashUtils.sha256Hex(canonical.toString());
     }
-
-    /**
-     * 根据树模型编码生成稳定版本，编码摘要用于隔离不同树结构。
-     */
-    public String versionOfTree(ColumnModelTrainingRequest request,
-                                ClassifierType classifierType,
-                                String trainingMode,
-                                String modelPayload) {
-        if (request == null || classifierType == null || trainingMode == null
-                || modelPayload == null) {
-            throw new IllegalArgumentException("树模型版本参数不能为空");
-        }
-        String canonical = request.getModelName() + '|'
-                + request.getDatasetId() + '|'
-                + request.getSchemaHash() + '|'
-                + request.getStrategyPlanVersion() + '|'
-                + request.getDataset().getColumnName() + '|'
-                + request.getDataset().getFeatureDictionaryVersion() + '|'
-                + request.getModelConfig().getThreshold() + '|'
-                + classifierType.name() + '|' + trainingMode + '|'
-                + HashUtils.sha256Hex(modelPayload);
-        return HashUtils.sha256Hex(canonical);
-    }
 }

@@ -48,11 +48,11 @@ public final class RahaUdfRegistrar {
         LOGGER.info("开始注册 Raha 表级 UDF");
         try {
             sparkSession.udf().register(config.getTrainFunction(),
-                    new F_DW_RAHATRAIN(), DataTypes.StringType);
+                    new F_DW_RAHATRAIN(submitter), DataTypes.StringType);
             sparkSession.udf().register(config.getDetectFunction(),
-                    new F_DW_RAHADETECT(), DataTypes.StringType);
+                    new F_DW_RAHADETECT(submitter), DataTypes.StringType);
             sparkSession.udf().register(config.getSampleFunction(),
-                    new F_DW_RAHASAMPLE(), DataTypes.StringType);
+                    new F_DW_RAHASAMPLE(submitter), DataTypes.StringType);
             LOGGER.info("Raha 表级 UDF 注册完成，functions={},{},{}",
                     config.getTrainFunction(), config.getDetectFunction(),
                     config.getSampleFunction());
