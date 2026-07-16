@@ -28,7 +28,7 @@
     "f1": 0.8623142916928228,
     "resultRowCount": 9504,
     "candidateModelCount": 4,
-    "elapsedMillis": 273875
+    "elapsedMillis": 131328
   },
   "overlap": {
     "bothDetectedCount": 3397,
@@ -241,7 +241,7 @@
         "count": 2376,
         "minimum": 0.0,
         "maximum": 1.0,
-        "mean": 0.5697364736991756,
+        "mean": 0.5697364736774674,
         "selectedThreshold": 0.5,
         "atOrAboveSelectedThreshold": 1346
       }

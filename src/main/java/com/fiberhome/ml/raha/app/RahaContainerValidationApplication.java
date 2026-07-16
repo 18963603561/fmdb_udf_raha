@@ -32,6 +32,7 @@ import com.fiberhome.ml.raha.evaluation.ThresholdComparisonResult;
 import com.fiberhome.ml.raha.evaluation.ThresholdComparisonService;
 import com.fiberhome.ml.raha.evaluation.ThresholdSelectionPolicy;
 import com.fiberhome.ml.raha.feature.FeatureAssembler;
+import com.fiberhome.ml.raha.feature.FeatureAssemblyResult;
 import com.fiberhome.ml.raha.feature.FeatureDictionary;
 import com.fiberhome.ml.raha.feature.FeatureDictionaryVersioner;
 import com.fiberhome.ml.raha.feature.FeatureService;
@@ -283,17 +284,23 @@ public final class RahaContainerValidationApplication {
                 sampleUdfResult = callUdf(RahaUdfRegistrar.SAMPLE_FUNCTION,
                         udfRequest(RahaTaskType.SAMPLE, null));
                 requireAccepted("采样", sampleUdfResult);
-                requireProcessed("采样", worker.runOnce());
+                int sampleProcessed = worker.runOnce();
+                failIfTaskFailed(queueDirectory, "采样");
+                requireProcessed("采样", sampleProcessed);
                 trainUdfResult = callUdf(RahaUdfRegistrar.TRAIN_FUNCTION,
                         udfRequest(RahaTaskType.TRAIN, null));
                 requireAccepted("训练", trainUdfResult);
-                requireProcessed("训练", worker.runOnce());
+                int trainProcessed = worker.runOnce();
+                failIfTaskFailed(queueDirectory, "训练");
+                requireProcessed("训练", trainProcessed);
                 String modelVersion = firstModelVersion(
                         requireValue("训练", state.training).trained);
                 detectUdfResult = callUdf(RahaUdfRegistrar.DETECT_FUNCTION,
                         udfRequest(RahaTaskType.DETECT, modelVersion));
                 requireAccepted("检测", detectUdfResult);
-                requireProcessed("检测", worker.runOnce());
+                int detectProcessed = worker.runOnce();
+                failIfTaskFailed(queueDirectory, "检测");
+                requireProcessed("检测", detectProcessed);
             } else {
                 waitForWorkerState("采样", queueDirectory, worker,
                         () -> state.sampled != null);
@@ -915,6 +922,13 @@ public final class RahaContainerValidationApplication {
                 new RahaFeaturePreparationRequest(SAMPLE_JOB_ID,
                         "sample-prepare", dataset, jobConfig,
                         version("sample-prepare")));
+        int availableRowCount = featureRowCount(preparation.getFeatures());
+        int samplingBudget = Math.min(budget, Math.max(1, availableRowCount - 1));
+        if (samplingBudget < budget) {
+            LOGGER.warn("验收数据行数不足以同时满足采样和评测，自动保留一行，"
+                            + "requestedBudget={}，samplingBudget={}，rowCount={}",
+                    budget, samplingBudget, availableRowCount);
+        }
         ColumnClusteringService clusteringService = new ColumnClusteringService(
                 new ScalableColumnClusterer(new ClusterVersioner(), clock),
                 new DefaultClusterRepository(storage), clock);
@@ -927,7 +941,7 @@ public final class RahaContainerValidationApplication {
         ClusteringConfig baseClustering = configFactory.clusteringConfig();
         ClusteringConfig activeClustering = new ClusteringConfig(
                 baseClustering.getDistanceMetric(),
-                Math.max(baseClustering.getTargetClusterCount(), budget + 2),
+                Math.max(baseClustering.getTargetClusterCount(), samplingBudget + 2),
                 baseClustering.getMaxSampleCount());
         Map<String, CellLabel> truthByCell = new LinkedHashMap<String, CellLabel>();
         for (CellLabel label : truth.getLabels()) {
@@ -937,7 +951,7 @@ public final class RahaContainerValidationApplication {
         ActiveSamplingResult activeResult = new ActiveSamplingOrchestrator(sampleService)
                 .sample(SAMPLE_JOB_ID, preparation.getFeatures(),
                         Collections.<CellLabel>emptyList(), activeClustering,
-                        configFactory.samplingConfig(), budget, randomSeed,
+                        configFactory.samplingConfig(), samplingBudget, randomSeed,
                         version("sample-active"), configFactory.resourceConfig(),
                         new SampledTupleLabelProvider() {
                             @Override
@@ -974,6 +988,25 @@ public final class RahaContainerValidationApplication {
                 new LinkedHashSet<String>(activeResult.getRowIds()),
                 activeResult.getCellIds(), preparation,
                 activeResult.getRowIds(), evaluationSplit);
+    }
+
+    /**
+     * 从稳定特征坐标统计可参与主动采样的元组数量。
+     *
+     * @param features 已准备单元格特征
+     * @return 去重后的元组数量
+     */
+    private static int featureRowCount(FeatureAssemblyResult features) {
+        Set<String> rowIds = new LinkedHashSet<String>();
+        for (SparseFeatureRow row : features.getRows()) {
+            if (row != null && row.getCoordinate() != null) {
+                rowIds.add(row.getCoordinate().getRowId());
+            }
+        }
+        if (rowIds.isEmpty()) {
+            throw new IllegalStateException("主动采样特征缺少稳定元组坐标");
+        }
+        return rowIds.size();
     }
 
     private static EvaluationSlice evaluationSlice(

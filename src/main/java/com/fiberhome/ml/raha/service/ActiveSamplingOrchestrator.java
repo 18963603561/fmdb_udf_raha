@@ -6,6 +6,7 @@ import com.fiberhome.ml.raha.config.ResourceConfig;
 import com.fiberhome.ml.raha.config.SamplingConfig;
 import com.fiberhome.ml.raha.data.LabelSource;
 import com.fiberhome.ml.raha.feature.FeatureAssemblyResult;
+import com.fiberhome.ml.raha.feature.SparseFeatureRow;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
 import com.fiberhome.ml.raha.sampling.AnnotationTask;
@@ -76,9 +77,19 @@ public final class ActiveSamplingOrchestrator {
         List<String> selectedRows = new ArrayList<String>();
         Set<String> selectedCellIds = new LinkedHashSet<String>();
         ClusteringBatchResult reusableClustering = null;
-        LOGGER.info("开始逐轮主动采样，jobId={}，totalBudget={}，randomSeed={}",
-                jobId, totalBudget, randomSeed);
-        for (int round = 1; round <= totalBudget; round++) {
+        int effectiveBudget = effectiveBudget(features, initialLabels, totalBudget);
+        if (effectiveBudget <= 0) {
+            throw new IllegalStateException("主动采样没有可用候选行");
+        }
+        if (effectiveBudget < totalBudget) {
+            LOGGER.warn("主动采样预算超过可用候选行，自动收缩预算，jobId={}，"
+                            + "requestedBudget={}，effectiveBudget={}",
+                    jobId, totalBudget, effectiveBudget);
+        }
+        LOGGER.info("开始逐轮主动采样，jobId={}，requestedBudget={}，"
+                        + "effectiveBudget={}，randomSeed={}",
+                jobId, totalBudget, effectiveBudget, randomSeed);
+        for (int round = 1; round <= effectiveBudget; round++) {
             RahaTaskResult<RahaSampleOutput> result = sampleService.sample(
                     new RahaSampleRequest(jobId, features, labels,
                             clusteringConfig, roundConfig, round, randomSeed,
@@ -108,6 +119,41 @@ public final class ActiveSamplingOrchestrator {
                 jobId, selectedRows.size(), labels.size());
         return new ActiveSamplingResult(completedTasks, selectedRows,
                 labels, selectedCellIds, reusableClustering);
+    }
+
+    /**
+     * 根据稳定特征坐标和已有直接标签计算本次可执行的最大采样预算。
+     *
+     * @param features 已准备单元格特征
+     * @param labels 已有标签
+     * @param requestedBudget 请求预算
+     * @return 不超过剩余候选行数量的有效预算
+     */
+    static int effectiveBudget(FeatureAssemblyResult features,
+                               List<CellLabel> labels,
+                               int requestedBudget) {
+        if (features == null || labels == null || requestedBudget <= 0) {
+            throw new IllegalArgumentException("主动采样预算计算输入必须有效");
+        }
+        Set<String> directCellIds = new LinkedHashSet<String>();
+        for (CellLabel label : labels) {
+            if (label != null && label.getLabelSource() != LabelSource.PROPAGATED) {
+                directCellIds.add(label.getCellId());
+            }
+        }
+        Set<String> candidateRows = new LinkedHashSet<String>();
+        Set<String> excludedRows = new LinkedHashSet<String>();
+        for (SparseFeatureRow row : features.getRows()) {
+            if (row != null && row.getCoordinate() != null) {
+                String rowId = row.getCoordinate().getRowId();
+                candidateRows.add(rowId);
+                if (directCellIds.contains(row.getCellId())) {
+                    excludedRows.add(rowId);
+                }
+            }
+        }
+        candidateRows.removeAll(excludedRows);
+        return Math.min(requestedBudget, candidateRows.size());
     }
 
     private static void validateRoundLabels(AnnotationTask task,

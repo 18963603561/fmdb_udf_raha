@@ -3,8 +3,12 @@ package com.fiberhome.ml.raha.evaluation;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.util.HashUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -12,6 +16,10 @@ import java.util.Set;
  * 使用稳定单元格哈希划分阈值验证集和最终测试集。
  */
 public final class EvaluationSplitService {
+
+    /** 日志记录器。 */
+    private static final Logger LOGGER = LoggerFactory.getLogger(
+            EvaluationSplitService.class);
 
     /**
      * 排除直接标注坐标后执行确定性划分。
@@ -50,8 +58,21 @@ public final class EvaluationSplitService {
                 test.add(label);
             }
         }
-        if (validation.isEmpty() || test.isEmpty()) {
-            throw new IllegalStateException("评测划分后验证集或测试集为空");
+        Collections.sort(validation, Comparator.comparing(CellLabel::getCellId));
+        Collections.sort(test, Comparator.comparing(CellLabel::getCellId));
+        int eligibleCount = validation.size() + test.size();
+        if (eligibleCount < 2) {
+            throw new IllegalStateException("评测划分至少需要两个非训练坐标");
+        }
+        // 极小数据集可能全部落入同一哈希桶，稳定移动一个坐标以保持两侧非空。
+        if (validation.isEmpty()) {
+            validation.add(test.remove(0));
+            LOGGER.warn("评测验证集哈希结果为空，已按稳定坐标顺序重平衡，"
+                    + "eligibleCount={}", eligibleCount);
+        } else if (test.isEmpty()) {
+            test.add(validation.remove(validation.size() - 1));
+            LOGGER.warn("最终测试集哈希结果为空，已按稳定坐标顺序重平衡，"
+                    + "eligibleCount={}", eligibleCount);
         }
         return new EvaluationSplit(validation, test);
     }

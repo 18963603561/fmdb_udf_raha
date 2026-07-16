@@ -23,6 +23,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -82,6 +83,23 @@ class EvaluationSplitAndThresholdPolicyTest {
                 "evaluation.recall"), 0.0d);
         assertFalse(result.getUpdatedModel().getMetrics().get(
                 "evaluation.constraintFallback") > 0.0d);
+    }
+
+    @Test
+    void shouldRebalanceTinySplitAndRejectSingleRemainingCell() {
+        EvaluationSplitService service = new EvaluationSplitService();
+        List<CellLabel> tiny = Arrays.asList(
+                label("tiny-a", 0), label("tiny-b", 1));
+
+        EvaluationSplit split = service.split(tiny,
+                Collections.<String>emptySet(), Integer.MAX_VALUE, 0,
+                "tiny-split");
+
+        assertEquals(1, split.getValidationLabels().size());
+        assertEquals(1, split.getTestLabels().size());
+        assertThrows(IllegalStateException.class, () -> service.split(
+                Collections.singletonList(label("only", 0)),
+                Collections.<String>emptySet(), 5, 0, "single-split"));
     }
 
     private static CellLabel label(String cellId, int value) {
