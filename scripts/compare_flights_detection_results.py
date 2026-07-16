@@ -42,8 +42,23 @@ def metric_summary(detected, actual):
     }
 
 
-def score_summary(values):
-    """汇总 Java 字段预测分数的范围、均值和过阈值数量。"""
+def parse_selected_thresholds(value):
+    """解析 Java 验收摘要中的字段阈值映射。"""
+    if not value:
+        return {}
+    text = value.strip()
+    if text.startswith("{") and text.endswith("}"):
+        text = text[1:-1]
+    thresholds = {}
+    for item in text.split(","):
+        name, separator, threshold = item.strip().partition("=")
+        if separator and name:
+            thresholds[name] = float(threshold)
+    return thresholds
+
+
+def score_summary(values, selected_threshold):
+    """汇总 Java 字段预测分数的范围、均值和超过实际阈值的数量。"""
     if not values:
         return None
     return {
@@ -51,7 +66,9 @@ def score_summary(values):
         "minimum": min(values),
         "maximum": max(values),
         "mean": statistics.fmean(values),
-        "atOrAboveThreshold": sum(1 for value in values if value >= 0.5),
+        "selectedThreshold": selected_threshold,
+        "atOrAboveSelectedThreshold": sum(
+            1 for value in values if value >= selected_threshold),
     }
 
 
@@ -105,6 +122,8 @@ def main():
                 java_detected.add((row_index, column_index))
     with open(args.java_summary, "r", encoding="utf-8") as stream:
         java_summary = json.load(stream)
+    selected_thresholds = parse_selected_thresholds(
+        java_summary.get("selectedThresholds"))
 
     both = python_detected & java_detected
     python_only = python_detected - java_detected
@@ -123,7 +142,9 @@ def main():
             "overlapDetectedCount": len(python_column & java_column),
             "pythonOnlyDetectedCount": len(python_column - java_column),
             "javaOnlyDetectedCount": len(java_column - python_column),
-            "javaScore": score_summary(java_scores[column_name]),
+            "javaScore": score_summary(
+                java_scores[column_name],
+                selected_thresholds.get(column_name, 0.5)),
         }
 
     result = {

@@ -4,6 +4,8 @@ import com.fiberhome.ml.raha.cluster.ClusteringBatchResult;
 import com.fiberhome.ml.raha.cluster.ColumnClusteringService;
 import com.fiberhome.ml.raha.sampling.SamplingBatchResult;
 import com.fiberhome.ml.raha.sampling.SamplingService;
+import com.fiberhome.ml.raha.sampling.AnnotationTask;
+import com.fiberhome.ml.raha.repository.ArtifactVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,12 +53,19 @@ public final class RahaSampleService {
         LOGGER.info("开始 Raha 采样服务，jobId={}，samplingRound={}，labelCount={}",
                 request.getJobId(), request.getSamplingRound(), request.getLabels().size());
         try {
-            ClusteringBatchResult clustering = clusteringService.clusterAndSaveParallel(
-                    request.getJobId(), request.getFeatures(),
-                    request.getClusteringConfig(), request.getRandomSeed(),
-                    request.getArtifactVersion(),
-                    request.getResourceConfig().getMaxParallelColumns(),
-                    request.getResourceConfig().getStageTimeoutMillis());
+            ClusteringBatchResult clustering = request.getPreparedClustering();
+            if (clustering == null) {
+                clustering = clusteringService.clusterAndSaveParallel(
+                        request.getJobId(), request.getFeatures(),
+                        request.getClusteringConfig(), request.getRandomSeed(),
+                        request.getArtifactVersion(),
+                        request.getResourceConfig().getMaxParallelColumns(),
+                        request.getResourceConfig().getStageTimeoutMillis());
+            } else {
+                LOGGER.info("采样服务复用聚类结果，jobId={}，samplingRound={}，assignmentCount={}",
+                        request.getJobId(), request.getSamplingRound(),
+                        clustering.getMetrics().getAssignmentCount());
+            }
             SamplingBatchResult sampling = samplingService.createTasks(
                     request.getJobId(), request.getSamplingRound(), clustering,
                     request.getLabels(), request.getSamplingConfig(),
@@ -89,5 +98,19 @@ public final class RahaSampleService {
                     RahaTaskType.SAMPLE, RahaTaskStatus.FAILED, null, summary, null,
                     "SAMPLE_SERVICE_FAILED", exception.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * 在外部标注成功后完成并持久化标注任务。
+     *
+     * @param jobId 任务标识
+     * @param task 本轮待标注任务
+     * @param version 仓储业务版本
+     * @return 已进入完成状态的任务快照
+     */
+    public AnnotationTask completeTask(String jobId,
+                                       AnnotationTask task,
+                                       ArtifactVersion version) {
+        return samplingService.completeTask(jobId, task, version);
     }
 }

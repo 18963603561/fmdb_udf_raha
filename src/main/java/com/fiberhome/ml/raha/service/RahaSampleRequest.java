@@ -3,6 +3,7 @@ package com.fiberhome.ml.raha.service;
 import com.fiberhome.ml.raha.config.ClusteringConfig;
 import com.fiberhome.ml.raha.config.SamplingConfig;
 import com.fiberhome.ml.raha.config.ResourceConfig;
+import com.fiberhome.ml.raha.cluster.ClusteringBatchResult;
 import com.fiberhome.ml.raha.feature.FeatureAssemblyResult;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.repository.ArtifactVersion;
@@ -35,6 +36,8 @@ public final class RahaSampleRequest {
     private final ArtifactVersion artifactVersion;
     /** 列并发和阶段超时资源配置。 */
     private final ResourceConfig resourceConfig;
+    /** 相同特征和聚类配置下可直接复用的聚类结果。 */
+    private final ClusteringBatchResult preparedClustering;
 
     public RahaSampleRequest(String jobId,
                              FeatureAssemblyResult features,
@@ -45,7 +48,7 @@ public final class RahaSampleRequest {
                              long randomSeed,
                              ArtifactVersion artifactVersion) {
         this(jobId, features, labels, clusteringConfig, samplingConfig,
-                samplingRound, randomSeed, artifactVersion, ResourceConfig.defaults());
+                samplingRound, randomSeed, artifactVersion, ResourceConfig.defaults(), null);
     }
 
     public RahaSampleRequest(String jobId,
@@ -57,6 +60,20 @@ public final class RahaSampleRequest {
                              long randomSeed,
                              ArtifactVersion artifactVersion,
                              ResourceConfig resourceConfig) {
+        this(jobId, features, labels, clusteringConfig, samplingConfig,
+                samplingRound, randomSeed, artifactVersion, resourceConfig, null);
+    }
+
+    public RahaSampleRequest(String jobId,
+                             FeatureAssemblyResult features,
+                             List<CellLabel> labels,
+                             ClusteringConfig clusteringConfig,
+                             SamplingConfig samplingConfig,
+                             int samplingRound,
+                             long randomSeed,
+                             ArtifactVersion artifactVersion,
+                             ResourceConfig resourceConfig,
+                             ClusteringBatchResult preparedClustering) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "采样任务标识");
         if (features == null || labels == null || clusteringConfig == null
                 || samplingConfig == null || samplingRound <= 0
@@ -71,6 +88,7 @@ public final class RahaSampleRequest {
         this.randomSeed = randomSeed;
         this.artifactVersion = artifactVersion;
         this.resourceConfig = resourceConfig;
+        this.preparedClustering = preparedClustering;
     }
 
     public String getJobId() { return jobId; }
@@ -82,4 +100,5 @@ public final class RahaSampleRequest {
     public long getRandomSeed() { return randomSeed; }
     public ArtifactVersion getArtifactVersion() { return artifactVersion; }
     public ResourceConfig getResourceConfig() { return resourceConfig; }
+    public ClusteringBatchResult getPreparedClustering() { return preparedClustering; }
 }

@@ -28,7 +28,6 @@ import com.fiberhome.ml.raha.strategy.StrategyBatchResult;
 import com.fiberhome.ml.raha.strategy.StrategyExecutionService;
 import com.fiberhome.ml.raha.strategy.StrategyPlan;
 import com.fiberhome.ml.raha.strategy.StrategyPlanService;
-import com.fiberhome.ml.raha.util.HashUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.spark.sql.Dataset;
@@ -73,6 +72,8 @@ public final class RahaTrainService {
     private final Clock clock;
     /** 受限列训练并行执行器。 */
     private final BoundedParallelExecutor parallelExecutor;
+    /** 可由 SAMPLE 和 TRAIN 共同复用的策略及特征准备服务。 */
+    private final RahaFeaturePreparationService preparationService;
 
     public RahaTrainService(StrategyPlanService planService,
                             StrategyExecutionService executionService,
@@ -121,6 +122,8 @@ public final class RahaTrainService {
         this.releaseManager = releaseManager;
         this.clock = clock;
         this.parallelExecutor = parallelExecutor;
+        this.preparationService = new RahaFeaturePreparationService(
+                planService, executionService, featureService, clock);
     }
 
     /**
@@ -135,7 +138,8 @@ public final class RahaTrainService {
         }
         long startedAt = clock.millis();
         Dataset<Row> inputFrame = request.getDataset().getDataFrame();
-        boolean ownsInputCache = inputFrame.storageLevel().equals(StorageLevel.NONE());
+        boolean ownsInputCache = request.getPreparedFeatures() == null
+                && inputFrame.storageLevel().equals(StorageLevel.NONE());
         LOGGER.info("开始 Raha 训练服务，jobId={}，datasetId={}，directLabelCount={}",
                 request.getJobId(), request.getDataset().getDatasetId(),
                 request.getDirectLabels().size());
@@ -148,20 +152,20 @@ public final class RahaTrainService {
                 inputFrame.persist(storageLevel);
                 inputFrame.count();
             }
-            List<StrategyPlan> plans = planService.generateAndSave(
-                    request.getDataset(), request.getConfig().getStrategyConfig(),
-                    request.getArtifactVersion());
-            StrategyBatchResult strategyBatch = executionService.execute(
-                    request.getJobId(), request.getStageId() + "-strategy",
-                    request.getDataset(), plans,
-                    request.getConfig().getStrategyConfig().getStrategyTimeoutMillis(),
-                    request.getArtifactVersion(),
-                    request.getConfig().getResourceConfig().getMaxParallelStrategies(),
-                    request.getConfig().getResourceConfig().getStageTimeoutMillis());
-            FeatureAssemblyResult features = featureService.assembleAndSave(
-                    request.getJobId(), request.getDataset(), plans,
-                    strategyBatch.getHits(), request.getConfig().getFeatureConfig(),
-                    request.getArtifactVersion());
+            RahaFeaturePreparationResult preparation = request.getPreparedFeatures();
+            if (preparation == null) {
+                preparation = preparationService.prepare(
+                        new RahaFeaturePreparationRequest(request.getJobId(),
+                                request.getStageId() + "-prepare", request.getDataset(),
+                                request.getConfig(), request.getArtifactVersion()));
+            } else {
+                LOGGER.info("训练服务复用已准备特征，jobId={}，planVersion={}，featureRowCount={}",
+                        request.getJobId(), preparation.getStrategyPlanVersion(),
+                        preparation.getFeatures().getRows().size());
+            }
+            List<StrategyPlan> plans = preparation.getStrategyPlans();
+            StrategyBatchResult strategyBatch = preparation.getStrategyBatch();
+            FeatureAssemblyResult features = preparation.getFeatures();
             ClusteringBatchResult clustering = clusteringService.clusterAndSaveParallel(
                     request.getJobId(), features,
                     request.getConfig().getClusteringConfig(),
@@ -172,7 +176,7 @@ public final class RahaTrainService {
                     request.getJobId(), assignments(clustering), request.getDirectLabels(),
                     request.getPropagationMethod(), request.getPropagationConfig(),
                     request.getArtifactVersion());
-            String planVersion = strategyPlanVersion(plans);
+            String planVersion = preparation.getStrategyPlanVersion();
             Map<String, ColumnModelTrainingResult> trainingResults =
                     new LinkedHashMap<String, ColumnModelTrainingResult>();
             Map<String, RahaColumnModel> candidates =
@@ -266,15 +270,6 @@ public final class RahaTrainService {
         return assignments;
     }
 
-    private static String strategyPlanVersion(List<StrategyPlan> plans) {
-        List<String> signatures = new ArrayList<String>(plans.size());
-        for (StrategyPlan plan : plans) {
-            signatures.add(plan.getStrategyId() + ":" + plan.getConfigurationHash());
-        }
-        Collections.sort(signatures);
-        return HashUtils.sha256Hex(String.join("|", signatures));
-    }
-
     private ColumnTrainingOutcome trainColumn(RahaTrainRequest request,
                                               FeatureAssemblyResult features,
                                               LabelPropagationResult propagation,
@@ -285,6 +280,26 @@ public final class RahaTrainService {
                 columnName, dictionary, features.getRowsByColumn(columnName),
                 propagation.getLabels(),
                 request.getTrainingConfig().isClassBalanceEnabled());
+        if (shouldUseDirectLabels(trainingDataset)) {
+            ColumnTrainingDataset directDataset = dataBuilder.build(
+                    columnName, dictionary, features.getRowsByColumn(columnName),
+                    request.getDirectLabels(),
+                    request.getTrainingConfig().isClassBalanceEnabled());
+            // 传播结果出现单一类别或极端失衡时，保留主动采样的直接标签以避免模型退化。
+            if (directDataset.getStatus()
+                    == com.fiberhome.ml.raha.model.ColumnTrainingStatus.TRAINABLE) {
+                LOGGER.warn("字段传播训练集不可用或类别极端失衡，回退直接标签，"
+                                + "jobId={}，columnName={}，propagatedPositiveCount={}，"
+                                + "propagatedNegativeCount={}，directPositiveCount={}，"
+                                + "directNegativeCount={}",
+                        request.getJobId(), columnName,
+                        trainingDataset.getPositiveCount(),
+                        trainingDataset.getNegativeCount(),
+                        directDataset.getPositiveCount(),
+                        directDataset.getNegativeCount());
+                trainingDataset = directDataset;
+            }
+        }
         ColumnModelTrainingRequest trainingRequest = new ColumnModelTrainingRequest(
                 request.getModelNamePrefix() + "-" + columnName,
                 request.getDataset().getDatasetId(),
@@ -302,6 +317,21 @@ public final class RahaTrainService {
         RahaColumnModel candidate = releaseManager.markCandidate(
                 draft, request.getArtifactVersion());
         return new ColumnTrainingOutcome(trainingResult, candidate);
+    }
+
+    private static boolean shouldUseDirectLabels(
+            ColumnTrainingDataset trainingDataset) {
+        if (trainingDataset.getStatus()
+                != com.fiberhome.ml.raha.model.ColumnTrainingStatus.TRAINABLE) {
+            return true;
+        }
+        int total = trainingDataset.getPositiveCount()
+                + trainingDataset.getNegativeCount();
+        if (total == 0) {
+            return true;
+        }
+        double positiveRatio = (double) trainingDataset.getPositiveCount() / total;
+        return positiveRatio < 0.05d || positiveRatio > 0.95d;
     }
 
     private static Map<String, String> details(

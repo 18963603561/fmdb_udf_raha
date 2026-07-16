@@ -92,6 +92,77 @@ public final class ThresholdComparisonService {
                 selected.getThreshold(), updated);
     }
 
+    /**
+     * 在召回下限约束内优先提高精确率并降低假阳性，适用于误报集中的字段。
+     *
+     * @param model 待评测候选模型
+     * @param scores 独立验证集分数
+     * @param groundTruth 独立验证集真值
+     * @param candidateThresholds 候选阈值
+     * @param policy 阈值选择约束
+     * @param version 模型元数据仓储业务版本
+     * @return 阈值评测和已更新模型元数据
+     */
+    public ThresholdComparisonResult compareAndSave(
+            RahaColumnModel model,
+            List<CellScore> scores,
+            List<com.fiberhome.ml.raha.label.CellLabel> groundTruth,
+            List<Double> candidateThresholds,
+            ThresholdSelectionPolicy policy,
+            ArtifactVersion version) {
+        if (model == null || scores == null || groundTruth == null
+                || candidateThresholds == null || candidateThresholds.isEmpty()
+                || policy == null || version == null) {
+            throw new IllegalArgumentException("约束阈值比较输入、策略和版本不能为空");
+        }
+        List<Double> thresholds = thresholds(candidateThresholds);
+        List<ThresholdEvaluation> evaluations = new ArrayList<ThresholdEvaluation>();
+        for (Double threshold : thresholds) {
+            evaluations.add(new ThresholdEvaluation(threshold,
+                    evaluationService.evaluateAtThreshold(
+                            scores, groundTruth, threshold)));
+        }
+        DetectionEvaluationMetrics baseline = evaluationService.evaluateAtThreshold(
+                scores, groundTruth, policy.getBaselineThreshold());
+        double recallFloor = Math.max(policy.getMinimumRecall(),
+                baseline.getRecall() - policy.getMaximumRecallDrop());
+        ThresholdEvaluation selected = null;
+        for (ThresholdEvaluation candidate : evaluations) {
+            if (candidate.getMetrics().getRecall() + 1.0e-12d < recallFloor) {
+                continue;
+            }
+            if (selected == null || precisionFirst(candidate, selected)) {
+                selected = candidate;
+            }
+        }
+        // 极端小验证集无法满足召回约束时退回原 F1 规则，但保留回退指标用于审计。
+        boolean constraintFallback = selected == null;
+        if (selected == null) {
+            selected = evaluations.get(0);
+            for (ThresholdEvaluation candidate : evaluations) {
+                if (better(candidate, selected)) {
+                    selected = candidate;
+                }
+            }
+        }
+        Map<String, Double> metrics = evaluationMetrics(selected.getMetrics());
+        metrics.put("evaluation.recallFloor", recallFloor);
+        metrics.put("evaluation.baselineRecall", baseline.getRecall());
+        metrics.put("evaluation.baselineThreshold", policy.getBaselineThreshold());
+        metrics.put("evaluation.constraintFallback", constraintFallback ? 1.0d : 0.0d);
+        RahaColumnModel updated = model.withEvaluation(
+                selected.getThreshold(), metrics);
+        repository.saveAll(Collections.singletonList(updated), version, clock.millis());
+        LOGGER.info("约束阈值比较完成，datasetId={}，columnName={}，modelVersion={}，"
+                        + "selectedThreshold={}，precision={}，recall={}，recallFloor={}，"
+                        + "constraintFallback={}",
+                model.getDatasetId(), model.getColumnName(), model.getModelVersion(),
+                selected.getThreshold(), selected.getMetrics().getPrecision(),
+                selected.getMetrics().getRecall(), recallFloor, constraintFallback);
+        return new ThresholdComparisonResult(evaluations,
+                selected.getThreshold(), updated);
+    }
+
     private static List<Double> thresholds(List<Double> values) {
         Set<Double> unique = new LinkedHashSet<Double>();
         for (Double value : values) {
@@ -122,6 +193,30 @@ public final class ThresholdComparisonService {
                 candidateMetrics.getRecall(), selectedMetrics.getRecall());
         return recall != 0 ? recall > 0
                 : candidate.getThreshold() < selected.getThreshold();
+    }
+
+    private static boolean precisionFirst(ThresholdEvaluation candidate,
+                                          ThresholdEvaluation selected) {
+        DetectionEvaluationMetrics candidateMetrics = candidate.getMetrics();
+        DetectionEvaluationMetrics selectedMetrics = selected.getMetrics();
+        int precision = Double.compare(
+                candidateMetrics.getPrecision(), selectedMetrics.getPrecision());
+        if (precision != 0) {
+            return precision > 0;
+        }
+        int falsePositive = Long.compare(
+                candidateMetrics.getFalsePositive(), selectedMetrics.getFalsePositive());
+        if (falsePositive != 0) {
+            return falsePositive < 0;
+        }
+        int f1 = Double.compare(candidateMetrics.getF1(), selectedMetrics.getF1());
+        if (f1 != 0) {
+            return f1 > 0;
+        }
+        int recall = Double.compare(
+                candidateMetrics.getRecall(), selectedMetrics.getRecall());
+        return recall != 0 ? recall > 0
+                : candidate.getThreshold() > selected.getThreshold();
     }
 
     private static Map<String, Double> evaluationMetrics(

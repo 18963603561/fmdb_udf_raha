@@ -111,6 +111,33 @@ public final class SamplingService {
         return new SamplingBatchResult(effectiveScores, tasks, samplingVersion, metrics);
     }
 
+    /**
+     * 将已经获得人工标签的任务推进到完成状态并保存终态快照。
+     *
+     * @param jobId 任务标识
+     * @param task 待完成标注任务
+     * @param version 仓储业务版本
+     * @return 完成后的任务快照
+     */
+    public AnnotationTask completeTask(String jobId,
+                                       AnnotationTask task,
+                                       ArtifactVersion version) {
+        if (jobId == null || jobId.trim().isEmpty()
+                || task == null || version == null
+                || !jobId.equals(task.getJobId())) {
+            throw new IllegalArgumentException("完成标注任务的输入和版本必须有效");
+        }
+        AnnotationTask completed = task.snapshot();
+        long finishedAt = Math.max(completed.getCreatedAt(), clock.millis());
+        completed.complete(finishedAt);
+        repository.saveAll(jobId, Collections.singletonList(completed),
+                version, finishedAt);
+        LOGGER.info("标注任务已完成，jobId={}，taskId={}，samplingRound={}，rowId={}",
+                jobId, completed.getTaskId(), completed.getSamplingRound(),
+                completed.getRowId());
+        return completed.snapshot();
+    }
+
     private static List<ClusterAssignment> assignments(ClusteringBatchResult clustering) {
         List<ClusterAssignment> assignments = new ArrayList<ClusterAssignment>();
         for (ColumnClusteringResult result : clustering.getResults().values()) {

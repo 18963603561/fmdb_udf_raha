@@ -39,6 +39,8 @@ public final class RahaTrainRequest {
     private final String modelNamePrefix;
     /** 训练服务仓储业务版本。 */
     private final ArtifactVersion artifactVersion;
+    /** SAMPLE 阶段已经生成的可复用策略和特征产物。 */
+    private final RahaFeaturePreparationResult preparedFeatures;
 
     public RahaTrainRequest(String jobId,
                             String stageId,
@@ -50,6 +52,22 @@ public final class RahaTrainRequest {
                             LogisticRegressionTrainingConfig trainingConfig,
                             String modelNamePrefix,
                             ArtifactVersion artifactVersion) {
+        this(jobId, stageId, dataset, config, directLabels, propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix,
+                artifactVersion, null);
+    }
+
+    public RahaTrainRequest(String jobId,
+                            String stageId,
+                            RahaDataset dataset,
+                            RahaJobConfig config,
+                            List<CellLabel> directLabels,
+                            LabelPropagationMethod propagationMethod,
+                            LabelPropagationConfig propagationConfig,
+                            LogisticRegressionTrainingConfig trainingConfig,
+                            String modelNamePrefix,
+                            ArtifactVersion artifactVersion,
+                            RahaFeaturePreparationResult preparedFeatures) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "训练任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "训练阶段标识");
         this.modelNamePrefix = ValueUtils.requireNotBlank(modelNamePrefix, "模型名称前缀");
@@ -75,6 +93,12 @@ public final class RahaTrainRequest {
         this.propagationConfig = propagationConfig;
         this.trainingConfig = trainingConfig;
         this.artifactVersion = artifactVersion;
+        if (preparedFeatures != null
+                && (!dataset.getDatasetId().equals(preparedFeatures.getDatasetId())
+                || !dataset.getSnapshotId().equals(preparedFeatures.getSnapshotId()))) {
+            throw new IllegalArgumentException("复用特征产物与训练数据集快照不一致");
+        }
+        this.preparedFeatures = preparedFeatures;
     }
 
     public String getJobId() { return jobId; }
@@ -87,4 +111,5 @@ public final class RahaTrainRequest {
     public LogisticRegressionTrainingConfig getTrainingConfig() { return trainingConfig; }
     public String getModelNamePrefix() { return modelNamePrefix; }
     public ArtifactVersion getArtifactVersion() { return artifactVersion; }
+    public RahaFeaturePreparationResult getPreparedFeatures() { return preparedFeatures; }
 }

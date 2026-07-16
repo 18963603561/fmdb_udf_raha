@@ -34,27 +34,40 @@ public final class StrategyExecutionService {
     private final Clock clock;
     /** 受并发和批次超时控制的通用执行器。 */
     private final BoundedParallelExecutor parallelExecutor;
+    /** 合并执行同批一对多关系策略的批量执行器。 */
+    private final RvdBatchStrategyExecutor rvdBatchExecutor;
 
     public StrategyExecutionService(StrategyExecutor executor,
                                     StrategyRepository repository,
                                     Clock clock) {
-        this(executor, repository, clock, new BoundedParallelExecutor());
+        this(executor, repository, clock, new BoundedParallelExecutor(),
+                new RvdBatchStrategyExecutor(clock));
     }
 
     public StrategyExecutionService(StrategyExecutor executor,
                                     StrategyRepository repository,
                                     Clock clock,
                                     BoundedParallelExecutor parallelExecutor) {
+        this(executor, repository, clock, parallelExecutor,
+                new RvdBatchStrategyExecutor(clock));
+    }
+
+    public StrategyExecutionService(StrategyExecutor executor,
+                                    StrategyRepository repository,
+                                    Clock clock,
+                                    BoundedParallelExecutor parallelExecutor,
+                                    RvdBatchStrategyExecutor rvdBatchExecutor) {
         if (executor == null || repository == null || clock == null) {
             throw new IllegalArgumentException("策略执行服务依赖不能为空");
         }
-        if (parallelExecutor == null) {
+        if (parallelExecutor == null || rvdBatchExecutor == null) {
             throw new IllegalArgumentException("策略并行执行器不能为空");
         }
         this.executor = executor;
         this.repository = repository;
         this.clock = clock;
         this.parallelExecutor = parallelExecutor;
+        this.rvdBatchExecutor = rvdBatchExecutor;
     }
 
     public StrategyBatchResult execute(String jobId,
@@ -95,29 +108,50 @@ public final class StrategyExecutionService {
             throw new IllegalArgumentException("策略并发数和批次超时必须有效");
         }
         Set<String> strategyIds = new HashSet<String>();
+        List<StrategyPlan> rvdPlans = new ArrayList<StrategyPlan>();
+        List<StrategyPlan> regularPlans = new ArrayList<StrategyPlan>();
         List<ParallelWorkItem<String, StrategyExecutionResult>> workItems =
                 new ArrayList<ParallelWorkItem<String, StrategyExecutionResult>>();
         for (StrategyPlan plan : plans) {
             if (!strategyIds.add(plan.getStrategyId())) {
                 throw new IllegalArgumentException("策略批次包含重复标识：" + plan.getStrategyId());
             }
-            workItems.add(new ParallelWorkItem<String, StrategyExecutionResult>(
-                    plan.getStrategyId(), () -> executor.execute(jobId, stageId,
-                    dataset, plan, strategyTimeoutMillis)));
+            if (isBatchRvd(plan)) {
+                rvdPlans.add(plan);
+            } else {
+                regularPlans.add(plan);
+                workItems.add(new ParallelWorkItem<String, StrategyExecutionResult>(
+                        plan.getStrategyId(), () -> executor.execute(jobId, stageId,
+                        dataset, plan, strategyTimeoutMillis)));
+            }
         }
-        LOGGER.info("开始并行执行策略批次，jobId={}，planCount={}，maxParallelStrategies={}，"
-                        + "batchTimeoutMillis={}",
-                jobId, plans.size(), maxParallelStrategies, batchTimeoutMillis);
+        LOGGER.info("开始执行策略批次，jobId={}，planCount={}，regularCount={}，rvdBatchCount={}，"
+                        + "maxParallelStrategies={}，batchTimeoutMillis={}",
+                jobId, plans.size(), regularPlans.size(), rvdPlans.size(),
+                maxParallelStrategies, batchTimeoutMillis);
         ParallelBatchResult<String, StrategyExecutionResult> parallelResult =
                 parallelExecutor.execute(workItems, maxParallelStrategies, batchTimeoutMillis);
         if (!parallelResult.getFailures().isEmpty()) {
             throw new IllegalStateException("策略并行调度失败："
                     + parallelResult.getFailures().keySet());
         }
+        Map<String, StrategyExecutionResult> results =
+                new LinkedHashMap<String, StrategyExecutionResult>();
+        results.putAll(parallelResult.getSuccesses());
+        if (!rvdPlans.isEmpty()) {
+            long rvdTimeoutMillis = Math.min(batchTimeoutMillis,
+                    safeBatchTimeout(strategyTimeoutMillis, rvdPlans.size()));
+            for (StrategyExecutionResult result : rvdBatchExecutor.execute(
+                    jobId, stageId, dataset, rvdPlans, rvdTimeoutMillis)) {
+                results.put(result.getSummary().getStrategyId(), result);
+            }
+        }
         List<StrategyExecutionResult> executions = new ArrayList<StrategyExecutionResult>();
         for (StrategyPlan plan : plans) {
-            StrategyExecutionResult result = parallelResult.getSuccesses().get(
-                    plan.getStrategyId());
+            StrategyExecutionResult result = results.get(plan.getStrategyId());
+            if (result == null) {
+                throw new IllegalStateException("策略批次缺少执行结果：" + plan.getStrategyId());
+            }
             repository.saveExecution(result, version, clock.millis());
             executions.add(result);
         }
@@ -127,6 +161,13 @@ public final class StrategyExecutionService {
                 jobId, batchResult.getFailedCount(), batchResult.getHits().size(),
                 parallelResult.getMaxObservedConcurrency());
         return batchResult;
+    }
+
+    private static boolean isBatchRvd(StrategyPlan plan) {
+        return plan != null && plan.getStrategyFamily()
+                == com.fiberhome.ml.raha.data.StrategyFamily.RVD
+                && StrategyTypes.RVD_ONE_TO_MANY.equals(plan.getConfiguration().get(
+                StrategyConfigurationKeys.STRATEGY_TYPE));
     }
 
     /**

@@ -1,0 +1,6 @@
+{
+  "mode": "SUBMITTER",
+  "sampleUdfResult": "{\"jobId\":\"flights-sample-job\",\"taskType\":\"SAMPLE\",\"status\":\"ACCEPTED\",\"resultLocation\":\"file:///opt/spark/work-dir/data/raha-flights-validation-final-independent-20260716-0939/udf-requests/flights-sample-job-sample.request\",\"configVersion\":\"8ff64c9da04502ecab0eac04e9887e6de5b94f8ed012ec8e1e458ecab50373dc\",\"errorCode\":null,\"errorMessage\":null,\"submittedAt\":1784166131583}",
+  "trainUdfResult": "{\"jobId\":\"flights-train-job\",\"taskType\":\"TRAIN\",\"status\":\"ACCEPTED\",\"resultLocation\":\"file:///opt/spark/work-dir/data/raha-flights-validation-final-independent-20260716-0939/udf-requests/flights-train-job-train.request\",\"configVersion\":\"d7f9c6aced21787e016b8f9956275c4b18b7a0188a0271c732a06216f506664f\",\"errorCode\":null,\"errorMessage\":null,\"submittedAt\":1784166214909}",
+  "detectUdfResult": "{\"jobId\":\"flights-detect-job\",\"taskType\":\"DETECT\",\"status\":\"ACCEPTED\",\"resultLocation\":\"file:///opt/spark/work-dir/data/raha-flights-validation-final-independent-20260716-0939/udf-requests/flights-detect-job-detect.request\",\"configVersion\":\"b50415e3c8dee5bd01fe2e03e0fc1514c70661f67e3327ffe10bcc7da38884dd\",\"errorCode\":null,\"errorMessage\":null,\"submittedAt\":1784166277306}"
+}
