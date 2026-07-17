@@ -21,7 +21,10 @@ public final class RahaUdfRequestParser implements Serializable {
     /** 单次 UDF 请求允许的最大字符数。 */
     private final int maxRequestLength;
 
-    /** 所有允许的请求字段。 */
+    /**
+     * UDF 请求允许出现的表单字段白名单，用于拒绝拼写错误、无效或跨任务传入的参数。
+     * 例如：datasetId=dataset-001&inputReference=/data/input.csv&sourceType=CSV&labelingBudget=100。
+     */
     private static final Set<String> ALLOWED_KEYS = new LinkedHashSet<String>(Arrays.asList(
             "datasetId", "inputReference", "sourceType", "rowIdColumn", "snapshotId",
             "idempotencyKey", "caller", "resultTable", "annotationReference",
