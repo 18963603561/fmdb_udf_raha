@@ -166,12 +166,18 @@ public final class RahaTrainService {
             List<StrategyPlan> plans = preparation.getStrategyPlans();
             StrategyBatchResult strategyBatch = preparation.getStrategyBatch();
             FeatureAssemblyResult features = preparation.getFeatures();
-            ClusteringBatchResult clustering = clusteringService.clusterAndSaveParallel(
-                    request.getJobId(), features,
-                    request.getConfig().getClusteringConfig(),
-                    request.getConfig().getRandomSeed(), request.getArtifactVersion(),
-                    request.getConfig().getResourceConfig().getMaxParallelColumns(),
-                    request.getConfig().getResourceConfig().getStageTimeoutMillis());
+            ClusteringBatchResult clustering = preparation.getClustering();
+            if (clustering == null) {
+                clustering = clusteringService.clusterAndSaveParallel(
+                        request.getJobId(), features,
+                        request.getConfig().getClusteringConfig(),
+                        request.getConfig().getRandomSeed(), request.getArtifactVersion(),
+                        request.getConfig().getResourceConfig().getMaxParallelColumns(),
+                        request.getConfig().getResourceConfig().getStageTimeoutMillis());
+            } else {
+                LOGGER.info("训练服务复用已准备聚类，jobId={}，assignmentCount={}",
+                        request.getJobId(), clustering.getMetrics().getAssignmentCount());
+            }
             LabelPropagationResult propagation = propagationService.propagateAndSave(
                     request.getJobId(), assignments(clustering), request.getDirectLabels(),
                     request.getPropagationMethod(), request.getPropagationConfig(),
@@ -345,7 +351,7 @@ public final class RahaTrainService {
         Map<String, String> details = new LinkedHashMap<String, String>();
         details.put("strategyPlanCount", String.valueOf(plans.size()));
         details.put("strategyFamilyPlanCounts", strategyFamilyPlanCounts(plans));
-        details.put("strategyHitCount", String.valueOf(strategyBatch.getHits().size()));
+        details.put("strategyHitCount", String.valueOf(strategyBatch.getHitCount()));
         details.put("strategyFailureCount", String.valueOf(strategyBatch.getFailedCount()));
         details.put("featureRowCount", String.valueOf(features.getRows().size()));
         details.put("propagatedLabelCount", String.valueOf(

@@ -110,6 +110,32 @@ public final class InMemoryRahaRepository implements RahaRepository {
         return records.size();
     }
 
+    /**
+     * 删除指定分区的中间记录，供验收流程在特征落盘后释放大批量命中对象。
+     *
+     * @param namespace 仓储命名空间
+     * @param partitionKey 分区标识
+     * @return 删除记录数
+     */
+    public synchronized int removePartition(RepositoryNamespace namespace,
+                                             String partitionKey) {
+        if (namespace == null || partitionKey == null || partitionKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("仓储命名空间和分区标识不能为空");
+        }
+        int removed = 0;
+        java.util.Iterator<Map.Entry<RepositoryKey, RepositoryRecord<?>>> iterator =
+                records.entrySet().iterator();
+        while (iterator.hasNext()) {
+            RepositoryKey key = iterator.next().getKey();
+            if (key.getNamespace() == namespace
+                    && partitionKey.equals(key.getPartitionKey())) {
+                iterator.remove();
+                removed++;
+            }
+        }
+        return removed;
+    }
+
     private static <T> RepositoryRecord<T> castRecord(RepositoryRecord<?> record,
                                                        Class<T> payloadType) {
         return new RepositoryRecord<T>(record.getKey(), record.getVersion(),

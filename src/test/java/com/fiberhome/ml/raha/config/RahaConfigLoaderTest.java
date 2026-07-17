@@ -2,13 +2,6 @@ package com.fiberhome.ml.raha.config;
 
 import com.fiberhome.ml.raha.data.JobType;
 import com.fiberhome.ml.raha.data.StrategyFamily;
-import com.fiberhome.ml.raha.performance.BenchmarkDatasetSpec;
-import com.fiberhome.ml.raha.performance.CapacityBand;
-import com.fiberhome.ml.raha.performance.ProductionResourceAdvisor;
-import com.fiberhome.ml.raha.performance.ProductionResourceRecommendation;
-import com.fiberhome.ml.raha.retention.RetentionTableRule;
-import com.fiberhome.ml.raha.security.ResultValueMode;
-import com.fiberhome.ml.raha.security.ResultValueProtectionPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -16,7 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,14 +31,9 @@ class RahaConfigLoaderTest {
                 new RahaConfigLoader().load());
         RahaJobConfig job = factory.jobConfig(JobType.DETECTION,
                 "dataset", "source_table", "id");
-        ResultValueProtectionPolicy protection =
-                factory.resultValueProtectionPolicy();
-        List<BenchmarkDatasetSpec> benchmarks = factory.benchmarkDatasetSpecs();
-
         new RahaConfigValidator().validate(job);
         assertFalse(job.isSaveIntermediate());
         assertEquals(20260714L, job.getRandomSeed());
-        assertEquals(30, job.getResultRetentionDays());
         assertEquals(1000, job.getStrategyConfig().getMaxStrategyCount());
         assertTrue(job.getStrategyConfig().getStrategyFamilies()
                 .contains(StrategyFamily.RVD));
@@ -66,13 +53,6 @@ class RahaConfigLoaderTest {
         assertEquals(0.5d, factory.labelPropagationConfig()
                 .getMaxDirectWeightRatio(), 0.000001d);
         assertEquals("F_DW_RAHADETECT", factory.udfConfig().getDetectFunction());
-        assertEquals(ResultValueMode.MASKED, protection.getMode());
-        assertTrue(protection.isAllColumnsSensitive());
-        assertEquals(1, protection.getVisiblePrefix());
-        assertEquals(4, benchmarks.size());
-        assertEquals("wide-normal-error", benchmarks.get(3).getName());
-        assertEquals(7, new RetentionTableRule(
-                "raha_intermediate", "updated_at").getRetentionDays());
     }
 
     @Test
@@ -86,10 +66,7 @@ class RahaConfigLoaderTest {
                 "raha.model.context-signal.null-weight=0.25",
                 "raha.label.max-direct-weight-ratio=0.25",
                 "raha.sampling.coverage-score-exponent-cap=10.0",
-                "raha.udf.detect-function=F_CUSTOM_DETECT",
-                "raha.security.result.mode=HASH_ONLY",
-                "raha.performance.benchmark.small-low-error.rows=12345",
-                "raha.performance.partition.target-rows=1000"),
+                "raha.udf.detect-function=F_CUSTOM_DETECT"),
                 StandardCharsets.UTF_8);
         RahaConfigFactory defaults = new RahaConfigFactory(
                 new RahaConfigLoader().load());
@@ -100,10 +77,6 @@ class RahaConfigLoaderTest {
                 "dataset", "source_table", "id");
         RahaJobConfig overriddenJob = overridden.jobConfig(JobType.DETECTION,
                 "dataset", "source_table", "id");
-        ProductionResourceRecommendation recommendation =
-                new ProductionResourceAdvisor(overridden.productionResourceSettings())
-                        .recommend(500000L, 20, 512L * 1024L * 1024L);
-
         assertEquals(77, overriddenJob.getStrategyConfig().getMaxStrategyCount());
         assertEquals(9, overriddenJob.getResourceConfig().getMaxParallelColumns());
         assertEquals(0.05d, overriddenJob.getFeatureConfig()
@@ -115,11 +88,6 @@ class RahaConfigLoaderTest {
         assertEquals(10.0d, overriddenJob.getSamplingConfig()
                 .getCoverageScoreExponentCap(), 0.000001d);
         assertEquals("F_CUSTOM_DETECT", overridden.udfConfig().getDetectFunction());
-        assertEquals(ResultValueMode.HASH_ONLY,
-                overridden.resultValueProtectionPolicy().getMode());
-        assertEquals(12345L, overridden.benchmarkDatasetSpecs().get(0).getRowCount());
-        assertEquals(CapacityBand.SMALL, recommendation.getCapacityBand());
-        assertEquals(500, recommendation.getPartitionCount());
         assertNotEquals(new ConfigVersioner().versionOf(defaultJob),
                 new ConfigVersioner().versionOf(overriddenJob));
         assertNotEquals(defaultJob.getExecutionConfigFingerprint(),

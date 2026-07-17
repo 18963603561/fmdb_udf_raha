@@ -18,17 +18,35 @@ public final class StrategyExecutionResult {
 
     public StrategyExecutionResult(StrategyRunSummary summary,
                                    List<StrategyHit> hits) {
+        this(summary, hits, true);
+    }
+
+    private StrategyExecutionResult(StrategyRunSummary summary,
+                                    List<StrategyHit> hits,
+                                    boolean hitsMaterialized) {
         if (summary == null || hits == null) {
             throw new IllegalArgumentException("策略摘要和命中列表不能为空");
         }
         if (summary.getStatus() != StrategyStatus.SUCCEEDED && !hits.isEmpty()) {
             throw new IllegalArgumentException("失败策略不能保留部分命中");
         }
-        if (summary.getHitCount() != hits.size()) {
+        if (hitsMaterialized && summary.getHitCount() != hits.size()) {
             throw new IllegalArgumentException("策略摘要命中数量与命中列表不一致");
+        }
+        if (!hitsMaterialized && !hits.isEmpty()) {
+            throw new IllegalArgumentException("未物化命中结果不能包含命中对象");
         }
         this.summary = summary;
         this.hits = Collections.unmodifiableList(new ArrayList<StrategyHit>(hits));
+    }
+
+    /** 返回只保留摘要和命中数量的策略结果，用于阶段边界释放命中对象。 */
+    public static StrategyExecutionResult withoutHits(StrategyExecutionResult source) {
+        if (source == null) {
+            throw new IllegalArgumentException("原始策略结果不能为空");
+        }
+        return new StrategyExecutionResult(source.summary,
+                Collections.<StrategyHit>emptyList(), false);
     }
 
     public StrategyRunSummary getSummary() {

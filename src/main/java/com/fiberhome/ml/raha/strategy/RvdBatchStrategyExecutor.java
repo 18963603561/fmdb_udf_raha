@@ -48,14 +48,26 @@ public final class RvdBatchStrategyExecutor {
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(
             RvdBatchStrategyExecutor.class);
+    /** 单次 Spark 作业允许处理的最大 RVD 计划数，限制驱动端瞬时结果规模。 */
+    private static final int DEFAULT_MAX_PLANS_PER_BATCH = 16;
     /** 提供可测试完成时间的时钟。 */
     private final Clock clock;
+    /** 单次 Spark 作业允许处理的最大 RVD 计划数。 */
+    private final int maxPlansPerBatch;
 
     public RvdBatchStrategyExecutor(Clock clock) {
+        this(clock, DEFAULT_MAX_PLANS_PER_BATCH);
+    }
+
+    RvdBatchStrategyExecutor(Clock clock, int maxPlansPerBatch) {
         if (clock == null) {
             throw new IllegalArgumentException("RVD 批量执行器时钟不能为空");
         }
+        if (maxPlansPerBatch <= 0) {
+            throw new IllegalArgumentException("RVD 单批计划数必须大于 0");
+        }
         this.clock = clock;
+        this.maxPlansPerBatch = maxPlansPerBatch;
     }
 
     /**
@@ -77,8 +89,43 @@ public final class RvdBatchStrategyExecutor {
         if (plans.isEmpty()) {
             return Collections.emptyList();
         }
+        long batchStartNanos = System.nanoTime();
+        List<StrategyExecutionResult> results = new ArrayList<StrategyExecutionResult>(
+                plans.size());
+        int batchCount = (plans.size() + maxPlansPerBatch - 1) / maxPlansPerBatch;
+        LOGGER.info("开始分批执行 RVD 策略，jobId={}，stageId={}，planCount={}，"
+                        + "maxPlansPerBatch={}，batchCount={}，timeoutMillis={}",
+                jobId, stageId, plans.size(), maxPlansPerBatch, batchCount, timeoutMillis);
+        for (int start = 0, batchIndex = 0; start < plans.size();
+                start += maxPlansPerBatch, batchIndex++) {
+            int end = Math.min(start + maxPlansPerBatch, plans.size());
+            List<StrategyPlan> currentPlans = plans.subList(start, end);
+            long remainingMillis = timeoutMillis - elapsedMillis(batchStartNanos);
+            if (remainingMillis <= 0L) {
+                // 总超时耗尽后不再提交 Spark 作业，剩余计划统一返回超时结果。
+                results.addAll(failed(jobId, stageId, dataset, currentPlans,
+                        elapsedMillis(batchStartNanos), "STRATEGY_TIMEOUT",
+                        "RVD 分批执行超过总超时时间"));
+                continue;
+            }
+            results.addAll(executeBatch(jobId, stageId, dataset, currentPlans,
+                    remainingMillis, batchIndex, batchCount));
+        }
+        LOGGER.info("RVD 策略分批执行结束，jobId={}，stageId={}，planCount={}，"
+                        + "batchCount={}，runtimeMillis={}",
+                jobId, stageId, plans.size(), batchCount, elapsedMillis(batchStartNanos));
+        return results;
+    }
+
+    private List<StrategyExecutionResult> executeBatch(String jobId,
+                                                       String stageId,
+                                                       RahaDataset dataset,
+                                                       List<StrategyPlan> plans,
+                                                       long timeoutMillis,
+                                                       int batchIndex,
+                                                       int batchCount) {
         long startNanos = System.nanoTime();
-        String jobGroup = jobId + ":rvd-batch:" + stageId;
+        String jobGroup = jobId + ":rvd-batch:" + stageId + ":" + batchIndex;
         ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "raha-rvd-batch");
             thread.setDaemon(true);
@@ -97,16 +144,18 @@ public final class RvdBatchStrategyExecutor {
                 }
             }
         });
-        LOGGER.info("开始批量执行 RVD 策略，jobId={}，stageId={}，planCount={}，timeoutMillis={}",
-                jobId, stageId, plans.size(), timeoutMillis);
+        LOGGER.info("开始执行 RVD 子批次，jobId={}，stageId={}，batchIndex={}，"
+                        + "batchCount={}，planCount={}，timeoutMillis={}",
+                jobId, stageId, batchIndex + 1, batchCount, plans.size(), timeoutMillis);
         try {
             List<Row> rows = future.get(timeoutMillis, TimeUnit.MILLISECONDS);
             long runtimeMillis = elapsedMillis(startNanos);
             List<StrategyExecutionResult> results = succeeded(
                     jobId, stageId, dataset, plans, rows, runtimeMillis);
-            LOGGER.info("RVD 策略批量执行完成，jobId={}，stageId={}，planCount={}，"
-                            + "candidateRowCount={}，runtimeMillis={}",
-                    jobId, stageId, plans.size(), rows.size(), runtimeMillis);
+            LOGGER.info("RVD 子批次执行完成，jobId={}，stageId={}，batchIndex={}，"
+                            + "batchCount={}，planCount={}，candidateRowCount={}，runtimeMillis={}",
+                    jobId, stageId, batchIndex + 1, batchCount, plans.size(), rows.size(),
+                    runtimeMillis);
             return results;
         } catch (TimeoutException exception) {
             future.cancel(true);

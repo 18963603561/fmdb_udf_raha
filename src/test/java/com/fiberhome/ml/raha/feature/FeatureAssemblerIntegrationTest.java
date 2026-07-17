@@ -38,6 +38,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -51,7 +52,7 @@ class FeatureAssemblerIntegrationTest {
     }
 
     @Test
-    void shouldAssembleStableSparseFeaturesAndProtectSensitiveValues() {
+    void shouldAssembleStableSparseFeaturesWithoutPersistingSensitiveValues() {
         RahaDataset dataset = dataset();
         List<StrategyPlan> plans = plans();
         List<StrategyHit> hits = hits(plans);
@@ -73,8 +74,7 @@ class FeatureAssemblerIntegrationTest {
         SparseFeatureRow codeHit = find(first, "3", "code");
         SparseFeatureRow secretHit = find(first, "3", "secret");
         assertFalse(codeHit.getValues().isEmpty());
-        assertEquals("1*********3", secretHit.getMaskedValue());
-        assertFalse(secretHit.getMaskedValue().contains("13800000003"));
+        assertNull(secretHit.getMaskedValue());
         assertEquals(HashUtils.sha256Hex("13800000003"), secretHit.getValueHash());
 
         InMemoryRahaRepository storage = new InMemoryRahaRepository();

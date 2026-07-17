@@ -54,7 +54,7 @@ class RahaConfigValidatorTest {
                 10, 1000L, false);
         RahaJobConfig config = new RahaJobConfig(
                 JobType.DETECTION, "dataset-1", null, "table-1", "id",
-                false, 1L, 30, strategyConfig, FeatureConfig.defaults(),
+                false, 1L, strategyConfig, FeatureConfig.defaults(),
                 ModelConfig.defaults(), ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
         ConfigValidationException exception = assertThrows(
@@ -67,7 +67,7 @@ class RahaConfigValidatorTest {
     void shouldRejectInvalidModelThreshold() {
         RahaJobConfig config = new RahaJobConfig(
                 JobType.TRAINING, "dataset-1", null, "table-1", "id",
-                true, 1L, 30, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                true, 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 1.1d, true),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
@@ -86,7 +86,7 @@ class RahaConfigValidatorTest {
                 ClassifierType.WEIGHTED_RULE, 0.5d, true, weights, 0.2d);
         RahaJobConfig config = new RahaJobConfig(
                 JobType.DETECTION, "dataset-1", null, "table-1", "id",
-                false, 1L, 30, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                false, 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 modelConfig, ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
         ConfigValidationException exception = assertThrows(
@@ -102,7 +102,7 @@ class RahaConfigValidatorTest {
                 Collections.<StrategyFamily, Double>emptyMap(), -0.1d);
         RahaJobConfig config = new RahaJobConfig(
                 JobType.DETECTION, "dataset-1", null, "table-1", "id",
-                false, 1L, 30, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                false, 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 modelConfig, ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
         ConfigValidationException exception = assertThrows(
@@ -115,14 +115,14 @@ class RahaConfigValidatorTest {
     void shouldRejectInvalidClusteringAndSamplingConfiguration() {
         RahaJobConfig invalidClustering = new RahaJobConfig(
                 JobType.SAMPLING, "dataset-1", null, "table-1", "id",
-                false, 1L, 30, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                false, 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 ModelConfig.defaults(),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 0, 100),
                 SamplingConfig.defaults(), ResourceConfig.defaults(),
                 FailureToleranceConfig.defaults());
         RahaJobConfig invalidSampling = new RahaJobConfig(
                 JobType.SAMPLING, "dataset-1", null, "table-1", "id",
-                false, 1L, 30, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                false, 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 ModelConfig.defaults(), ClusteringConfig.defaults(),
                 new SamplingConfig(0, true, false, 1000L),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
@@ -160,7 +160,7 @@ class RahaConfigValidatorTest {
                 Collections.<String, Integer>emptyMap());
         RahaJobConfig config = new RahaJobConfig(
                 JobType.DETECTION, "dataset-1", null, "table-1", "id",
-                false, 1L, 30, strategyConfig, FeatureConfig.defaults(),
+                false, 1L, strategyConfig, FeatureConfig.defaults(),
                 ModelConfig.defaults(), ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
         ConfigValidationException exception = assertThrows(
@@ -193,7 +193,7 @@ class RahaConfigValidatorTest {
                 families, 100, columns, Collections.<String>emptySet(), 50, 1000L, false);
         return new RahaJobConfig(
                 JobType.DETECTION, "dataset-1", null, "table-1", "id",
-                false, 1L, 30, strategyConfig, FeatureConfig.defaults(),
+                false, 1L, strategyConfig, FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, threshold, true),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
     }
@@ -201,7 +201,7 @@ class RahaConfigValidatorTest {
     private static RahaJobConfig configWithResource(ResourceConfig resourceConfig) {
         return new RahaJobConfig(
                 JobType.DETECTION, "dataset-1", null, "table-1", "id",
-                false, 1L, 30, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                false, 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 ModelConfig.defaults(), resourceConfig, FailureToleranceConfig.defaults());
     }
 }

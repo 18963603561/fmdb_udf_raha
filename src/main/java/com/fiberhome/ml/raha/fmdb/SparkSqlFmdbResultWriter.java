@@ -2,7 +2,6 @@ package com.fiberhome.ml.raha.fmdb;
 
 import com.fiberhome.ml.raha.data.DetectionResult;
 import com.fiberhome.ml.raha.job.RahaJob;
-import com.fiberhome.ml.raha.security.ResultValueProtectionPolicy;
 import com.fiberhome.ml.raha.util.FormDataCodec;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import org.apache.spark.sql.Dataset;
@@ -22,14 +21,14 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 将 Raha 任务审计状态和检测明细转换为稳定 FMDB 表模式后幂等写入。
+ * 将 Raha 任务状态和检测明细转换为稳定 FMDB 表模式后幂等写入。
  */
 public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
 
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(
             SparkSqlFmdbResultWriter.class);
-    /** 任务审计表模式。 */
+    /** 任务状态表模式。 */
     private static final StructType JOB_SCHEMA = DataTypes.createStructType(
             new StructField[]{
                     field("job_id", DataTypes.StringType, false),
@@ -77,28 +76,15 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
     private final FmdbTableGateway tableGateway;
     /** 提供可测试写入时间的时钟。 */
     private final Clock clock;
-    /** 控制敏感检测结果展示值落库方式的策略。 */
-    private final ResultValueProtectionPolicy valueProtectionPolicy;
-
     public SparkSqlFmdbResultWriter(SparkSession sparkSession,
                                     FmdbTableGateway tableGateway,
                                     Clock clock) {
-        this(sparkSession, tableGateway, clock,
-                ResultValueProtectionPolicy.configuredDefaults());
-    }
-
-    public SparkSqlFmdbResultWriter(SparkSession sparkSession,
-                                    FmdbTableGateway tableGateway,
-                                    Clock clock,
-                                    ResultValueProtectionPolicy valueProtectionPolicy) {
-        if (sparkSession == null || tableGateway == null || clock == null
-                || valueProtectionPolicy == null) {
+        if (sparkSession == null || tableGateway == null || clock == null) {
             throw new IllegalArgumentException("FMDB 结果写入器依赖不能为空");
         }
         this.sparkSession = sparkSession;
         this.tableGateway = tableGateway;
         this.clock = clock;
-        this.valueProtectionPolicy = valueProtectionPolicy;
     }
 
     @Override
@@ -140,7 +126,7 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
                     result.getCoordinate().getRowId(),
                     result.getCoordinate().getColumnName(),
                     result.getCoordinate().toCellId(), result.getValueHash(),
-                    valueProtectionPolicy.protectedMaskedValue(result),
+                    null,
                     result.isError(), result.getScore(),
                     result.getThreshold(), FormDataCodec.encodeList(result.getStrategyIds()),
                     FormDataCodec.encode(result.getReasons()), result.getModelName(),

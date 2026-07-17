@@ -21,8 +21,6 @@ public final class RahaJobConfig {
     private final boolean saveIntermediate;
     /** 聚类、采样和模型使用的随机种子。 */
     private final long randomSeed;
-    /** 任务结果保留天数。 */
-    private final int resultRetentionDays;
     /** 策略生成和执行配置。 */
     private final StrategyConfig strategyConfig;
     /** 特征生成配置。 */
@@ -47,14 +45,13 @@ public final class RahaJobConfig {
                          String rowIdColumn,
                          boolean saveIntermediate,
                          long randomSeed,
-                         int resultRetentionDays,
                          StrategyConfig strategyConfig,
                          FeatureConfig featureConfig,
                          ModelConfig modelConfig,
                          ResourceConfig resourceConfig,
                          FailureToleranceConfig failureToleranceConfig) {
         this(jobType, datasetId, snapshotId, inputReference, rowIdColumn,
-                saveIntermediate, randomSeed, resultRetentionDays,
+                saveIntermediate, randomSeed,
                 strategyConfig, featureConfig, modelConfig,
                 ClusteringConfig.defaults(), SamplingConfig.defaults(),
                 resourceConfig, failureToleranceConfig);
@@ -67,7 +64,6 @@ public final class RahaJobConfig {
                          String rowIdColumn,
                          boolean saveIntermediate,
                          long randomSeed,
-                         int resultRetentionDays,
                          StrategyConfig strategyConfig,
                          FeatureConfig featureConfig,
                          ModelConfig modelConfig,
@@ -76,7 +72,7 @@ public final class RahaJobConfig {
                          ResourceConfig resourceConfig,
                          FailureToleranceConfig failureToleranceConfig) {
         this(jobType, datasetId, snapshotId, inputReference, rowIdColumn,
-                saveIntermediate, randomSeed, resultRetentionDays,
+                saveIntermediate, randomSeed,
                 strategyConfig, featureConfig, modelConfig, clusteringConfig,
                 samplingConfig, resourceConfig, failureToleranceConfig,
                 RahaDefaultConfigProvider.factory().executionFingerprint());
@@ -89,7 +85,6 @@ public final class RahaJobConfig {
                          String rowIdColumn,
                          boolean saveIntermediate,
                          long randomSeed,
-                         int resultRetentionDays,
                          StrategyConfig strategyConfig,
                          FeatureConfig featureConfig,
                          ModelConfig modelConfig,
@@ -105,7 +100,6 @@ public final class RahaJobConfig {
         this.rowIdColumn = rowIdColumn;
         this.saveIntermediate = saveIntermediate;
         this.randomSeed = randomSeed;
-        this.resultRetentionDays = resultRetentionDays;
         this.strategyConfig = strategyConfig;
         this.featureConfig = featureConfig;
         this.modelConfig = modelConfig;
@@ -161,10 +155,6 @@ public final class RahaJobConfig {
         return randomSeed;
     }
 
-    public int getResultRetentionDays() {
-        return resultRetentionDays;
-    }
-
     public StrategyConfig getStrategyConfig() {
         return strategyConfig;
     }
@@ -205,7 +195,6 @@ public final class RahaJobConfig {
                 + ConfigTextUtils.token(rowIdColumn)
                 + ConfigTextUtils.token(saveIntermediate)
                 + ConfigTextUtils.token(randomSeed)
-                + ConfigTextUtils.token(resultRetentionDays)
                 + ConfigTextUtils.token(strategyConfig == null ? null : strategyConfig.toCanonicalString())
                 + ConfigTextUtils.token(featureConfig == null ? null : featureConfig.toCanonicalString())
                 + ConfigTextUtils.token(modelConfig == null ? null : modelConfig.toCanonicalString())

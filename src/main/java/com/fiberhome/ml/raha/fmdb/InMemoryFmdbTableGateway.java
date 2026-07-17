@@ -76,8 +76,13 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
             return 0L;
         }
         Dataset<Row> combined = existing == null ? pending : existing.unionByName(pending);
-        tables.put(validated, combined);
-        combined.createOrReplaceTempView(validated);
+        // 内存网关会连续追加模型和字典；立即物化并截断血缘，避免后续写入递归重算历史连接。
+        Dataset<Row> materialized = combined.localCheckpoint(true);
+        if (existing != null) {
+            existing.unpersist(false);
+        }
+        tables.put(validated, materialized);
+        materialized.createOrReplaceTempView(validated);
         return count;
     }
 

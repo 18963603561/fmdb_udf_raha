@@ -94,7 +94,7 @@ public final class RahaFeaturePreparationService {
                     System.nanoTime() - startNanos));
             LOGGER.info("Raha 策略和特征准备完成，jobId={}，planCount={}，hitCount={}，"
                             + "featureRowCount={}，runtimeMillis={}",
-                    request.getJobId(), plans.size(), strategyBatch.getHits().size(),
+                    request.getJobId(), plans.size(), strategyBatch.getHitCount(),
                     features.getRows().size(), runtimeMillis);
             return new RahaFeaturePreparationResult(
                     request.getDataset().getDatasetId(),

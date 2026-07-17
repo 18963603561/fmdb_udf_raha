@@ -36,6 +36,25 @@ public final class StrategyBatchResult {
         return failed;
     }
 
+    /** 返回全部策略摘要中的命中总数，不创建命中对象汇总列表。 */
+    public long getHitCount() {
+        long count = 0L;
+        for (StrategyExecutionResult execution : executions) {
+            count += execution.getSummary().getHitCount();
+        }
+        return count;
+    }
+
+    /** 返回释放命中对象但保留摘要和命中数量的批次结果。 */
+    public StrategyBatchResult withoutHits() {
+        List<StrategyExecutionResult> summaries =
+                new ArrayList<StrategyExecutionResult>(executions.size());
+        for (StrategyExecutionResult execution : executions) {
+            summaries.add(StrategyExecutionResult.withoutHits(execution));
+        }
+        return new StrategyBatchResult(summaries);
+    }
+
     public List<StrategyHit> getHits() {
         List<StrategyHit> hits = new ArrayList<StrategyHit>();
         for (StrategyExecutionResult execution : executions) {

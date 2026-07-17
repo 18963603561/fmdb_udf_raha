@@ -12,6 +12,7 @@ def parse_args():
     parser.add_argument("--python", required=True)
     parser.add_argument("--java", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--row-id-column", default="tuple_id")
     return parser.parse_args()
 
 
@@ -63,8 +64,12 @@ def main():
     for key in sorted(python_rvd):
         java_item = java_rvd.get(key)
         if java_item is None:
+            parts = key.split("|")
+            # 稳定行标识不参与 Java 检测，相关有向字段对属于明确的不适用范围。
+            not_applicable = (len(parts) >= 3
+                              and args.row_id_column in parts[1:3])
             mappings.append({"key": key, "status": "NOT_APPLICABLE"
-                             if "tuple_id" in key.lower() else "MISSING"})
+                             if not_applicable else "MISSING"})
             continue
         metrics = coordinate_metrics(python_rvd[key], java_item)
         mappings.append({"key": key,

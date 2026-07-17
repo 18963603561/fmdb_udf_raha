@@ -50,10 +50,12 @@ class RvdBatchStrategyExecutorIntegrationTest {
             expected.add(singleExecutor.execute("job", "stage", dataset, plan, 30000L));
         }
 
-        List<StrategyExecutionResult> actual = new RvdBatchStrategyExecutor(clock)
+        // 使用两条计划的单批上限，验证跨批执行不会改变策略语义。
+        List<StrategyExecutionResult> actual = new RvdBatchStrategyExecutor(clock, 2)
                 .execute("job", "stage", dataset, plans, 30000L);
 
         assertEquals(signatures(expected), signatures(actual));
+        assertEquals(strategyIds(plans), resultStrategyIds(actual));
     }
 
     private static RahaDataset dataset() {
@@ -104,6 +106,22 @@ class RvdBatchStrategyExecutorIntegrationTest {
             }
         }
         Collections.sort(values, Comparator.naturalOrder());
+        return values;
+    }
+
+    private static List<String> strategyIds(List<StrategyPlan> plans) {
+        List<String> values = new ArrayList<String>();
+        for (StrategyPlan plan : plans) {
+            values.add(plan.getStrategyId());
+        }
+        return values;
+    }
+
+    private static List<String> resultStrategyIds(List<StrategyExecutionResult> results) {
+        List<String> values = new ArrayList<String>();
+        for (StrategyExecutionResult result : results) {
+            values.add(result.getSummary().getStrategyId());
+        }
         return values;
     }
 }

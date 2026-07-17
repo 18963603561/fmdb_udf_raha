@@ -191,7 +191,7 @@ class Iteration8ParallelLearningIntegrationTest {
         ResourceConfig resourceConfig = new ResourceConfig(
                 2, 2, 1024L, "MEMORY_AND_DISK", 4096L, 60000L);
         return new RahaJobConfig(JobType.TRAINING, "parallel-dataset", "snapshot-v1",
-                "memory", "id", true, 20260715L, 30, strategyConfig,
+                "memory", "id", true, 20260715L, strategyConfig,
                 FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, true),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 2, 100),

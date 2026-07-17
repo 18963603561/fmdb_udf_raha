@@ -1,0 +1,4618 @@
+{
+  "javaFamilyCounts": {
+    "OD": 25,
+    "PVD": 69,
+    "RVD": 342
+  },
+  "javaStrategyCount": 436,
+  "odStatus": "APPROXIMATE_SPARK_NATIVE_IMPLEMENTATION",
+  "pvdStatus": "MISSING_PYTHON_OBSERVED_CHARACTER_GRID",
+  "pythonFamilyCounts": {
+    "OD": 34,
+    "PVD": 361,
+    "RVD": 380
+  },
+  "pythonStrategyCount": 775,
+  "rvdApproximateCount": 0,
+  "rvdExactCount": 342,
+  "rvdMappings": [
+    {
+      "key": "RVD|address_1|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1152,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1922,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1178,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 978,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|address_1|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1934,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1934,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 828,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 860,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 998,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1020,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1886,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1886,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1054,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1934,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_1|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 990,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|address_2|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_2|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|address_3|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|address_3|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1236,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1924,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1254,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1082,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|city|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1932,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1932,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 974,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1010,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1034,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1352,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1130,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1932,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1166,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|city|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1144,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1924,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|condition|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1960,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1960,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1922,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1960,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1942,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|condition|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1446,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1304,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1938,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1170,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|county|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1326,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1070,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1332,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1508,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1942,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1264,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1294,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|county|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1436,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|emergency_service|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1996,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|emergency_service|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|index|address_1",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|address_2",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|address_3",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|city",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|condition",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|county",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|emergency_service",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|measure_code",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|measure_name",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|name",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|owner",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|phone",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|provider_number",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|sample",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|score",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|state",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|state_average",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|type",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|index|zip",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|measure_code|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1544,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1926,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|measure_code|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1316,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1772,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1772,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1400,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_code|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1536,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1912,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|measure_name|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1390,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1924,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1684,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1606,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1304,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|measure_name|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 958,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1156,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1932,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1204,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 992,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|name|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 866,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1034,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1030,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1896,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1896,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 998,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 984,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|name|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1970,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1970,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1960,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1920,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1966,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|owner|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1974,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1974,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1970,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1920,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1970,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1974,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1970,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1912,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1974,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1820,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|owner|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1924,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 960,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1098,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1922,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1192,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 968,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|phone|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1948,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1948,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 822,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 758,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1012,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1894,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1894,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 920,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1948,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1024,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|phone|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 980,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 998,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1196,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1194,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 984,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|provider_number|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 824,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 860,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1036,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1892,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1892,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1002,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1020,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|provider_number|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 998,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1622,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1614,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1548,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1614,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1116,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|sample|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1634,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1634,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1622,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1568,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1622,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1622,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1292,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 628,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1638,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 580,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sample|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1626,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1866,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|score|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1954,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1594,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1368,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|score|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1442,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1888,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|state_average|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1292,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1296,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1904,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1144,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1440,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state_average|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1910,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1980,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|state|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 1940,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|state|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 2000,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1984,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 1960,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|type|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 1980,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|type|zip",
+      "metrics": {
+        "exact": true,
+        "intersection": 1988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|address_1",
+      "metrics": {
+        "exact": true,
+        "intersection": 1038,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|address_2",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|address_3",
+      "metrics": {
+        "exact": true,
+        "intersection": 0,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 0.0,
+        "pythonOnly": 0,
+        "recall": 0.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|city",
+      "metrics": {
+        "exact": true,
+        "intersection": 1206,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|condition",
+      "metrics": {
+        "exact": true,
+        "intersection": 1932,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|county",
+      "metrics": {
+        "exact": true,
+        "intersection": 1246,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|emergency_service",
+      "metrics": {
+        "exact": true,
+        "intersection": 956,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|index",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|zip|measure_code",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|measure_name",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|name",
+      "metrics": {
+        "exact": true,
+        "intersection": 926,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|owner",
+      "metrics": {
+        "exact": true,
+        "intersection": 928,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|phone",
+      "metrics": {
+        "exact": true,
+        "intersection": 1078,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|provider_number",
+      "metrics": {
+        "exact": true,
+        "intersection": 1118,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|sample",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|score",
+      "metrics": {
+        "exact": true,
+        "intersection": 1946,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|state",
+      "metrics": {
+        "exact": true,
+        "intersection": 1038,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|state_average",
+      "metrics": {
+        "exact": true,
+        "intersection": 1950,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|zip|type",
+      "metrics": {
+        "exact": true,
+        "intersection": 988,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.service;
 
+import com.fiberhome.ml.raha.cluster.ClusteringBatchResult;
 import com.fiberhome.ml.raha.feature.FeatureAssemblyResult;
 import com.fiberhome.ml.raha.strategy.StrategyBatchResult;
 import com.fiberhome.ml.raha.strategy.StrategyPlan;
@@ -28,6 +29,8 @@ public final class RahaFeaturePreparationResult {
     private final String strategyPlanVersion;
     /** 特征准备总耗时。 */
     private final long runtimeMillis;
+    /** 已完成的列内聚类结果，可由训练阶段复用。 */
+    private final ClusteringBatchResult clustering;
 
     public RahaFeaturePreparationResult(String datasetId,
                                         String snapshotId,
@@ -36,6 +39,18 @@ public final class RahaFeaturePreparationResult {
                                         FeatureAssemblyResult features,
                                         String strategyPlanVersion,
                                         long runtimeMillis) {
+        this(datasetId, snapshotId, strategyPlans, strategyBatch, features,
+                strategyPlanVersion, runtimeMillis, null);
+    }
+
+    public RahaFeaturePreparationResult(String datasetId,
+                                        String snapshotId,
+                                        List<StrategyPlan> strategyPlans,
+                                        StrategyBatchResult strategyBatch,
+                                        FeatureAssemblyResult features,
+                                        String strategyPlanVersion,
+                                        long runtimeMillis,
+                                        ClusteringBatchResult clustering) {
         this.datasetId = ValueUtils.requireNotBlank(datasetId, "数据集标识");
         this.snapshotId = ValueUtils.requireNotBlank(snapshotId, "快照标识");
         this.strategyPlanVersion = ValueUtils.requireNotBlank(
@@ -49,6 +64,7 @@ public final class RahaFeaturePreparationResult {
         this.strategyBatch = strategyBatch;
         this.features = features;
         this.runtimeMillis = runtimeMillis;
+        this.clustering = clustering;
     }
 
     public String getDatasetId() { return datasetId; }
@@ -58,4 +74,21 @@ public final class RahaFeaturePreparationResult {
     public FeatureAssemblyResult getFeatures() { return features; }
     public String getStrategyPlanVersion() { return strategyPlanVersion; }
     public long getRuntimeMillis() { return runtimeMillis; }
+    public ClusteringBatchResult getClustering() { return clustering; }
+
+    /** 返回释放策略命中对象后的特征准备结果。 */
+    public RahaFeaturePreparationResult withoutStrategyHits() {
+        return new RahaFeaturePreparationResult(datasetId, snapshotId, strategyPlans,
+                strategyBatch.withoutHits(), features, strategyPlanVersion,
+                runtimeMillis, clustering);
+    }
+
+    /** 返回附带列内聚类结果的特征准备结果。 */
+    public RahaFeaturePreparationResult withClustering(ClusteringBatchResult value) {
+        if (value == null) {
+            throw new IllegalArgumentException("聚类结果不能为空");
+        }
+        return new RahaFeaturePreparationResult(datasetId, snapshotId, strategyPlans,
+                strategyBatch, features, strategyPlanVersion, runtimeMillis, value);
+    }
 }

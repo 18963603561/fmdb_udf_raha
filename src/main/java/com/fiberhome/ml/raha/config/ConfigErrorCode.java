@@ -14,8 +14,6 @@ public enum ConfigErrorCode {
     INPUT_REFERENCE_REQUIRED,
     /** 行标识字段为空。 */
     ROW_ID_COLUMN_REQUIRED,
-    /** 结果保留天数非法。 */
-    RESULT_RETENTION_INVALID,
     /** 策略配置为空。 */
     STRATEGY_CONFIG_REQUIRED,
     /** 策略族为空。 */

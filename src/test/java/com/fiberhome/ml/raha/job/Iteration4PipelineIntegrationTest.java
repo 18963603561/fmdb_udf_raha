@@ -78,6 +78,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -167,7 +168,7 @@ class Iteration4PipelineIntegrationTest {
         DetectionExplanation explanation = new DetectionExplanationService().explain(
                 cityResult, plans, strategyBatch.getHits(), cityFeature);
         assertTrue(cityResult.isError());
-        assertEquals("*", cityResult.getMaskedValue());
+        assertNull(cityResult.getMaskedValue());
         assertEquals(1, explanation.getStrategies().size());
         assertEquals("RVD_ONE_TO_MANY_CONFLICT",
                 explanation.getStrategies().get(0).getReasonCode());
@@ -183,7 +184,7 @@ class Iteration4PipelineIntegrationTest {
                 Collections.singleton(StrategyTypes.RVD_ONE_TO_MANY),
                 Collections.<String>emptySet(), Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(JobType.DETECTION, "dataset", null,
-                csv.toString(), "id", true, 1L, 30,
+                csv.toString(), "id", true, 1L,
                 strategyConfig, FeatureConfig.defaults(),
                 new ModelConfig(com.fiberhome.ml.raha.data.ClassifierType.WEIGHTED_RULE,
                         0.5d, false),

@@ -57,6 +57,8 @@ class FmdbAdapterIntegrationTest {
     private static final String MODEL_TABLE = "raha_fmdb_models";
     /** 测试字典表。 */
     private static final String DICTIONARY_TABLE = "raha_fmdb_dictionaries";
+    /** 验证连续追加后血缘被截断的测试表。 */
+    private static final String LINEAGE_TABLE = "raha_fmdb_lineage";
     /** 每个测试独立使用的内存 FMDB 表网关。 */
     private InMemoryFmdbTableGateway gateway;
 
@@ -68,6 +70,7 @@ class FmdbAdapterIntegrationTest {
         spark.catalog().dropTempView(RESULT_TABLE);
         spark.catalog().dropTempView(MODEL_TABLE);
         spark.catalog().dropTempView(DICTIONARY_TABLE);
+        spark.catalog().dropTempView(LINEAGE_TABLE);
         gateway = new InMemoryFmdbTableGateway(spark);
         inputFrame(spark).createOrReplaceTempView(INPUT_VIEW);
     }
@@ -150,6 +153,27 @@ class FmdbAdapterIntegrationTest {
         assertEquals(2L, gateway.read(DICTIONARY_TABLE).count());
         assertThrows(IllegalStateException.class,
                 () -> restarted.save(artifact(0.75d)));
+    }
+
+    @Test
+    void shouldMaterializeAndTruncateLineageAfterEachAppend() {
+        SparkSession spark = SparkTestSession.get();
+        StructType schema = new StructType()
+                .add("id", DataTypes.StringType, false)
+                .add("value", DataTypes.StringType, true);
+        org.apache.spark.sql.Dataset<Row> first = spark.createDataFrame(
+                Collections.singletonList(RowFactory.create("1", "A")), schema);
+        org.apache.spark.sql.Dataset<Row> second = spark.createDataFrame(
+                Collections.singletonList(RowFactory.create("2", "B")), schema);
+
+        assertEquals(1L, gateway.appendIdempotent(
+                LINEAGE_TABLE, first, Collections.singletonList("id")));
+        assertEquals(1L, gateway.appendIdempotent(
+                LINEAGE_TABLE, second, Collections.singletonList("id")));
+
+        assertEquals(2L, gateway.read(LINEAGE_TABLE).count());
+        assertFalse(gateway.read(LINEAGE_TABLE).queryExecution()
+                .logical().toString().contains("Union"));
     }
 
     private static FmdbDatasetLoader loader() {

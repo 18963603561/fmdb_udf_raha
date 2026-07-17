@@ -9,7 +9,6 @@ import com.fiberhome.ml.raha.data.RahaDataset;
 import com.fiberhome.ml.raha.data.StrategyFamily;
 import com.fiberhome.ml.raha.error.RahaErrorCode;
 import com.fiberhome.ml.raha.error.RahaException;
-import com.fiberhome.ml.raha.security.ResultValueProtectionPolicy;
 import com.fiberhome.ml.raha.strategy.SparkStrategySupport;
 import com.fiberhome.ml.raha.strategy.StrategyConfigurationKeys;
 import com.fiberhome.ml.raha.strategy.StrategyHit;
@@ -51,22 +50,12 @@ public final class FeatureAssembler {
     private final FeatureDictionaryVersioner versioner;
     /** 提供可测试字典创建时间的时钟。 */
     private final Clock clock;
-    /** 敏感字段展示值保护策略。 */
-    private final ResultValueProtectionPolicy valueProtectionPolicy;
-
     public FeatureAssembler(FeatureDictionaryVersioner versioner, Clock clock) {
-        this(versioner, clock, ResultValueProtectionPolicy.configuredDefaults());
-    }
-
-    public FeatureAssembler(FeatureDictionaryVersioner versioner,
-                            Clock clock,
-                            ResultValueProtectionPolicy valueProtectionPolicy) {
-        if (versioner == null || clock == null || valueProtectionPolicy == null) {
+        if (versioner == null || clock == null) {
             throw new IllegalArgumentException("特征组装器依赖不能为空");
         }
         this.versioner = versioner;
         this.clock = clock;
-        this.valueProtectionPolicy = valueProtectionPolicy;
     }
 
     /**
@@ -201,10 +190,8 @@ public final class FeatureAssembler {
             long frequency = ((Number) row.getAs("value_frequency")).longValue();
             CellCoordinate coordinate = new CellCoordinate(dataset.getDatasetId(),
                     dataset.getSnapshotId(), rowId, column.getName());
-            String maskedValue = column.isSensitive()
-                    ? valueProtectionPolicy.protectedRawValue(originalText) : null;
             MutableCellFeatures cell = new MutableCellFeatures(
-                    coordinate, valueHash, maskedValue);
+                    coordinate, valueHash, null);
             List<StrategyHit> cellHits = hitsByCell.containsKey(coordinate.toCellId())
                     ? hitsByCell.get(coordinate.toCellId()) : Collections.<StrategyHit>emptyList();
             addStrategyValues(cell, cellHits, specs, valueHash);

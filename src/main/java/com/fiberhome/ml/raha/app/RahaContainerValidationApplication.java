@@ -68,6 +68,7 @@ import com.fiberhome.ml.raha.repository.DefaultStrategyRepository;
 import com.fiberhome.ml.raha.repository.DetectionResultRepository;
 import com.fiberhome.ml.raha.repository.InMemoryRahaRepository;
 import com.fiberhome.ml.raha.repository.ModelMetadataRepository;
+import com.fiberhome.ml.raha.repository.RepositoryNamespace;
 import com.fiberhome.ml.raha.repository.StrategyRepository;
 import com.fiberhome.ml.raha.service.RahaDetectOutput;
 import com.fiberhome.ml.raha.service.RahaDetectRequest;
@@ -324,10 +325,6 @@ public final class RahaContainerValidationApplication {
             DetectionEvaluationMetrics metrics = new DetectionEvaluationService()
                     .evaluate(holdout.detections, holdout.labels);
             long resultCount = writeDetectionResults(detected, fmdbGateway);
-            new StrategyAlignmentArtifactWriter().write(
-                    outputDirectory.resolve("java-strategy-alignment.jsonl"),
-                    training.trained.getPayload().getStrategyPlans(),
-                    training.trained.getPayload().getStrategyBatch());
             writeSummary(dirtyRowCount, truth, training, detected, resultCount,
                     metrics, fullMetrics, sampledLabels, trainUdfResult, detectUdfResult,
                     sampleUdfResult,
@@ -981,6 +978,16 @@ public final class RahaContainerValidationApplication {
                         + "randomSeed={}，preparationMillis={}",
                 activeResult.getRowIds().size(), activeResult.getLabels().size(),
                 randomSeed, preparation.getRuntimeMillis());
+        // 对齐文件写出后，释放策略命中对象及内存仓储副本，避免训练阶段驱动端堆积。
+        new StrategyAlignmentArtifactWriter().write(
+                outputDirectory.resolve("java-strategy-alignment.jsonl"),
+                preparation.getStrategyPlans(), preparation.getStrategyBatch());
+        int removedHitRecords = storage.removePartition(RepositoryNamespace.STRATEGY_HIT,
+                SAMPLE_JOB_ID);
+        LOGGER.info("策略命中中间结果已释放，jobId={}，removedRecordCount={}",
+                SAMPLE_JOB_ID, removedHitRecords);
+        preparation = preparation.withClustering(activeResult.getClustering())
+                .withoutStrategyHits();
         EvaluationSplit evaluationSplit = new EvaluationSplitService().split(
                 truth.getLabels(), activeResult.getCellIds(), 5, 0,
                 DATASET_ID + "|" + SNAPSHOT_ID + "|threshold-v1");

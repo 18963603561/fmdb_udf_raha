@@ -1,0 +1,458 @@
+{
+  "javaFamilyCounts": {
+    "OD": 6,
+    "PVD": 24,
+    "RVD": 30
+  },
+  "javaStrategyCount": 60,
+  "odStatus": "APPROXIMATE_SPARK_NATIVE_IMPLEMENTATION",
+  "pvdStatus": "MISSING_PYTHON_OBSERVED_CHARACTER_GRID",
+  "pythonFamilyCounts": {
+    "OD": 34,
+    "PVD": 232,
+    "RVD": 42
+  },
+  "pythonStrategyCount": 308,
+  "rvdApproximateCount": 19,
+  "rvdExactCount": 11,
+  "rvdMappings": [
+    {
+      "key": "RVD|act_arr_time|act_dep_time",
+      "metrics": {
+        "exact": true,
+        "intersection": 2682,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|act_arr_time|flight",
+      "metrics": {
+        "exact": true,
+        "intersection": 964,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|act_arr_time|sched_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 726,
+        "jaccard": 0.6413427561837456,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 406,
+        "recall": 0.6413427561837456
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|act_arr_time|sched_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 908,
+        "jaccard": 0.696319018404908,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 396,
+        "recall": 0.696319018404908
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|act_arr_time|src",
+      "metrics": {
+        "exact": true,
+        "intersection": 3834,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|act_arr_time|tuple_id",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|act_dep_time|act_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 2962,
+        "jaccard": 0.9946272666218939,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 16,
+        "recall": 0.9946272666218939
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|act_dep_time|flight",
+      "metrics": {
+        "exact": true,
+        "intersection": 1550,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|act_dep_time|sched_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 1442,
+        "jaccard": 0.743298969072165,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 498,
+        "recall": 0.743298969072165
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|act_dep_time|sched_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 800,
+        "jaccard": 0.7393715341959335,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 282,
+        "recall": 0.7393715341959335
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|act_dep_time|src",
+      "metrics": {
+        "exact": true,
+        "intersection": 3836,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|act_dep_time|tuple_id",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|flight|act_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 3988,
+        "jaccard": 0.8392255892255892,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 764,
+        "recall": 0.8392255892255892
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|flight|act_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 4000,
+        "jaccard": 0.8417508417508418,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 752,
+        "recall": 0.8417508417508418
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|flight|sched_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 2952,
+        "jaccard": 0.701187648456057,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 1258,
+        "recall": 0.701187648456057
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|flight|sched_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 2102,
+        "jaccard": 0.6503712871287128,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 1130,
+        "recall": 0.6503712871287128
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|flight|src",
+      "metrics": {
+        "exact": true,
+        "intersection": 4752,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|flight|tuple_id",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|sched_arr_time|act_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 1812,
+        "jaccard": 0.8451492537313433,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 332,
+        "recall": 0.8451492537313433
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|sched_arr_time|act_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 1984,
+        "jaccard": 0.8343145500420521,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 394,
+        "recall": 0.8343145500420521
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|sched_arr_time|flight",
+      "metrics": {
+        "exact": true,
+        "intersection": 670,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sched_arr_time|sched_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 1162,
+        "jaccard": 0.9914675767918089,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 10,
+        "recall": 0.9914675767918089
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|sched_arr_time|src",
+      "metrics": {
+        "exact": true,
+        "intersection": 3108,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sched_arr_time|tuple_id",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|sched_dep_time|act_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 2240,
+        "jaccard": 0.7915194346289752,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 590,
+        "recall": 0.7915194346289752
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|sched_dep_time|act_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 2276,
+        "jaccard": 0.8025387870239774,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 560,
+        "recall": 0.8025387870239774
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|sched_dep_time|flight",
+      "metrics": {
+        "exact": true,
+        "intersection": 1110,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sched_dep_time|sched_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 2714,
+        "jaccard": 0.9948680351906158,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 14,
+        "recall": 0.9948680351906158
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|sched_dep_time|src",
+      "metrics": {
+        "exact": true,
+        "intersection": 3098,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|sched_dep_time|tuple_id",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|src|act_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 3988,
+        "jaccard": 0.8554268554268555,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 674,
+        "recall": 0.8554268554268555
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|src|act_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 3998,
+        "jaccard": 0.862381363244176,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 638,
+        "recall": 0.862381363244176
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|src|flight",
+      "metrics": {
+        "exact": true,
+        "intersection": 4750,
+        "jaccard": 1.0,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 0,
+        "recall": 1.0
+      },
+      "status": "EXACT"
+    },
+    {
+      "key": "RVD|src|sched_arr_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 3212,
+        "jaccard": 0.6776371308016877,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 1528,
+        "recall": 0.6776371308016877
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|src|sched_dep_time",
+      "metrics": {
+        "exact": false,
+        "intersection": 3178,
+        "jaccard": 0.6755952380952381,
+        "javaOnly": 0,
+        "precision": 1.0,
+        "pythonOnly": 1526,
+        "recall": 0.6755952380952381
+      },
+      "status": "APPROXIMATE"
+    },
+    {
+      "key": "RVD|src|tuple_id",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|tuple_id|act_arr_time",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|tuple_id|act_dep_time",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|tuple_id|flight",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|tuple_id|sched_arr_time",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|tuple_id|sched_dep_time",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "key": "RVD|tuple_id|src",
+      "status": "NOT_APPLICABLE"
+    }
+  ]
+}

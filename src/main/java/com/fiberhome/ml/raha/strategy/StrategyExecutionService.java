@@ -158,7 +158,7 @@ public final class StrategyExecutionService {
         StrategyBatchResult batchResult = new StrategyBatchResult(executions);
         LOGGER.info("策略并行批次执行完成，jobId={}，failedCount={}，hitCount={}，"
                         + "maxObservedConcurrency={}",
-                jobId, batchResult.getFailedCount(), batchResult.getHits().size(),
+                jobId, batchResult.getFailedCount(), batchResult.getHitCount(),
                 parallelResult.getMaxObservedConcurrency());
         return batchResult;
     }

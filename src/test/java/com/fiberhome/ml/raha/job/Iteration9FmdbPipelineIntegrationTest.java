@@ -223,7 +223,7 @@ class Iteration9FmdbPipelineIntegrationTest {
                 1, 60000L, false, strategyTypes,
                 Collections.<String>emptySet(), Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(JobType.TRAINING, "fmdb-dataset", "snapshot-v1",
-                INPUT_TABLE, "id", true, 20260715L, 30, strategyConfig,
+                INPUT_TABLE, "id", true, 20260715L, strategyConfig,
                 FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, true),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 2, 100),

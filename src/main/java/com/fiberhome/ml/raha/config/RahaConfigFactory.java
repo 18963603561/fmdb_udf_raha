@@ -6,17 +6,9 @@ import com.fiberhome.ml.raha.data.JobType;
 import com.fiberhome.ml.raha.data.StrategyFamily;
 import com.fiberhome.ml.raha.label.LabelPropagationConfig;
 import com.fiberhome.ml.raha.model.LogisticRegressionTrainingConfig;
-import com.fiberhome.ml.raha.performance.BenchmarkDatasetSpec;
-import com.fiberhome.ml.raha.performance.BenchmarkScale;
-import com.fiberhome.ml.raha.performance.CapacityBand;
-import com.fiberhome.ml.raha.performance.CapacityBandResourceSettings;
-import com.fiberhome.ml.raha.performance.ProductionResourceSettings;
-import com.fiberhome.ml.raha.security.ResultValueMode;
-import com.fiberhome.ml.raha.security.ResultValueProtectionPolicy;
 import com.fiberhome.ml.raha.strategy.StrategyGenerationConfig;
 import com.fiberhome.ml.raha.util.HashUtils;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -28,7 +20,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * 将统一属性转换为任务、算法、安全、UDF 和性能配置对象。
+ * 将统一属性转换为任务、算法和 UDF 配置对象。
  */
 public final class RahaConfigFactory {
 
@@ -49,7 +41,6 @@ public final class RahaConfigFactory {
         return new RahaJobConfig(jobType, datasetId, null, inputReference,
                 rowIdColumn, properties.getBoolean("raha.job.save-intermediate"),
                 properties.getLong("raha.job.random-seed"),
-                properties.getInt("raha.job.result-retention-days"),
                 strategyConfig(), featureConfig(), modelConfig(),
                 clusteringConfig(), samplingConfig(), resourceConfig(),
                 failureToleranceConfig(), executionFingerprint());
@@ -190,52 +181,6 @@ public final class RahaConfigFactory {
                 properties.getInt("raha.udf.max-request-length"));
     }
 
-    public ResultValueProtectionPolicy resultValueProtectionPolicy() {
-        return new ResultValueProtectionPolicy(
-                properties.getBoolean("raha.security.result.all-columns-sensitive"),
-                properties.getCsvSet("raha.security.result.sensitive-columns"),
-                properties.getEnum("raha.security.result.mode", ResultValueMode.class),
-                properties.getInt("raha.security.result.visible-prefix"),
-                properties.getInt("raha.security.result.visible-suffix"));
-    }
-
-    public List<BenchmarkDatasetSpec> benchmarkDatasetSpecs() {
-        List<BenchmarkDatasetSpec> specs = new ArrayList<BenchmarkDatasetSpec>();
-        for (String name : properties.getCsvSet(
-                "raha.performance.benchmark.names")) {
-            String prefix = "raha.performance.benchmark." + name + ".";
-            specs.add(new BenchmarkDatasetSpec(name,
-                    properties.getEnum(prefix + "scale", BenchmarkScale.class),
-                    properties.getLong(prefix + "rows"),
-                    properties.getInt(prefix + "columns"),
-                    properties.getDouble(prefix + "error-rate"),
-                    properties.getInt(prefix + "partitions"),
-                    properties.getLong(prefix + "seed")));
-        }
-        return Collections.unmodifiableList(specs);
-    }
-
-    public ProductionResourceSettings productionResourceSettings() {
-        EnumMap<CapacityBand, CapacityBandResourceSettings> bands =
-                new EnumMap<CapacityBand, CapacityBandResourceSettings>(CapacityBand.class);
-        bands.put(CapacityBand.SMALL, bandSettings("small"));
-        bands.put(CapacityBand.MEDIUM, bandSettings("medium"));
-        bands.put(CapacityBand.LARGE, bandSettings("large"));
-        bands.put(CapacityBand.EXTRA_LARGE, bandSettings("extra-large"));
-        return new ProductionResourceSettings(
-                properties.getLong("raha.performance.partition.target-bytes"),
-                properties.getLong("raha.performance.partition.target-rows"),
-                properties.getInt("raha.performance.partition.minimum"),
-                properties.getInt("raha.performance.partition.maximum"),
-                properties.getLong("raha.performance.capacity.small.max-rows"),
-                properties.getInt("raha.performance.capacity.small.max-columns"),
-                properties.getLong("raha.performance.capacity.medium.max-rows"),
-                properties.getInt("raha.performance.capacity.medium.max-columns"),
-                properties.getLong("raha.performance.capacity.large.max-rows"),
-                properties.getInt("raha.performance.capacity.large.max-columns"),
-                bands);
-    }
-
     public int profileMaxValueFrequencyCount() {
         return positiveInt("raha.profile.max-value-frequency-count");
     }
@@ -288,14 +233,6 @@ public final class RahaConfigFactory {
         return properties.getDouble("raha.label.max-direct-weight-ratio");
     }
 
-    public int intermediateRetentionDays() {
-        return properties.getInt("raha.retention.intermediate-days");
-    }
-
-    public int detectionRetentionDays() {
-        return properties.getInt("raha.retention.detection-days");
-    }
-
     public RahaProperties getProperties() {
         return properties;
     }
@@ -316,18 +253,6 @@ public final class RahaConfigFactory {
                     .append(ConfigTextUtils.token(entry.getValue()));
         }
         return HashUtils.sha256Hex(canonical.toString());
-    }
-
-    private CapacityBandResourceSettings bandSettings(String bandName) {
-        String prefix = "raha.performance.band." + bandName + ".";
-        return new CapacityBandResourceSettings(
-                properties.getInt(prefix + "strategy-concurrency"),
-                properties.getInt(prefix + "column-concurrency"),
-                properties.getInt(prefix + "max-rvd-pairs"),
-                properties.getBoolean(prefix + "cache-enabled"),
-                properties.getRequired(prefix + "storage-level"),
-                properties.getInt(prefix + "intermediate-retention-days"),
-                properties.getInt(prefix + "detection-retention-days"));
     }
 
     private int positiveInt(String key) {

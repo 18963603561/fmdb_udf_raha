@@ -26,9 +26,6 @@ public final class RahaConfigValidator {
         requireNotBlank(config.getRowIdColumn(), ConfigErrorCode.ROW_ID_COLUMN_REQUIRED, "行标识字段不能为空");
         requireNotBlank(config.getExecutionConfigFingerprint(),
                 ConfigErrorCode.CONFIG_REQUIRED, "执行配置指纹不能为空");
-        if (config.getResultRetentionDays() <= 0) {
-            fail(ConfigErrorCode.RESULT_RETENTION_INVALID, "结果保留天数必须大于 0");
-        }
         validateStrategy(config.getStrategyConfig());
         validateFeature(config.getFeatureConfig());
         validateModel(config.getModelConfig());

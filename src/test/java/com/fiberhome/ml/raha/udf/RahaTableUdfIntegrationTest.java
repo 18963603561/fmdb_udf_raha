@@ -1,18 +1,11 @@
 package com.fiberhome.ml.raha.udf;
 
-import com.fiberhome.ml.raha.audit.InMemoryRahaAuditWriter;
-import com.fiberhome.ml.raha.audit.RahaAuditService;
-import com.fiberhome.ml.raha.audit.RahaAuditStatus;
 import com.fiberhome.ml.raha.data.StageType;
 import com.fiberhome.ml.raha.fmdb.InMemoryFmdbTableGateway;
 import com.fiberhome.ml.raha.fmdb.SparkSqlFmdbResultWriter;
 import com.fiberhome.ml.raha.job.RahaIdGenerator;
 import com.fiberhome.ml.raha.repository.DefaultJobRepository;
 import com.fiberhome.ml.raha.repository.InMemoryRahaRepository;
-import com.fiberhome.ml.raha.security.RahaPermissionAction;
-import com.fiberhome.ml.raha.security.RahaPermissionGrant;
-import com.fiberhome.ml.raha.security.RahaResourceType;
-import com.fiberhome.ml.raha.security.RuleBasedRahaPermissionChecker;
 import com.fiberhome.ml.raha.service.RahaTaskType;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import com.fiberhome.ml.raha.util.FormDataCodec;
@@ -30,14 +23,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Collections;
-import java.util.Arrays;
-import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -170,37 +160,6 @@ class RahaTableUdfIntegrationTest {
         assertTrue(result.contains("\"errorCode\":\"UDF_RUNTIME_UNAVAILABLE\""));
     }
 
-    @Test
-    void shouldRejectUnauthorizedTaskBeforeCreatingJobAndAuditDenial() {
-        spark.catalog().dropTempView(JOB_TABLE);
-        InMemoryFmdbTableGateway gateway = new InMemoryFmdbTableGateway(spark);
-        InMemoryRahaAuditWriter auditWriter = new InMemoryRahaAuditWriter();
-        Map<String, List<RahaPermissionGrant>> grants =
-                new LinkedHashMap<String, List<RahaPermissionGrant>>();
-        grants.put("tester", Arrays.asList(
-                grant(RahaPermissionAction.SUBMIT, RahaResourceType.TASK, "DETECT"),
-                grant(RahaPermissionAction.READ, RahaResourceType.INPUT_DATA,
-                        "source_table"),
-                grant(RahaPermissionAction.WRITE, RahaResourceType.RESULT_DATA,
-                        "raha_result_table")));
-        RahaUdfJobSubmitter securedSubmitter = new RepositoryBackedRahaUdfJobSubmitter(
-                new DefaultJobRepository(new InMemoryRahaRepository()),
-                new SparkSqlFmdbResultWriter(spark, gateway, fixedClock()),
-                JOB_TABLE, new SequentialIdGenerator(), fixedClock(),
-                new RuleBasedRahaPermissionChecker("policy-v1", grants),
-                new RahaAuditService(auditWriter, fixedClock()));
-
-        String result = new F_DW_RAHADETECT(securedSubmitter)
-                .call(request(RahaTaskType.DETECT, "denied-key"));
-
-        assertTrue(result.contains("\"status\":\"REJECTED\""));
-        assertTrue(result.contains("\"errorCode\":\"PERMISSION_DENIED\""));
-        assertFalse(gateway.tableExists(JOB_TABLE));
-        assertEquals(1, auditWriter.findAll().size());
-        assertEquals(RahaAuditStatus.DENIED,
-                auditWriter.findAll().get(0).getStatus());
-    }
-
     private static String request(RahaTaskType taskType, String idempotencyKey) {
         return FormDataCodec.encode(requestValues(taskType, idempotencyKey));
     }
@@ -233,12 +192,6 @@ class RahaTableUdfIntegrationTest {
 
     private static Clock fixedClock() {
         return Clock.fixed(Instant.ofEpochMilli(1000L), ZoneOffset.UTC);
-    }
-
-    private static RahaPermissionGrant grant(RahaPermissionAction action,
-                                             RahaResourceType resourceType,
-                                             String resourceName) {
-        return new RahaPermissionGrant(action, resourceType, resourceName, "dataset");
     }
 
     /**
