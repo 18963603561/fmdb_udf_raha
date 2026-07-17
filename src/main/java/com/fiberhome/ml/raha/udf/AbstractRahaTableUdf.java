@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.udf;
 
 import com.fiberhome.ml.raha.service.RahaTaskType;
+import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.spark.sql.api.java.UDF1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,7 @@ import org.slf4j.LoggerFactory;
 /**
  * 统一表级 UDF 参数解析、异步提交、错误转换和安全日志行为。
  */
-abstract class AbstractRahaTableUdf implements UDF1<String, String> {
+abstract class AbstractRahaTableUdf extends UDF implements UDF1<String, String> {
 
     /** Java 序列化版本。 */
     private static final long serialVersionUID = 1L;
@@ -62,5 +63,15 @@ abstract class AbstractRahaTableUdf implements UDF1<String, String> {
                     "UDF_SUBMISSION_FAILED", exception.getClass().getSimpleName(),
                     startedAt).toJson();
         }
+    }
+
+    /**
+     * 提供 Hive 风格函数入口，支持通过 ADD JAR 和 CREATE FUNCTION 独立注册。
+     *
+     * @param encodedRequest 表单编码请求
+     * @return 异步任务提交结果 JSON
+     */
+    public String evaluate(String encodedRequest) {
+        return call(encodedRequest);
     }
 }

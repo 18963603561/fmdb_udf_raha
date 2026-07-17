@@ -23,7 +23,40 @@ public final class RahaUdfRequestParser implements Serializable {
 
     /**
      * UDF 请求允许出现的表单字段白名单，用于拒绝拼写错误、无效或跨任务传入的参数。
-     * 例如：datasetId=dataset-001&inputReference=/data/input.csv&sourceType=CSV&labelingBudget=100。
+     *
+     * <p>通用字段：</p>
+     * <ul>
+     *     <li><code>datasetId</code>：逻辑数据集标识；必填；适用于训练、检测和采样任务。
+     *         样例：<code>datasetId=orders_202607</code>。</li>
+     *     <li><code>inputReference</code>：待处理的 FMDB 表名或只读 SQL；必填；适用于训练、检测和采样任务。
+     *         样例：<code>inputReference=ods.orders_dirty</code>。</li>
+     *     <li><code>sourceType</code>：输入来源类型，只允许 <code>TABLE</code> 或 <code>SQL</code>；必填；
+     *         用于确定 <code>inputReference</code> 按表名还是 SQL 解析。
+     *         样例：<code>sourceType=TABLE</code>。</li>
+     *     <li><code>rowIdColumn</code>：输入数据中唯一且稳定的行标识字段；必填；适用于训练、检测和采样任务。
+     *         样例：<code>rowIdColumn=id</code>。</li>
+     *     <li><code>snapshotId</code>：输入数据快照标识；选填；用于训练、检测或采样时固定并追溯同一批数据。
+     *         样例：<code>snapshotId=orders_snapshot_001</code>。</li>
+     *     <li><code>idempotencyKey</code>：调用方生成的幂等键；必填；用于重试提交时复用已创建的同配置任务。
+     *         样例：<code>idempotencyKey=detect_orders_202607_v1</code>。</li>
+     *     <li><code>caller</code>：调用方或调用人标识；必填；用于任务审计和日志追踪。
+     *         样例：<code>caller=data_quality</code>。</li>
+     *     <li><code>resultTable</code>：写入任务产物或结果的 FMDB 表名；必填；适用于训练、检测和采样任务。
+     *         样例：<code>resultTable=dw.raha_detection_result</code>。</li>
+     * </ul>
+     *
+     * <p>任务专属字段：</p>
+     * <ul>
+     *     <li><code>annotationReference</code>：人工标注数据的引用；训练任务必填，检测和采样任务禁止传入；
+     *         用于为模型训练提供标签。
+     *         样例：<code>annotationReference=dw.raha_labels</code>。</li>
+     *     <li><code>modelVersion</code>：用于检测的已发布模型版本；检测任务必填，训练和采样任务禁止传入；
+     *         用于指定本次检测加载的模型。
+     *         样例：<code>modelVersion=orders_model_v1</code>。</li>
+     *     <li><code>labelingBudget</code>：待人工标注的最大行数，必须为正整数；采样任务必填，训练和检测任务禁止传入；
+     *         用于控制一次采样生成的标注工作量。
+     *         样例：<code>labelingBudget=20</code>。</li>
+     * </ul>
      */
     private static final Set<String> ALLOWED_KEYS = new LinkedHashSet<String>(Arrays.asList(
             "datasetId", "inputReference", "sourceType", "rowIdColumn", "snapshotId",

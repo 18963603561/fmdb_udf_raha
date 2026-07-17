@@ -25,6 +25,7 @@ public final class SparkTestSession {
                     .config("spark.sql.shuffle.partitions", "2")
                     .config("spark.sql.warehouse.dir",
                             System.getProperty("java.io.tmpdir") + "/raha-spark-warehouse")
+                    .enableHiveSupport()
                     .getOrCreate();
             sparkSession.sparkContext().setLogLevel("WARN");
         }

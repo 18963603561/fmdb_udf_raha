@@ -20,11 +20,21 @@ public final class UdfConfig {
     private final String sampleFunction;
     /** 单次请求最大字符数。 */
     private final int maxRequestLength;
+    /** 独立注册模式使用的共享任务目录。 */
+    private final String queueDirectory;
 
     public UdfConfig(String trainFunction,
                      String detectFunction,
                      String sampleFunction,
                      int maxRequestLength) {
+        this(trainFunction, detectFunction, sampleFunction, maxRequestLength, null);
+    }
+
+    public UdfConfig(String trainFunction,
+                     String detectFunction,
+                     String sampleFunction,
+                     int maxRequestLength,
+                     String queueDirectory) {
         this.trainFunction = functionName(trainFunction, "训练 UDF 名称");
         this.detectFunction = functionName(detectFunction, "检测 UDF 名称");
         this.sampleFunction = functionName(sampleFunction, "采样 UDF 名称");
@@ -35,6 +45,8 @@ public final class UdfConfig {
             throw new IllegalArgumentException("UDF 名称必须唯一且请求长度上限必须大于 0");
         }
         this.maxRequestLength = maxRequestLength;
+        this.queueDirectory = queueDirectory == null || queueDirectory.trim().isEmpty()
+                ? null : queueDirectory.trim();
     }
 
     private static String functionName(String value, String fieldName) {
@@ -49,4 +61,5 @@ public final class UdfConfig {
     public String getDetectFunction() { return detectFunction; }
     public String getSampleFunction() { return sampleFunction; }
     public int getMaxRequestLength() { return maxRequestLength; }
+    public String getQueueDirectory() { return queueDirectory; }
 }

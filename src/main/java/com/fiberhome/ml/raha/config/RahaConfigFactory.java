@@ -178,7 +178,8 @@ public final class RahaConfigFactory {
                 properties.getRequired("raha.udf.train-function"),
                 properties.getRequired("raha.udf.detect-function"),
                 properties.getRequired("raha.udf.sample-function"),
-                properties.getInt("raha.udf.max-request-length"));
+                properties.getInt("raha.udf.max-request-length"),
+                properties.getRequired("raha.udf.queue-directory"));
     }
 
     public int profileMaxValueFrequencyCount() {

@@ -6,6 +6,7 @@ import com.fiberhome.ml.raha.service.RahaTaskType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -24,6 +25,7 @@ class RahaUdfConfigurationTest {
         assertEquals(defaults.getTrainFunction(), RahaUdfRegistrar.TRAIN_FUNCTION);
         assertEquals(defaults.getDetectFunction(), RahaUdfRegistrar.DETECT_FUNCTION);
         assertEquals(defaults.getSampleFunction(), RahaUdfRegistrar.SAMPLE_FUNCTION);
+        assertNull(defaults.getQueueDirectory());
         assertThrows(IllegalArgumentException.class,
                 () -> new UdfConfig("F_DUP", "F_DUP", "F_SAMPLE", 100));
     }

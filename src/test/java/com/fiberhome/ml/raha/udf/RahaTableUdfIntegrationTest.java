@@ -17,8 +17,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.Serializable;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -41,6 +44,9 @@ class RahaTableUdfIntegrationTest {
     private SparkSession spark;
     /** 当前测试真实仓储提交器。 */
     private RahaUdfJobSubmitter submitter;
+    /** ADD JAR 独立注册模式使用的隔离共享目录。 */
+    @TempDir
+    Path queueDirectory;
 
     @BeforeEach
     void prepareSubmitter() {
@@ -158,6 +164,63 @@ class RahaTableUdfIntegrationTest {
 
         assertTrue(result.contains("\"status\":\"REJECTED\""));
         assertTrue(result.contains("\"errorCode\":\"UDF_RUNTIME_UNAVAILABLE\""));
+    }
+
+    @Test
+    void shouldRegisterThreeFunctionsIndependentlyByClassName() {
+        System.setProperty("raha.udf.queue-directory", queueDirectory.toString());
+        String trainFunction = "RAHA_ADD_JAR_TRAIN_TEST";
+        String detectFunction = "RAHA_ADD_JAR_DETECT_TEST";
+        String sampleFunction = "RAHA_ADD_JAR_SAMPLE_TEST";
+        try {
+            spark.sql("CREATE TEMPORARY FUNCTION " + trainFunction
+                    + " AS 'com.fiberhome.ml.raha.udf.F_DW_RAHATRAIN'");
+            spark.sql("CREATE TEMPORARY FUNCTION " + detectFunction
+                    + " AS 'com.fiberhome.ml.raha.udf.F_DW_RAHADETECT'");
+            spark.sql("CREATE TEMPORARY FUNCTION " + sampleFunction
+                    + " AS 'com.fiberhome.ml.raha.udf.F_DW_RAHASAMPLE'");
+
+            String train = callRegisteredFunction(trainFunction,
+                    request(RahaTaskType.TRAIN, "add-jar-train"));
+            String detect = callRegisteredFunction(detectFunction,
+                    request(RahaTaskType.DETECT, "add-jar-detect"));
+            String sample = callRegisteredFunction(sampleFunction,
+                    request(RahaTaskType.SAMPLE, "add-jar-sample"));
+            String duplicateTrain = callRegisteredFunction(trainFunction,
+                    request(RahaTaskType.TRAIN, "add-jar-train"));
+            Map<String, String> conflictValues = requestValues(
+                    RahaTaskType.TRAIN, "add-jar-train");
+            conflictValues.put("inputReference", "other_table");
+            String conflict = callRegisteredFunction(trainFunction,
+                    FormDataCodec.encode(conflictValues));
+            String unsafePath = callRegisteredFunction(trainFunction,
+                    request(RahaTaskType.TRAIN, "../unsafe"));
+
+            assertTrue(train.contains("\"status\":\"ACCEPTED\""));
+            assertTrue(detect.contains("\"status\":\"ACCEPTED\""));
+            assertTrue(sample.contains("\"status\":\"ACCEPTED\""));
+            assertTrue(duplicateTrain.contains("\"status\":\"DUPLICATE\""));
+            assertTrue(conflict.contains("\"errorCode\":\"IDEMPOTENCY_CONFLICT\""));
+            assertTrue(unsafePath.contains("\"errorCode\":\"INVALID_UDF_ARGUMENT\""));
+            assertTrue(Files.exists(queueDirectory.resolve(
+                    "add-jar-train-train.request")));
+            assertTrue(Files.exists(queueDirectory.resolve(
+                    "add-jar-detect-detect.request")));
+            assertTrue(Files.exists(queueDirectory.resolve(
+                    "add-jar-sample-sample.request")));
+        } finally {
+            spark.sql("DROP TEMPORARY FUNCTION IF EXISTS " + trainFunction);
+            spark.sql("DROP TEMPORARY FUNCTION IF EXISTS " + detectFunction);
+            spark.sql("DROP TEMPORARY FUNCTION IF EXISTS " + sampleFunction);
+            System.clearProperty("raha.udf.queue-directory");
+        }
+    }
+
+    private String callRegisteredFunction(String functionName, String request) {
+        return spark.createDataset(Collections.singletonList(request), Encoders.STRING())
+                .toDF("request")
+                .selectExpr(functionName + "(request) AS result")
+                .first().getString(0);
     }
 
     private static String request(RahaTaskType taskType, String idempotencyKey) {

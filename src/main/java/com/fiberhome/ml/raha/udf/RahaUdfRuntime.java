@@ -28,6 +28,11 @@ public final class RahaUdfRuntime {
         submitter = null;
     }
 
+    /** 返回当前进程已配置的提交器，未配置时返回空。 */
+    static RahaUdfJobSubmitter currentSubmitter() {
+        return submitter;
+    }
+
     static RahaUdfJobSubmitter requireSubmitter() {
         RahaUdfJobSubmitter current = submitter;
         if (current == null) {

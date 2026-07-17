@@ -97,14 +97,12 @@ import com.fiberhome.ml.raha.strategy.StrategyExecutor;
 import com.fiberhome.ml.raha.strategy.StrategyPlanGenerator;
 import com.fiberhome.ml.raha.strategy.StrategyPlanService;
 import com.fiberhome.ml.raha.strategy.StrategyRegistry;
+import com.fiberhome.ml.raha.udf.FileRahaUdfJobSubmitter;
 import com.fiberhome.ml.raha.udf.FileRahaUdfJobWorker;
-import com.fiberhome.ml.raha.udf.RahaUdfJobSubmitter;
 import com.fiberhome.ml.raha.udf.RahaUdfRegistrar;
 import com.fiberhome.ml.raha.udf.RahaUdfRequest;
 import com.fiberhome.ml.raha.udf.RahaUdfSubmissionResult;
 import com.fiberhome.ml.raha.util.FormDataCodec;
-import com.fiberhome.ml.raha.util.HashUtils;
-import org.apache.spark.SparkEnv;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -112,9 +110,7 @@ import org.apache.spark.sql.functions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -280,7 +276,7 @@ public final class RahaContainerValidationApplication {
             String detectUdfResult;
             if (submitLocally) {
                 RahaUdfRegistrar registrar = new RahaUdfRegistrar();
-                registrar.register(spark, new SharedFileRahaUdfJobSubmitter(
+                registrar.register(spark, new FileRahaUdfJobSubmitter(
                         queueDirectory.toString()));
                 sampleUdfResult = callUdf(RahaUdfRegistrar.SAMPLE_FUNCTION,
                         udfRequest(RahaTaskType.SAMPLE, null));
@@ -351,7 +347,7 @@ public final class RahaContainerValidationApplication {
         prepareOutputDirectory();
         Path queueDirectory = outputDirectory.resolve("udf-requests");
         RahaUdfRegistrar registrar = new RahaUdfRegistrar();
-        registrar.register(spark, new SharedFileRahaUdfJobSubmitter(
+        registrar.register(spark, new FileRahaUdfJobSubmitter(
                 queueDirectory.toString()));
         String sample = callUdf(RahaUdfRegistrar.SAMPLE_FUNCTION,
                 udfRequest(RahaTaskType.SAMPLE, null));
@@ -1137,72 +1133,4 @@ public final class RahaContainerValidationApplication {
         }
     }
 
-    /**
-     * 将执行器收到的 UDF 请求幂等写入共享目录，模拟生产异步任务队列边界。
-     */
-    private static final class SharedFileRahaUdfJobSubmitter
-            implements RahaUdfJobSubmitter, Serializable {
-
-        /** Java 序列化版本。 */
-        private static final long serialVersionUID = 1L;
-        /** 日志记录器。 */
-        private static final Logger LOGGER = LoggerFactory.getLogger(
-                SharedFileRahaUdfJobSubmitter.class);
-        /** 所有 Spark 节点可读写的任务目录。 */
-        private final String queueDirectory;
-
-        private SharedFileRahaUdfJobSubmitter(String queueDirectory) {
-            this.queueDirectory = queueDirectory;
-        }
-
-        @Override
-        public RahaUdfSubmissionResult submit(RahaUdfRequest request) {
-            long submittedAt = Math.max(1L, System.currentTimeMillis());
-            String jobId = request.getIdempotencyKey();
-            String configVersion = HashUtils.sha256Hex(
-                    request.toCanonicalConfiguration());
-            Path queuePath = Paths.get(queueDirectory,
-                    jobId + "-" + request.getTaskType().name().toLowerCase(Locale.ROOT)
-                            + ".request");
-            Map<String, String> receipt = new LinkedHashMap<String, String>();
-            receipt.put("jobId", jobId);
-            receipt.put("taskType", request.getTaskType().name());
-            receipt.put("datasetId", request.getDatasetId());
-            receipt.put("inputReference", request.getInputReference());
-            receipt.put("resultTable", request.getResultTable());
-            receipt.put("configVersion", configVersion);
-            SparkEnv environment = SparkEnv.get();
-            receipt.put("executorId", environment == null
-                    ? "unknown" : environment.executorId());
-            receipt.put("submittedAt", String.valueOf(submittedAt));
-            try {
-                LOGGER.info("开始写入 Raha UDF 共享任务，jobId={}，taskType={}，queuePath={}",
-                        jobId, request.getTaskType(), queuePath);
-                Files.createDirectories(queuePath.getParent());
-                Files.write(queuePath,
-                        request.toEncodedRequest().getBytes(StandardCharsets.UTF_8),
-                        StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-                Files.write(queuePath.resolveSibling(
-                                queuePath.getFileName().toString() + ".receipt"),
-                        FormDataCodec.encode(receipt).getBytes(StandardCharsets.UTF_8),
-                        StandardOpenOption.CREATE,
-                        StandardOpenOption.TRUNCATE_EXISTING);
-                LOGGER.info("Raha UDF 共享任务写入完成，jobId={}，executorId={}",
-                        jobId, receipt.get("executorId"));
-                return RahaUdfSubmissionResult.accepted(jobId,
-                        request.getTaskType(), queuePath.toUri().toString(),
-                        configVersion, submittedAt);
-            } catch (FileAlreadyExistsException exception) {
-                LOGGER.info("Raha UDF 共享任务重复提交，jobId={}，queuePath={}",
-                        jobId, queuePath);
-                return RahaUdfSubmissionResult.duplicate(jobId,
-                        request.getTaskType(), queuePath.toUri().toString(),
-                        configVersion, submittedAt);
-            } catch (java.io.IOException exception) {
-                LOGGER.error("写入 Raha UDF 共享任务失败，jobId={}，queuePath={}",
-                        jobId, queuePath, exception);
-                throw new IllegalStateException("无法写入 Raha UDF 共享任务", exception);
-            }
-        }
-    }
 }
