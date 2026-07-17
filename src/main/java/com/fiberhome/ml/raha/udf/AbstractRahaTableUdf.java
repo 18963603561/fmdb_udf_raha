@@ -1,13 +1,20 @@
 package com.fiberhome.ml.raha.udf;
 
-import com.fiberhome.ml.raha.service.RahaTaskType;
+import com.fiberhome.ml.raha.api.DefaultRahaFacade;
+import com.fiberhome.ml.raha.api.RahaFacade;
+import com.fiberhome.ml.raha.support.JsonUtils;
+import com.fiberhome.ml.raha.support.RahaException;
 import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.api.java.UDF1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
- * 统一表级 UDF 参数解析、异步提交、错误转换和安全日志行为。
+ * 表级入口的同步执行、日志和异常转换基类。
  */
 abstract class AbstractRahaTableUdf extends UDF implements UDF1<String, String> {
 
@@ -15,63 +22,50 @@ abstract class AbstractRahaTableUdf extends UDF implements UDF1<String, String> 
     private static final long serialVersionUID = 1L;
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractRahaTableUdf.class);
-    /** 当前 UDF 固定任务类型。 */
-    private final RahaTaskType taskType;
-    /** 请求解析器。 */
-    private final RahaUdfRequestParser parser;
-    /** 可序列化部署实现或测试注入的任务提交器。 */
-    private final RahaUdfJobSubmitter submitter;
+    /** 固定业务类型。 */
+    private final String operation;
 
-    AbstractRahaTableUdf(RahaTaskType taskType,
-                         RahaUdfRequestParser parser,
-                         RahaUdfJobSubmitter submitter) {
-        if (taskType == null || parser == null || submitter == null) {
-            throw new IllegalArgumentException("表级 UDF 依赖不能为空");
-        }
-        this.taskType = taskType;
-        this.parser = parser;
-        this.submitter = submitter;
+    AbstractRahaTableUdf(String operation) {
+        this.operation = operation;
     }
 
     @Override
-    public String call(String encodedRequest) {
-        long startedAt = Math.max(1L, System.currentTimeMillis());
+    public final String call(String encodedRequest) {
+        long startedAt = System.currentTimeMillis();
         try {
-            RahaUdfRequest request = parser.parse(taskType, encodedRequest);
-            LOGGER.info("开始处理 Raha 表级 UDF，taskType={}，datasetId={}，caller={}，"
-                            + "requestLength={}",
-                    taskType, request.getDatasetId(), request.getCaller(),
+            // UDF 必须由驱动进程单次调用，直接取得当前活动 Spark 会话。
+            SparkSession sparkSession = SparkSession.active();
+            RahaFacade facade = DefaultRahaFacade.create(sparkSession);
+            LOGGER.info("开始执行 Raha UDF，operation={}，requestLength={}", operation,
                     encodedRequest == null ? 0 : encodedRequest.length());
-            RahaUdfSubmissionResult result = submitter.submit(request);
-            LOGGER.info("Raha 表级 UDF 处理完成，taskType={}，jobId={}，status={}，"
-                            + "elapsedMillis={}",
-                    taskType, result.getJobId(), result.getStatus(),
+            String result = execute(facade, encodedRequest);
+            LOGGER.info("Raha UDF 执行完成，operation={}，elapsedMillis={}", operation,
                     System.currentTimeMillis() - startedAt);
-            return result.toJson();
-        } catch (RahaUdfException exception) {
-            LOGGER.warn("Raha 表级 UDF 请求被拒绝，taskType={}，errorCode={}，"
-                            + "requestLength={}",
-                    taskType, exception.getErrorCode(),
-                    encodedRequest == null ? 0 : encodedRequest.length(), exception);
-            return RahaUdfSubmissionResult.rejected(taskType,
-                    exception.getErrorCode(), exception.getMessage(), startedAt).toJson();
+            return result;
+        } catch (RahaException exception) {
+            LOGGER.error("Raha UDF 业务失败，operation={}，errorCode={}", operation,
+                    exception.getErrorCode(), exception);
+            return failure(exception.getErrorCode().name(), exception.getMessage(),
+                    System.currentTimeMillis() - startedAt);
         } catch (RuntimeException exception) {
-            // 外部 FMDB 写入或任务仓储异常必须返回可追溯失败并记录完整堆栈。
-            LOGGER.error("Raha 表级 UDF 提交失败，taskType={}，requestLength={}",
-                    taskType, encodedRequest == null ? 0 : encodedRequest.length(), exception);
-            return RahaUdfSubmissionResult.rejected(taskType,
-                    "UDF_SUBMISSION_FAILED", exception.getClass().getSimpleName(),
-                    startedAt).toJson();
+            LOGGER.error("Raha UDF 执行失败，operation={}", operation, exception);
+            return failure("UDF_EXECUTION_FAILED", exception.getClass().getSimpleName(),
+                    System.currentTimeMillis() - startedAt);
         }
     }
 
-    /**
-     * 提供 Hive 风格函数入口，支持通过 ADD JAR 和 CREATE FUNCTION 独立注册。
-     *
-     * @param encodedRequest 表单编码请求
-     * @return 异步任务提交结果 JSON
-     */
-    public String evaluate(String encodedRequest) {
+    protected abstract String execute(RahaFacade facade, String encodedRequest);
+
+    public final String evaluate(String encodedRequest) {
         return call(encodedRequest);
+    }
+
+    private static String failure(String errorCode, String message, long elapsedMillis) {
+        Map<String, Object> values = new LinkedHashMap<String, Object>();
+        values.put("success", false);
+        values.put("errorCode", errorCode);
+        values.put("message", message);
+        values.put("elapsedMillis", elapsedMillis);
+        return JsonUtils.toJson(values);
     }
 }

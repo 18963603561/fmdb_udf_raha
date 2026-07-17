@@ -1,20 +1,23 @@
 package com.fiberhome.ml.raha.udf;
 
-import com.fiberhome.ml.raha.service.RahaTaskType;
+import com.fiberhome.ml.raha.api.RahaFacade;
 
 /**
- * `F_DW_RAHADETECT` 表级入口，异步提交整表 Raha 检测任务。
+ * `F_DW_RAHADETECT` 驱动进程同步检测入口。
  */
 public final class F_DW_RAHADETECT extends AbstractRahaTableUdf {
 
     /** Java 序列化版本。 */
     private static final long serialVersionUID = 1L;
+    /** 固定请求解析器。 */
+    private final RahaRequestParser parser = new RahaRequestParser();
 
     public F_DW_RAHADETECT() {
-        this(new RuntimeRahaUdfJobSubmitter());
+        super("DETECT");
     }
 
-    public F_DW_RAHADETECT(RahaUdfJobSubmitter submitter) {
-        super(RahaTaskType.DETECT, new RahaUdfRequestParser(), submitter);
+    @Override
+    protected String execute(RahaFacade facade, String encodedRequest) {
+        return facade.detect(parser.parseDetect(encodedRequest)).toJson();
     }
 }

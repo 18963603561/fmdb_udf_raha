@@ -1,12 +1,12 @@
--- UDF 不读取 raha.udf.* 默认配置。将路径替换为 Driver 可读取的实际 Shade Jar 路径。
-ADD JAR /path/to/fmdb-udf-raha-1.0.0-SNAPSHOT-all.jar;
+-- Jar 必须位于 Spark 驱动进程可读取的位置。
+ADD JAR /opt/spark/work-dir/fmdb-udf-raha-1.0.0-SNAPSHOT-all.jar;
 
--- ADD JAR 只加载 Jar；三个函数仍需按类名创建，可按需执行任意一条 CREATE 语句。
+-- 三个入口均要求驱动进程单次调用，不能按输入数据行执行。
+CREATE TEMPORARY FUNCTION F_DW_RAHASAMPLE
+AS 'com.fiberhome.ml.raha.udf.F_DW_RAHASAMPLE';
+
 CREATE TEMPORARY FUNCTION F_DW_RAHATRAIN
 AS 'com.fiberhome.ml.raha.udf.F_DW_RAHATRAIN';
 
 CREATE TEMPORARY FUNCTION F_DW_RAHADETECT
 AS 'com.fiberhome.ml.raha.udf.F_DW_RAHADETECT';
-
-CREATE TEMPORARY FUNCTION F_DW_RAHASAMPLE
-AS 'com.fiberhome.ml.raha.udf.F_DW_RAHASAMPLE';
