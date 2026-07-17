@@ -1,6 +1,5 @@
 package com.fiberhome.ml.raha.udf;
 
-import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.service.RahaTaskType;
 import com.fiberhome.ml.raha.util.FormDataCodec;
@@ -18,6 +17,8 @@ public final class RahaUdfRequestParser implements Serializable {
 
     /** Java 序列化版本。 */
     private static final long serialVersionUID = 1L;
+    /** 单次 UDF 请求允许的固定最大字符数。 */
+    private static final int DEFAULT_MAX_REQUEST_LENGTH = 65536;
     /** 单次 UDF 请求允许的最大字符数。 */
     private final int maxRequestLength;
 
@@ -64,7 +65,7 @@ public final class RahaUdfRequestParser implements Serializable {
             "modelVersion", "labelingBudget"));
 
     public RahaUdfRequestParser() {
-        this(RahaDefaultConfigProvider.factory().udfConfig().getMaxRequestLength());
+        this(DEFAULT_MAX_REQUEST_LENGTH);
     }
 
     public RahaUdfRequestParser(int maxRequestLength) {

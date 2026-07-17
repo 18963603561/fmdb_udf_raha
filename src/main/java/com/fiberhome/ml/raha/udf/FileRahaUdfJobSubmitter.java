@@ -1,6 +1,5 @@
 package com.fiberhome.ml.raha.udf;
 
-import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.util.FormDataCodec;
 import com.fiberhome.ml.raha.util.HashUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
@@ -44,14 +43,10 @@ public final class FileRahaUdfJobSubmitter
     }
 
     /**
-     * 根据统一 UDF 配置创建独立文件提交器，未配置目录时返回空。
+     * 根据进程系统属性创建独立文件提交器，未配置目录时返回空。
      */
     static FileRahaUdfJobSubmitter fromConfiguration() {
         String configured = System.getProperty("raha.udf.queue-directory");
-        if (configured == null || configured.trim().isEmpty()) {
-            configured = RahaDefaultConfigProvider.factory().udfConfig()
-                    .getQueueDirectory();
-        }
         return configured == null || configured.trim().isEmpty()
                 ? null : new FileRahaUdfJobSubmitter(configured);
     }
