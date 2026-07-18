@@ -1,88 +1,73 @@
 package com.fiberhome.ml.raha.feature;
 
-import com.fiberhome.ml.raha.support.HashUtils;
-import com.fiberhome.ml.raha.support.JsonUtils;
-import com.fiberhome.ml.raha.support.ValueNormalizer;
+import com.fiberhome.ml.raha.util.ValueUtils;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * 单列稳定特征字典，包含固定结构特征和训练值特征。
+ * 保存单列特征名称到编号的冻结映射，训练和检测必须使用同一版本。
  */
 public final class FeatureDictionary {
 
-    /** 固定特征数量。 */
-    public static final int FIXED_FEATURE_COUNT = 5;
-    /** 目标字段。 */
-    private final String columnName;
-    /** 特征字典版本。 */
+    /** 特征字典不可变版本。 */
     private final String version;
-    /** 按编号排序的特征名称。 */
-    private final List<String> featureNames;
-    /** 特征名称到编号的索引。 */
-    private final Map<String, Integer> indexByName;
+    /** 特征字典对应的字段。 */
+    private final String columnName;
+    /** 按特征编号索引的定义。 */
+    private final Map<Integer, FeatureDefinition> definitions;
+    /** 特征字典创建时间。 */
+    private final long createdAt;
 
-    public FeatureDictionary(String columnName, List<String> featureNames) {
-        this.columnName = columnName;
-        this.featureNames = Collections.unmodifiableList(new ArrayList<String>(featureNames));
-        this.indexByName = new LinkedHashMap<String, Integer>();
-        for (int index = 0; index < featureNames.size(); index++) {
-            indexByName.put(featureNames.get(index), index);
+    public FeatureDictionary(String version,
+                             String columnName,
+                             Map<Integer, FeatureDefinition> definitions,
+                             long createdAt) {
+        this.version = ValueUtils.requireNotBlank(version, "特征字典版本");
+        this.columnName = ValueUtils.requireNotBlank(columnName, "特征字典字段");
+        if (definitions == null) {
+            throw new IllegalArgumentException("特征定义集合不能为空");
         }
-        this.version = "dict:" + HashUtils.sha256(columnName + '|'
-                + JsonUtils.toJson(featureNames)).substring(0, 24);
-    }
-
-    /**
-     * 从训练值构建确定字典，离散值按字典序编号。
-     *
-     * @param columnName 字段名
-     * @param values 训练值
-     * @param maximumValues 最大离散值数量
-     * @return 特征字典
-     */
-    public static FeatureDictionary build(String columnName, List<String> values,
-                                          int maximumValues) {
-        List<String> names = new ArrayList<String>();
-        names.add("shape.missing");
-        names.add("shape.numeric");
-        names.add("shape.length");
-        names.add("shape.has_digit");
-        names.add("shape.has_space");
-        Set<String> distinct = new LinkedHashSet<String>();
-        for (String value : values) {
-            distinct.add(ValueNormalizer.normalize(value));
+        if (createdAt <= 0L) {
+            throw new IllegalArgumentException("特征字典创建时间必须大于 0");
         }
-        List<String> sorted = new ArrayList<String>(distinct);
-        Collections.sort(sorted, Comparator.naturalOrder());
-        int limit = Math.min(maximumValues, sorted.size());
-        for (int index = 0; index < limit; index++) {
-            names.add("value=" + sorted.get(index));
+        validateDefinitions(definitions);
+        this.definitions = Collections.unmodifiableMap(
+                new LinkedHashMap<Integer, FeatureDefinition>(definitions));
+        this.createdAt = createdAt;
+    }
+
+    private static void validateDefinitions(Map<Integer, FeatureDefinition> definitions) {
+        Set<String> names = new HashSet<String>();
+        for (Map.Entry<Integer, FeatureDefinition> entry : definitions.entrySet()) {
+            FeatureDefinition definition = entry.getValue();
+            // 映射键必须与定义编号一致，防止训练和检测阶段取到不同特征。
+            if (entry.getKey() == null || definition == null
+                    || entry.getKey().intValue() != definition.getIndex()) {
+                throw new IllegalArgumentException("特征定义编号与映射键不一致");
+            }
+            if (!names.add(definition.getName())) {
+                throw new IllegalArgumentException("特征名称不能重复：" + definition.getName());
+            }
         }
-        return new FeatureDictionary(columnName, names);
     }
 
-    public String getColumnName() { return columnName; }
-    public String getVersion() { return version; }
-    public List<String> getFeatureNames() { return featureNames; }
-    public int size() { return featureNames.size(); }
-
-    public Integer indexOf(String name) {
-        return indexByName.get(name);
+    public String getVersion() {
+        return version;
     }
 
-    public String toJson() {
-        return JsonUtils.toJson(featureNames);
+    public String getColumnName() {
+        return columnName;
     }
 
-    public static FeatureDictionary fromJson(String columnName, String json) {
-        return new FeatureDictionary(columnName, JsonUtils.parseStringArray(json));
+    public Map<Integer, FeatureDefinition> getDefinitions() {
+        return definitions;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
     }
 }

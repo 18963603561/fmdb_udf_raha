@@ -191,6 +191,8 @@ mvn test "-Draha.model.threshold=0.65" "-Draha.resource.max-parallel-columns=6"
 | `raha.resource.max-parallel-strategies` | `4` | 策略并发上限 |
 | `raha.resource.max-parallel-columns` | `4` | 字段并发上限 |
 | `raha.failure.max-retry-count` | `1` | 阶段最大重试次数 |
+| `raha.udf.max-request-length` | `65536` | UDF 请求最大字符数 |
+| `raha.udf.queue-directory` | 空 | `ADD JAR` 独立注册模式的共享任务目录 |
 
 全部配置项、取值范围和说明以 `src/main/resources/raha-defaults.properties` 为准。
 
@@ -245,7 +247,7 @@ n13 --> n14[生产检测];
 | `F_DW_RAHADETECT` | `com.fiberhome.ml.raha.udf.F_DW_RAHADETECT` | 异步提交整表检测任务 |
 | `F_DW_RAHASAMPLE` | `com.fiberhome.ml.raha.udf.F_DW_RAHASAMPLE` | 异步提交聚类覆盖采样任务 |
 
-程序化注册使用表中的三个固定名称。`ADD JAR` 独立注册时，SQL 函数名由 `CREATE TEMPORARY FUNCTION` 语句决定，不读取 `raha.udf.*` 默认配置。
+程序化注册的函数名可通过 `raha.udf.train-function`、`raha.udf.detect-function` 和 `raha.udf.sample-function` 修改，三个名称必须唯一。`ADD JAR` 独立注册时，函数名由 `CREATE TEMPORARY FUNCTION` 语句决定。
 
 三个函数均接收一个字符串并返回一个 JSON 字符串：
 
@@ -389,7 +391,7 @@ spark-sql \
 
 共享目录必须是所有 Driver、Executor 和文件任务消费者均可读写的挂载目录。未配置时，无参 UDF 调用会返回 `UDF_RUNTIME_UNAVAILABLE`。
 
-进入 Spark SQL 后先加载 Jar。`ADD JAR` 只负责加载类，随后仍需按类名创建临时函数：
+进入 Spark SQL 后先加载 Jar：
 
 ```sql
 ADD JAR /opt/fmdb/lib/fmdb-udf-raha-1.0.0-SNAPSHOT-all.jar;
