@@ -1,335 +1,277 @@
 package com.fiberhome.ml.raha.fmdb;
 
-import com.fiberhome.ml.raha.data.ClassifierType;
-import com.fiberhome.ml.raha.data.FeatureType;
-import com.fiberhome.ml.raha.feature.FeatureDefinition;
+import com.fiberhome.ml.raha.data.RowIdentityMode;
 import com.fiberhome.ml.raha.feature.FeatureDictionary;
-import com.fiberhome.ml.raha.model.ColumnModelArtifact;
-import com.fiberhome.ml.raha.model.ColumnModelStore;
-import com.fiberhome.ml.raha.util.FormDataCodec;
-import com.fiberhome.ml.raha.util.ValueUtils;
+import com.fiberhome.ml.raha.feature.FeatureVectorizer;
+import com.fiberhome.ml.raha.model.RahaColumnModel;
+import com.fiberhome.ml.raha.model.RahaModelSet;
+import com.fiberhome.ml.raha.model.ModelStore;
+import com.fiberhome.ml.raha.support.JsonUtils;
+import com.fiberhome.ml.raha.train.TrainingExample;
+import com.fiberhome.ml.raha.train.TrainingMode;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
-import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.functions;
-import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
+
+import static org.apache.spark.sql.functions.col;
 
 /**
- * 使用 FMDB 表保存不可变列级模型和特征字典，并按版本缓存加载结果。
+ * 模型集合、列模型和完整训练样本的 ORC 适配器。
  */
-public final class FmdbModelStore implements ColumnModelStore {
+public final class FmdbModelStore implements ModelStore {
 
-    /** 日志记录器。 */
-    private static final Logger LOGGER = LoggerFactory.getLogger(FmdbModelStore.class);
-    /** FMDB 模型路径协议。 */
-    private static final String MODEL_SCHEME = "fmdb://";
-    /** 空特征字典使用的稳定占位编号。 */
-    private static final int EMPTY_DICTIONARY_INDEX = -1;
-    /** 模型参数表模式。 */
-    private static final StructType MODEL_SCHEMA = DataTypes.createStructType(
-            new StructField[]{
-                    field("model_version", DataTypes.StringType, false),
-                    field("model_name", DataTypes.StringType, false),
-                    field("column_name", DataTypes.StringType, false),
-                    field("classifier_type", DataTypes.StringType, false),
-                    field("dictionary_version", DataTypes.StringType, false),
-                    field("feature_dimension", DataTypes.IntegerType, false),
-                    field("threshold", DataTypes.DoubleType, false),
-                    field("intercept", DataTypes.DoubleType, false),
-                    field("coefficients", DataTypes.StringType, false),
-                    field("training_mode", DataTypes.StringType, false),
-                    field("stored_at", DataTypes.LongType, false)
-            });
-    /** 特征字典表模式。 */
-    private static final StructType DICTIONARY_SCHEMA = DataTypes.createStructType(
-            new StructField[]{
-                    field("dictionary_version", DataTypes.StringType, false),
-                    field("column_name", DataTypes.StringType, false),
-                    field("created_at", DataTypes.LongType, false),
-                    field("feature_index", DataTypes.IntegerType, false),
-                    field("feature_name", DataTypes.StringType, true),
-                    field("feature_type", DataTypes.StringType, true),
-                    field("feature_source", DataTypes.StringType, true),
-                    field("default_value", DataTypes.DoubleType, true),
-                    field("stored_at", DataTypes.LongType, false)
-            });
-    /** Spark 会话。 */
-    private final SparkSession sparkSession;
-    /** FMDB 表网关。 */
-    private final FmdbTableGateway tableGateway;
-    /** 模型参数表名。 */
-    private final String modelTable;
-    /** 特征字典表名。 */
-    private final String dictionaryTable;
-    /** 提供可测试存储时间的时钟。 */
-    private final Clock clock;
-    /** 按完整路径缓存已加载模型。 */
-    private final Map<String, ColumnModelArtifact> modelCache =
-            new ConcurrentHashMap<String, ColumnModelArtifact>();
-    /** 按字典版本缓存已加载字典。 */
-    private final Map<String, FeatureDictionary> dictionaryCache =
-            new ConcurrentHashMap<String, FeatureDictionary>();
+    /** 标准表网关。 */
+    private final FmdbTableGateway gateway;
+    /** 特征向量序列化工具。 */
+    private final FeatureVectorizer vectorizer = new FeatureVectorizer();
 
-    public FmdbModelStore(SparkSession sparkSession,
-                          FmdbTableGateway tableGateway,
-                          String modelTable,
-                          String dictionaryTable,
-                          Clock clock) {
-        if (sparkSession == null || tableGateway == null || clock == null) {
-            throw new IllegalArgumentException("FMDB 模型存储依赖不能为空");
-        }
-        this.modelTable = SparkSqlFmdbTableGateway.validateTableName(modelTable);
-        this.dictionaryTable = SparkSqlFmdbTableGateway.validateTableName(dictionaryTable);
-        this.sparkSession = sparkSession;
-        this.tableGateway = tableGateway;
-        this.clock = clock;
+    public FmdbModelStore(FmdbTableGateway gateway) {
+        this.gateway = gateway;
     }
 
     @Override
-    public synchronized String save(ColumnModelArtifact artifact) {
-        if (artifact == null) {
-            throw new IllegalArgumentException("FMDB 模型参数不能为空");
-        }
-        String path = modelPath(artifact.getModelVersion());
-        LOGGER.info("开始保存 FMDB 列级模型，modelVersion={}，columnName={}",
-                artifact.getModelVersion(), artifact.getColumnName());
-        ColumnModelArtifact existing = findModel(artifact.getModelVersion());
-        // 同一模型版本必须对应完全相同的不可变参数，防止版本污染。
-        if (existing != null) {
-            if (!sameModel(existing, artifact)) {
-                throw new IllegalStateException("FMDB 中同一模型版本已存在不同参数");
-            }
-            modelCache.put(path, existing);
-            return path;
-        }
-        Map<String, String> coefficients = new LinkedHashMap<String, String>();
-        for (Map.Entry<Integer, Double> entry : artifact.getCoefficients().entrySet()) {
-            coefficients.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
-        }
-        Row row = RowFactory.create(artifact.getModelVersion(), artifact.getModelName(),
-                artifact.getColumnName(), artifact.getClassifierType().name(),
-                artifact.getFeatureDictionaryVersion(), artifact.getFeatureDimension(),
-                artifact.getThreshold(), artifact.getIntercept(),
-                FormDataCodec.encode(coefficients), artifact.getTrainingMode(), positiveNow());
-        tableGateway.appendIdempotent(modelTable,
-                sparkSession.createDataFrame(Collections.singletonList(row), MODEL_SCHEMA),
-                Collections.singletonList("model_version"));
-        modelCache.put(path, artifact);
-        LOGGER.info("FMDB 列级模型保存完成，modelVersion={}，columnName={}",
-                artifact.getModelVersion(), artifact.getColumnName());
-        return path;
+    public Optional<RahaModelSet> findModelSet(String modelSetVersion) {
+        List<Row> rows = gateway.table(RahaTables.MODEL_SET)
+                .filter(col("model_set_version").equalTo(modelSetVersion))
+                .limit(1).collectAsList();
+        return rows.isEmpty() ? Optional.<RahaModelSet>empty()
+                : Optional.of(toModelSet(rows.get(0)));
     }
 
     @Override
-    public ColumnModelArtifact load(String modelPath) {
-        String version = versionFromPath(modelPath);
-        ColumnModelArtifact cached = modelCache.get(modelPath);
-        if (cached != null) {
-            return cached;
-        }
-        LOGGER.info("开始加载 FMDB 列级模型，modelVersion={}", version);
-        ColumnModelArtifact artifact = findModel(version);
-        if (artifact == null) {
-            throw new IllegalStateException("FMDB 中不存在模型版本：" + version);
-        }
-        modelCache.put(modelPath, artifact);
-        LOGGER.info("FMDB 列级模型加载完成，modelVersion={}，columnName={}",
-                artifact.getModelVersion(), artifact.getColumnName());
-        return artifact;
-    }
-
-    /**
-     * 幂等保存特征字典，字典版本相同但内容变化时拒绝覆盖。
-     */
-    public synchronized String saveDictionary(FeatureDictionary dictionary) {
-        if (dictionary == null) {
-            throw new IllegalArgumentException("FMDB 特征字典不能为空");
-        }
-        FeatureDictionary existing = findDictionary(dictionary.getVersion());
-        if (existing != null) {
-            if (!sameDictionary(existing, dictionary)) {
-                throw new IllegalStateException("FMDB 中同一字典版本已存在不同内容");
-            }
-            dictionaryCache.put(dictionary.getVersion(), existing);
-            return dictionaryPath(dictionary.getVersion());
-        }
-        List<Row> rows = new ArrayList<Row>();
-        long storedAt = positiveNow();
-        if (dictionary.getDefinitions().isEmpty()) {
-            rows.add(RowFactory.create(dictionary.getVersion(), dictionary.getColumnName(),
-                    dictionary.getCreatedAt(), EMPTY_DICTIONARY_INDEX,
-                    null, null, null, null, storedAt));
-        } else {
-            for (FeatureDefinition definition : dictionary.getDefinitions().values()) {
-                rows.add(RowFactory.create(dictionary.getVersion(), dictionary.getColumnName(),
-                        dictionary.getCreatedAt(), definition.getIndex(), definition.getName(),
-                        definition.getFeatureType().name(), definition.getSource(),
-                        definition.getDefaultValue(), storedAt));
-            }
-        }
-        tableGateway.appendIdempotent(dictionaryTable,
-                sparkSession.createDataFrame(rows, DICTIONARY_SCHEMA),
-                Arrays.asList("dictionary_version", "feature_index"));
-        dictionaryCache.put(dictionary.getVersion(), dictionary);
-        LOGGER.info("FMDB 特征字典保存完成，dictionaryVersion={}，featureCount={}",
-                dictionary.getVersion(), dictionary.getDefinitions().size());
-        return dictionaryPath(dictionary.getVersion());
-    }
-
-    /**
-     * 按不可变版本加载特征字典。
-     */
-    public FeatureDictionary loadDictionary(String dictionaryVersion) {
-        String version = ValueUtils.requireNotBlank(
-                dictionaryVersion, "FMDB 特征字典版本");
-        FeatureDictionary cached = dictionaryCache.get(version);
-        if (cached != null) {
-            return cached;
-        }
-        FeatureDictionary dictionary = findDictionary(version);
-        if (dictionary == null) {
-            throw new IllegalStateException("FMDB 中不存在特征字典版本：" + version);
-        }
-        dictionaryCache.put(version, dictionary);
-        return dictionary;
-    }
-
-    private ColumnModelArtifact findModel(String version) {
-        if (!tableGateway.tableExists(modelTable)) {
-            return null;
-        }
-        List<Row> rows = tableGateway.read(modelTable)
-                .filter(functions.col("model_version").equalTo(version))
-                .limit(2).collectAsList();
-        if (rows.isEmpty()) {
-            return null;
-        }
-        if (rows.size() > 1) {
-            throw new IllegalStateException("FMDB 模型版本存在重复记录：" + version);
-        }
-        Row row = rows.get(0);
-        Map<Integer, Double> coefficients = new LinkedHashMap<Integer, Double>();
-        String encoded = row.getAs("coefficients");
-        if (encoded != null && !encoded.isEmpty()) {
-            for (Map.Entry<String, String> entry : FormDataCodec.decode(encoded).entrySet()) {
-                coefficients.put(Integer.parseInt(entry.getKey()),
-                        Double.parseDouble(entry.getValue()));
-            }
-        }
-        return new ColumnModelArtifact(row.getAs("model_name"),
-                row.getAs("model_version"), row.getAs("column_name"),
-                ClassifierType.valueOf(row.getAs("classifier_type")),
-                row.getAs("dictionary_version"), row.getAs("feature_dimension"),
-                row.getAs("threshold"), row.getAs("intercept"), coefficients,
-                row.getAs("training_mode"));
-    }
-
-    private FeatureDictionary findDictionary(String version) {
-        if (!tableGateway.tableExists(dictionaryTable)) {
-            return null;
-        }
-        List<Row> rows = tableGateway.read(dictionaryTable)
-                .filter(functions.col("dictionary_version").equalTo(version))
-                .orderBy("feature_index").collectAsList();
-        if (rows.isEmpty()) {
-            return null;
-        }
-        String columnName = rows.get(0).getAs("column_name");
-        long createdAt = rows.get(0).getAs("created_at");
-        Map<Integer, FeatureDefinition> definitions =
-                new LinkedHashMap<Integer, FeatureDefinition>();
+    public List<RahaColumnModel> loadColumnModels(String modelSetVersion) {
+        List<Row> rows = gateway.table(RahaTables.COLUMN_MODEL)
+                .filter(col("model_set_version").equalTo(modelSetVersion))
+                .collectAsList();
+        List<RahaColumnModel> models = new ArrayList<RahaColumnModel>();
         for (Row row : rows) {
-            int index = row.getAs("feature_index");
-            if (!columnName.equals(row.getAs("column_name"))
-                    || createdAt != ((Long) row.getAs("created_at"))) {
-                throw new IllegalStateException("FMDB 特征字典元数据不一致：" + version);
-            }
-            if (index == EMPTY_DICTIONARY_INDEX) {
+            String columnName = row.getAs("column_name");
+            FeatureDictionary dictionary = FeatureDictionary.fromJson(columnName,
+                    row.getAs("feature_dictionary_json"));
+            Map<String, String> payload = JsonUtils.parseStringMap(
+                    row.getAs("model_payload_json"));
+            double[] coefficients = parseCoefficients(payload.get("coefficients"));
+            models.add(new RahaColumnModel(row.getAs("model_set_version"),
+                    row.getAs("dataset_id"), row.getAs("model_version"),
+                    row.getAs("parent_model_version"), columnName, dictionary,
+                    ((Number) row.getAs("threshold")).doubleValue(),
+                    Double.parseDouble(payload.get("intercept")), coefficients,
+                    row.getAs("training_summary_json"),
+                    ((Number) row.getAs("created_at")).longValue()));
+        }
+        return models;
+    }
+
+    @Override
+    public List<TrainingExample> loadTrainingExamples(String modelSetVersion) {
+        Map<String, Integer> dimensions = new HashMap<String, Integer>();
+        for (RahaColumnModel model : loadColumnModels(modelSetVersion)) {
+            dimensions.put(model.getColumnName(), model.getFeatureDictionary().size());
+        }
+        List<Row> rows = gateway.table(RahaTables.TRAINING_EXAMPLE)
+                .filter(col("model_set_version").equalTo(modelSetVersion))
+                .collectAsList();
+        List<TrainingExample> examples = new ArrayList<TrainingExample>();
+        for (Row row : rows) {
+            String columnName = row.getAs("column_name");
+            Integer dimension = dimensions.get(columnName);
+            if (dimension == null) {
                 continue;
             }
-            definitions.put(index, new FeatureDefinition(index,
-                    row.getAs("feature_name"),
-                    FeatureType.valueOf(row.getAs("feature_type")),
-                    row.getAs("feature_source"), row.getAs("default_value")));
+            examples.add(new TrainingExample(row.getAs("model_set_version"),
+                    row.getAs("dataset_id"), row.getAs("source_sample_batch_id"),
+                    columnName, row.getAs("snapshot_id"), row.getAs("row_id"),
+                    ((Number) row.getAs("duplicate_count")).longValue(),
+                    row.getAs("value_hash"), vectorizer.fromSparseJson(
+                            row.getAs("feature_vector_json"), dimension),
+                    ((Number) row.getAs("label")).intValue(),
+                    row.getAs("label_source"),
+                    ((Number) row.getAs("sample_weight")).doubleValue(),
+                    ((Number) row.getAs("created_at")).longValue(),
+                    row.getAs("partition_date")));
         }
-        return new FeatureDictionary(version, columnName, definitions, createdAt);
+        return examples;
     }
 
-    private String modelPath(String version) {
-        return MODEL_SCHEME + modelTable + "/" + version;
-    }
-
-    private String dictionaryPath(String version) {
-        return MODEL_SCHEME + dictionaryTable + "/" + version;
-    }
-
-    private String versionFromPath(String path) {
-        String validated = ValueUtils.requireNotBlank(path, "FMDB 模型路径");
-        String prefix = MODEL_SCHEME + modelTable + "/";
-        if (!validated.startsWith(prefix) || validated.length() == prefix.length()) {
-            throw new IllegalArgumentException("FMDB 模型路径不属于当前模型表");
+    @Override
+    public void save(RahaModelSet modelSet, List<RahaColumnModel> models,
+                     List<TrainingExample> examples) {
+        if (findModelSet(modelSet.getModelSetVersion()).isPresent()) {
+            return;
         }
-        return validated.substring(prefix.length());
+        saveExamples(examples);
+        saveModels(models);
+        Dataset<Row> head = gateway.getSparkSession().createDataFrame(
+                Collections.singletonList(RowFactory.create(
+                        modelSet.getModelSetVersion(), modelSet.getRequestFingerprint(),
+                        modelSet.getDatasetId(), modelSet.getTrainingSnapshotId(),
+                        JsonUtils.toJson(modelSet.getSampleBatchIds()),
+                        modelSet.getTrainingMode().name(),
+                        modelSet.getParentModelSetVersion(),
+                        JsonUtils.toJson(modelSet.getModelColumns()),
+                        JsonUtils.toJson(modelSet.getTrainedColumns()),
+                        modelSet.getRowIdentityMode().name(),
+                        JsonUtils.toJson(modelSet.getRowKeyColumns()),
+                        modelSet.getSchemaHash(), modelSet.getAlgorithmVersion(),
+                        modelSet.getConfigJson(), modelSet.getStrategyPlanVersion(),
+                        modelSet.getStrategyPlanJson(), modelSet.getNormalizationVersion(),
+                        modelSet.getModelCount(), modelSet.getTrainingExampleCount(),
+                        modelSet.getCreatedAt())), modelSetSchema());
+        gateway.appendDistinct(RahaTables.MODEL_SET, head, "model_set_version");
     }
 
-    private long positiveNow() {
-        return Math.max(1L, clock.millis());
-    }
-
-    private static boolean sameModel(ColumnModelArtifact first,
-                                     ColumnModelArtifact second) {
-        return first.getModelName().equals(second.getModelName())
-                && first.getModelVersion().equals(second.getModelVersion())
-                && first.getColumnName().equals(second.getColumnName())
-                && first.getClassifierType() == second.getClassifierType()
-                && first.getFeatureDictionaryVersion().equals(
-                second.getFeatureDictionaryVersion())
-                && first.getFeatureDimension() == second.getFeatureDimension()
-                && Double.compare(first.getThreshold(), second.getThreshold()) == 0
-                && Double.compare(first.getIntercept(), second.getIntercept()) == 0
-                && first.getCoefficients().equals(second.getCoefficients())
-                && first.getTrainingMode().equals(second.getTrainingMode());
-    }
-
-    private static boolean sameDictionary(FeatureDictionary first,
-                                          FeatureDictionary second) {
-        if (!first.getVersion().equals(second.getVersion())
-                || !first.getColumnName().equals(second.getColumnName())
-                || first.getCreatedAt() != second.getCreatedAt()
-                || first.getDefinitions().size() != second.getDefinitions().size()) {
-            return false;
+    private void saveModels(List<RahaColumnModel> models) {
+        List<Row> rows = new ArrayList<Row>();
+        for (RahaColumnModel model : models) {
+            Map<String, Object> payload = new LinkedHashMap<String, Object>();
+            payload.put("intercept", String.valueOf(model.getIntercept()));
+            payload.put("coefficients", coefficients(model.getCoefficients()));
+            rows.add(RowFactory.create(model.getModelSetVersion(), model.getDatasetId(),
+                    model.getModelVersion(), model.getParentModelVersion(),
+                    model.getColumnName(), model.getClassifierType().name(),
+                    model.getFeatureDictionary().getVersion(),
+                    model.getFeatureDictionary().toJson(),
+                    model.getFeatureDictionary().size(), model.getThreshold(),
+                    JsonUtils.toJson(payload), model.getTrainingSummaryJson(),
+                    model.getCreatedAt()));
         }
-        for (Map.Entry<Integer, FeatureDefinition> entry
-                : first.getDefinitions().entrySet()) {
-            FeatureDefinition other = second.getDefinitions().get(entry.getKey());
-            FeatureDefinition value = entry.getValue();
-            if (other == null || value.getIndex() != other.getIndex()
-                    || !value.getName().equals(other.getName())
-                    || value.getFeatureType() != other.getFeatureType()
-                    || !value.getSource().equals(other.getSource())
-                    || Double.compare(value.getDefaultValue(), other.getDefaultValue()) != 0) {
-                return false;
+        if (rows.isEmpty()) {
+            return;
+        }
+        Dataset<Row> frame = gateway.getSparkSession().createDataFrame(rows,
+                columnModelSchema());
+        gateway.appendDistinct(RahaTables.COLUMN_MODEL, frame,
+                "model_set_version", "column_name");
+    }
+
+    private void saveExamples(List<TrainingExample> examples) {
+        List<Row> rows = new ArrayList<Row>();
+        for (TrainingExample example : examples) {
+            rows.add(RowFactory.create(example.getModelSetVersion(), example.getDatasetId(),
+                    example.getSourceSampleBatchId(), example.getColumnName(),
+                    example.getSnapshotId(), example.getRowId(),
+                    example.getDuplicateCount(), example.getValueHash(),
+                    vectorizer.toSparseJson(example.getFeatureVector()), example.getLabel(),
+                    example.getLabelSource(), example.getSampleWeight(),
+                    example.getCreatedAt(), example.getPartitionDate()));
+        }
+        if (rows.isEmpty()) {
+            return;
+        }
+        Dataset<Row> frame = gateway.getSparkSession().createDataFrame(rows,
+                trainingExampleSchema());
+        gateway.appendDistinct(RahaTables.TRAINING_EXAMPLE, frame,
+                "model_set_version", "column_name", "snapshot_id", "row_id");
+    }
+
+    private static RahaModelSet toModelSet(Row row) {
+        return new RahaModelSet(row.getAs("model_set_version"),
+                row.getAs("request_fingerprint"), row.getAs("dataset_id"),
+                row.getAs("training_snapshot_id"),
+                JsonUtils.parseStringArray(row.getAs("sample_batch_ids_json")),
+                TrainingMode.valueOf((String) row.getAs("training_mode")),
+                row.getAs("parent_model_set_version"),
+                JsonUtils.parseStringArray(row.getAs("model_columns_json")),
+                JsonUtils.parseStringArray(row.getAs("trained_columns_json")),
+                RowIdentityMode.valueOf((String) row.getAs("row_identity_mode")),
+                JsonUtils.parseStringArray(row.getAs("row_key_columns_json")),
+                row.getAs("schema_hash"), row.getAs("algorithm_version"),
+                row.getAs("config_json"), row.getAs("strategy_plan_version"),
+                row.getAs("strategy_plan_json"), row.getAs("normalization_version"),
+                ((Number) row.getAs("model_count")).intValue(),
+                ((Number) row.getAs("training_example_count")).longValue(),
+                ((Number) row.getAs("created_at")).longValue());
+    }
+
+    private static String coefficients(double[] values) {
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < values.length; index++) {
+            if (index > 0) {
+                builder.append(',');
             }
+            builder.append(values[index]);
         }
-        return true;
+        return builder.toString();
     }
 
-    private static StructField field(String name, DataType type, boolean nullable) {
-        return DataTypes.createStructField(name, type, nullable);
+    private static double[] parseCoefficients(String value) {
+        if (value == null || value.isEmpty()) {
+            return new double[0];
+        }
+        String[] tokens = value.split(",");
+        double[] result = new double[tokens.length];
+        for (int index = 0; index < tokens.length; index++) {
+            result[index] = Double.parseDouble(tokens[index]);
+        }
+        return result;
+    }
+
+    private static StructType modelSetSchema() {
+        return new StructType()
+                .add("model_set_version", DataTypes.StringType, false)
+                .add("request_fingerprint", DataTypes.StringType, false)
+                .add("dataset_id", DataTypes.StringType, false)
+                .add("training_snapshot_id", DataTypes.StringType, false)
+                .add("sample_batch_ids_json", DataTypes.StringType, false)
+                .add("training_mode", DataTypes.StringType, false)
+                .add("parent_model_set_version", DataTypes.StringType, true)
+                .add("model_columns_json", DataTypes.StringType, false)
+                .add("trained_columns_json", DataTypes.StringType, false)
+                .add("row_identity_mode", DataTypes.StringType, false)
+                .add("row_key_columns_json", DataTypes.StringType, true)
+                .add("schema_hash", DataTypes.StringType, false)
+                .add("algorithm_version", DataTypes.StringType, false)
+                .add("config_json", DataTypes.StringType, false)
+                .add("strategy_plan_version", DataTypes.StringType, false)
+                .add("strategy_plan_json", DataTypes.StringType, false)
+                .add("normalization_version", DataTypes.StringType, false)
+                .add("model_count", DataTypes.IntegerType, false)
+                .add("training_example_count", DataTypes.LongType, false)
+                .add("created_at", DataTypes.LongType, false);
+    }
+
+    private static StructType columnModelSchema() {
+        return new StructType()
+                .add("model_set_version", DataTypes.StringType, false)
+                .add("dataset_id", DataTypes.StringType, false)
+                .add("model_version", DataTypes.StringType, false)
+                .add("parent_model_version", DataTypes.StringType, true)
+                .add("column_name", DataTypes.StringType, false)
+                .add("classifier_type", DataTypes.StringType, false)
+                .add("dictionary_version", DataTypes.StringType, false)
+                .add("feature_dictionary_json", DataTypes.StringType, false)
+                .add("feature_dimension", DataTypes.IntegerType, false)
+                .add("threshold", DataTypes.DoubleType, false)
+                .add("model_payload_json", DataTypes.StringType, false)
+                .add("training_summary_json", DataTypes.StringType, false)
+                .add("created_at", DataTypes.LongType, false);
+    }
+
+    private static StructType trainingExampleSchema() {
+        return new StructType()
+                .add("model_set_version", DataTypes.StringType, false)
+                .add("dataset_id", DataTypes.StringType, false)
+                .add("source_sample_batch_id", DataTypes.StringType, true)
+                .add("column_name", DataTypes.StringType, false)
+                .add("snapshot_id", DataTypes.StringType, false)
+                .add("row_id", DataTypes.StringType, false)
+                .add("duplicate_count", DataTypes.LongType, false)
+                .add("value_hash", DataTypes.StringType, false)
+                .add("feature_vector_json", DataTypes.StringType, false)
+                .add("label", DataTypes.IntegerType, false)
+                .add("label_source", DataTypes.StringType, false)
+                .add("sample_weight", DataTypes.DoubleType, false)
+                .add("created_at", DataTypes.LongType, false)
+                .add("partition_date", DataTypes.StringType, false);
     }
 }
