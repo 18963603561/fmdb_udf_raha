@@ -1,14 +1,13 @@
 package com.fiberhome.ml.raha.data.profile;
 
-import com.fiberhome.ml.raha.data.ColumnProfile;
-import com.fiberhome.ml.raha.data.RahaDataset;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.ColumnProfileRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.fiberhome.ml.raha.data.domain.ColumnProfile;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.ColumnProfileRepository;
 import java.time.Clock;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 编排列画像生成和按快照持久化。

@@ -1,7 +1,6 @@
 package com.fiberhome.ml.raha.evaluation;
 
 import com.fiberhome.ml.raha.label.CellLabel;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

@@ -1,12 +1,7 @@
 package com.fiberhome.ml.raha.data.loader;
 
-import com.fiberhome.ml.raha.data.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
-import org.apache.spark.sql.SparkSession;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -19,6 +14,10 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

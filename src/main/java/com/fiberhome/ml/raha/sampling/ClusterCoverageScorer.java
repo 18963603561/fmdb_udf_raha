@@ -1,10 +1,10 @@
 package com.fiberhome.ml.raha.sampling;
 
-import com.fiberhome.ml.raha.cluster.ClusterAssignment;
-import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
-import com.fiberhome.ml.raha.data.LabelSource;
+import com.fiberhome.ml.raha.cluster.domain.ClusterAssignment;
+import com.fiberhome.ml.raha.config.core.RahaDefaultConfigProvider;
+import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.label.CellLabel;
-
+import com.fiberhome.ml.raha.sampling.domain.TupleSamplingScore;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;

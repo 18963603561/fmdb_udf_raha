@@ -1,15 +1,11 @@
 package com.fiberhome.ml.raha.job.stage;
 
-import com.fiberhome.ml.raha.cluster.ClusteringBatchResult;
-import com.fiberhome.ml.raha.data.StageType;
+import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
+import com.fiberhome.ml.raha.data.type.StageType;
 import com.fiberhome.ml.raha.label.CellLabel;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.sampling.SamplingBatchResult;
-import com.fiberhome.ml.raha.sampling.SamplingService;
-import com.fiberhome.ml.raha.job.StageAttributeKeys;
-import com.fiberhome.ml.raha.job.StageExecutionContext;
-import com.fiberhome.ml.raha.job.StageResult;
-
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.sampling.service.SamplingBatchResult;
+import com.fiberhome.ml.raha.sampling.service.SamplingService;
 import java.util.Collections;
 import java.util.List;
 

@@ -1,33 +1,34 @@
 package com.fiberhome.ml.raha.fmdb;
 
-import com.fiberhome.ml.raha.data.ClassifierType;
-import com.fiberhome.ml.raha.data.FeatureType;
-import com.fiberhome.ml.raha.feature.FeatureDefinition;
-import com.fiberhome.ml.raha.feature.FeatureDictionary;
-import com.fiberhome.ml.raha.model.ColumnModelArtifact;
+import com.fiberhome.ml.raha.data.type.ClassifierType;
+import com.fiberhome.ml.raha.data.type.FeatureType;
+import com.fiberhome.ml.raha.feature.domain.FeatureDefinition;
+import com.fiberhome.ml.raha.feature.domain.FeatureDictionary;
+import com.fiberhome.ml.raha.fmdb.gateway.FmdbTableGateway;
+import com.fiberhome.ml.raha.fmdb.gateway.SparkSqlFmdbTableGateway;
 import com.fiberhome.ml.raha.model.ColumnModelStore;
+import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
 import com.fiberhome.ml.raha.util.FormDataCodec;
 import com.fiberhome.ml.raha.util.ValueUtils;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.functions;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.functions;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Clock;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 使用 FMDB 表保存不可变列级模型和特征字典，并按版本缓存加载结果。

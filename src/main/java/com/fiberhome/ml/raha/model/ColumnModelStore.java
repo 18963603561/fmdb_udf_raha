@@ -1,5 +1,7 @@
 package com.fiberhome.ml.raha.model;
 
+import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
+
 /**
  * 保存和加载可移植列级模型参数文件。
  */

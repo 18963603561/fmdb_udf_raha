@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.sampling;
 
+import com.fiberhome.ml.raha.sampling.domain.TupleSamplingScore;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;

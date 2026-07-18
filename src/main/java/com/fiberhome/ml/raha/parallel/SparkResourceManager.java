@@ -1,6 +1,8 @@
 package com.fiberhome.ml.raha.parallel;
 
-import com.fiberhome.ml.raha.config.ResourceConfig;
+import com.fiberhome.ml.raha.config.dto.ResourceConfig;
+import java.io.Serializable;
+import java.util.Optional;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.Dataset;
@@ -8,9 +10,6 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.storage.StorageLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.Serializable;
-import java.util.Optional;
 
 /**
  * 根据资源配置控制小对象广播和数据集缓存，超过估算上限时拒绝操作。

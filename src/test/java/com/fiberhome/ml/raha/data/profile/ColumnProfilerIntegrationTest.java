@@ -1,13 +1,20 @@
 package com.fiberhome.ml.raha.data.profile;
 
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import com.fiberhome.ml.raha.data.ColumnProfile;
-import com.fiberhome.ml.raha.data.RahaDataset;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.DefaultColumnProfileRepository;
-import com.fiberhome.ml.raha.repository.InMemoryRahaRepository;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.ColumnProfile;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.repository.adapter.DefaultColumnProfileRepository;
+import com.fiberhome.ml.raha.repository.adapter.InMemoryRahaRepository;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import com.fiberhome.ml.raha.util.HashUtils;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -16,14 +23,6 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

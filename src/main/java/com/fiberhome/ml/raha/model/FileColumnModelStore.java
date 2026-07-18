@@ -1,9 +1,7 @@
 package com.fiberhome.ml.raha.model;
 
-import com.fiberhome.ml.raha.data.ClassifierType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.fiberhome.ml.raha.data.type.ClassifierType;
+import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -18,6 +16,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 使用 UTF-8 属性文件原子保存列级模型参数，不保存训练原始数据。

@@ -1,19 +1,18 @@
 package com.fiberhome.ml.raha.data.profile;
 
-import com.fiberhome.ml.raha.config.RahaDefaultConfigProvider;
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import com.fiberhome.ml.raha.data.ColumnProfile;
-import com.fiberhome.ml.raha.data.RahaDataset;
+import com.fiberhome.ml.raha.config.core.RahaDefaultConfigProvider;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.ColumnProfile;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 import static org.apache.spark.sql.functions.avg;
 import static org.apache.spark.sql.functions.col;

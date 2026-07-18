@@ -1,8 +1,8 @@
 package com.fiberhome.ml.raha.cluster;
 
-import com.fiberhome.ml.raha.config.ClusteringConfig;
+import com.fiberhome.ml.raha.cluster.domain.ColumnClusteringStatus;
+import com.fiberhome.ml.raha.config.dto.ClusteringConfig;
 import com.fiberhome.ml.raha.util.HashUtils;
-
 import java.util.Map;
 import java.util.TreeMap;
 

@@ -1,22 +1,27 @@
 package com.fiberhome.ml.raha.cluster;
 
-import com.fiberhome.ml.raha.config.ClusteringConfig;
-import com.fiberhome.ml.raha.feature.FeatureAssemblyResult;
-import com.fiberhome.ml.raha.feature.FeatureDictionary;
-import com.fiberhome.ml.raha.feature.SparseFeatureRow;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.ClusterRepository;
+import com.fiberhome.ml.raha.cluster.algorithm.ColumnClusterer;
+import com.fiberhome.ml.raha.cluster.domain.ClusterAssignment;
+import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
+import com.fiberhome.ml.raha.cluster.domain.ClusteringMetrics;
+import com.fiberhome.ml.raha.cluster.domain.ColumnClusteringResult;
+import com.fiberhome.ml.raha.cluster.domain.ColumnClusteringStatus;
+import com.fiberhome.ml.raha.config.dto.ClusteringConfig;
+import com.fiberhome.ml.raha.feature.assembly.FeatureAssemblyResult;
+import com.fiberhome.ml.raha.feature.domain.FeatureDictionary;
+import com.fiberhome.ml.raha.feature.domain.SparseFeatureRow;
 import com.fiberhome.ml.raha.parallel.BoundedParallelExecutor;
 import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
 import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.ClusterRepository;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 按字段隔离执行列内聚类并保存版本化结果。

@@ -1,8 +1,8 @@
 package com.fiberhome.ml.raha.fmdb;
 
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import com.fiberhome.ml.raha.data.DatasetSnapshot;
-import com.fiberhome.ml.raha.data.RahaDataset;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.DataValidationErrorCode;
@@ -13,16 +13,15 @@ import com.fiberhome.ml.raha.data.loader.RowIdValidationResult;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
+import java.time.Clock;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Clock;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
 
 /**
  * 通过 FMDB Spark Catalog 或只读 SQL 加载表级数据，并转换为 Raha 数据集。

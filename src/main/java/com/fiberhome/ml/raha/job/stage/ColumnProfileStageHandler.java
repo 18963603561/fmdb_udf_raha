@@ -1,12 +1,9 @@
 package com.fiberhome.ml.raha.job.stage;
 
-import com.fiberhome.ml.raha.data.RahaDataset;
-import com.fiberhome.ml.raha.data.StageType;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
 import com.fiberhome.ml.raha.data.profile.ColumnProfileService;
-import com.fiberhome.ml.raha.job.StageAttributeKeys;
-import com.fiberhome.ml.raha.job.StageExecutionContext;
-import com.fiberhome.ml.raha.job.StageResult;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
+import com.fiberhome.ml.raha.data.type.StageType;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 
 /**
  * 读取加载阶段的数据集，生成列画像并写回新的数据集版本。

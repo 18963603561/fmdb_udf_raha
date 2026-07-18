@@ -1,9 +1,15 @@
 package com.fiberhome.ml.raha.fmdb;
 
-import com.fiberhome.ml.raha.data.DetectionResult;
-import com.fiberhome.ml.raha.job.RahaJob;
+import com.fiberhome.ml.raha.data.domain.DetectionResult;
+import com.fiberhome.ml.raha.fmdb.gateway.FmdbTableGateway;
+import com.fiberhome.ml.raha.job.domain.RahaJob;
 import com.fiberhome.ml.raha.util.FormDataCodec;
 import com.fiberhome.ml.raha.util.ValueUtils;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -13,12 +19,6 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Clock;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * 将 Raha 任务状态和检测明细转换为稳定 FMDB 表模式后幂等写入。

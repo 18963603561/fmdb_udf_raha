@@ -1,7 +1,6 @@
 package com.fiberhome.ml.raha.label;
 
-import com.fiberhome.ml.raha.sampling.AnnotationTask;
-
+import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

@@ -1,7 +1,7 @@
 package com.fiberhome.ml.raha.data.loader;
 
-import com.fiberhome.ml.raha.data.DatasetSnapshot;
-import com.fiberhome.ml.raha.data.RahaDataset;
+import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
 
 /**
  * 返回只读 Raha 数据集及其输入快照元数据。

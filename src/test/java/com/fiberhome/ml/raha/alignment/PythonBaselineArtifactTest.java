@@ -1,11 +1,10 @@
 package com.fiberhome.ml.raha.alignment;
 
 import com.fiberhome.ml.raha.util.HashUtils;
-import org.junit.jupiter.api.Test;
-
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

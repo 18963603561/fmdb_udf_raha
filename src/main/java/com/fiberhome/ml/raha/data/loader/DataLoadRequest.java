@@ -1,13 +1,12 @@
 package com.fiberhome.ml.raha.data.loader;
 
 import com.fiberhome.ml.raha.util.ValueUtils;
-
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 
 /**
  * 描述文件或测试数据的读取方式、字段范围和快照版本。

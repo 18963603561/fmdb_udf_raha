@@ -1,8 +1,8 @@
 package com.fiberhome.ml.raha.feature;
 
-import com.fiberhome.ml.raha.config.FeatureConfig;
+import com.fiberhome.ml.raha.config.dto.FeatureConfig;
+import com.fiberhome.ml.raha.feature.domain.FeatureDefinition;
 import com.fiberhome.ml.raha.util.HashUtils;
-
 import java.util.List;
 
 /**

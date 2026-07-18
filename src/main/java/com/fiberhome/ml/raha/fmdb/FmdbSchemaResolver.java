@@ -1,10 +1,9 @@
 package com.fiberhome.ml.raha.fmdb;
 
-import com.fiberhome.ml.raha.data.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
-import org.apache.spark.sql.types.StructType;
-
 import java.util.List;
+import org.apache.spark.sql.types.StructType;
 
 /**
  * 将 FMDB 返回的 Spark 模式解析为核心层字段元数据。

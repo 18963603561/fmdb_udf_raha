@@ -1,16 +1,15 @@
 package com.fiberhome.ml.raha.checkpoint;
 
-import com.fiberhome.ml.raha.data.StageType;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.StageCheckpointRepository;
+import com.fiberhome.ml.raha.data.type.StageType;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.StageCheckpointRepository;
 import com.fiberhome.ml.raha.util.ValueUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Clock;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 统一执行阶段任务，记录每次尝试，并复用输入版本完全一致的成功检查点。

@@ -1,25 +1,24 @@
 package com.fiberhome.ml.raha.evaluation;
 
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import com.fiberhome.ml.raha.data.RahaDataset;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.CellLabelRepository;
-import com.fiberhome.ml.raha.repository.DefaultCellLabelRepository;
-import com.fiberhome.ml.raha.repository.InMemoryRahaRepository;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.repository.adapter.DefaultCellLabelRepository;
+import com.fiberhome.ml.raha.repository.adapter.InMemoryRahaRepository;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.CellLabelRepository;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.RowFactory;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructType;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Test;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

@@ -1,10 +1,16 @@
 package com.fiberhome.ml.raha.parallel;
 
-import com.fiberhome.ml.raha.config.ResourceConfig;
-import com.fiberhome.ml.raha.data.ClassifierType;
-import com.fiberhome.ml.raha.model.ColumnModelArtifact;
-import com.fiberhome.ml.raha.model.PartitionedColumnModelPredictor;
+import com.fiberhome.ml.raha.config.dto.ResourceConfig;
+import com.fiberhome.ml.raha.data.type.ClassifierType;
+import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
+import com.fiberhome.ml.raha.model.prediction.PartitionedColumnModelPredictor;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.ml.feature.VectorAssembler;
 import org.apache.spark.sql.Dataset;
@@ -17,13 +23,6 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.storage.StorageLevel;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

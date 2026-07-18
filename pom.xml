@@ -90,7 +90,7 @@
                     <argLine>-Dfile.encoding=UTF-8</argLine>
                 </configuration>
             </plugin>
-            <!-- 生成供 FMDB 注册使用的完整交付 Jar，Spark 依赖由 FMDB 运行环境提供。 -->
+            <!-- 生成完整交付 Jar，Spark 依赖由实际运行环境提供。 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

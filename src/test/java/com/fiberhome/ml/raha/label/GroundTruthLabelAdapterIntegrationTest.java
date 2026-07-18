@@ -1,8 +1,6 @@
 package com.fiberhome.ml.raha.label;
 
-import com.fiberhome.ml.raha.data.JobType;
-import com.fiberhome.ml.raha.data.LabelSource;
-import com.fiberhome.ml.raha.data.RahaDataset;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
 import com.fiberhome.ml.raha.data.loader.ColumnMetadataFactory;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
@@ -11,12 +9,11 @@ import com.fiberhome.ml.raha.data.loader.LoadedDataset;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
-import com.fiberhome.ml.raha.sampling.AnnotationTask;
-import com.fiberhome.ml.raha.sampling.AnnotationTaskStatus;
+import com.fiberhome.ml.raha.data.type.JobType;
+import com.fiberhome.ml.raha.data.type.LabelSource;
+import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
+import com.fiberhome.ml.raha.sampling.domain.AnnotationTaskStatus;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Test;
-
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,6 +23,8 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

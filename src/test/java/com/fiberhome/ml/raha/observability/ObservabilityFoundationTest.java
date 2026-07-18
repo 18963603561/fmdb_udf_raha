@@ -4,9 +4,8 @@ import com.fiberhome.ml.raha.error.RahaErrorCategory;
 import com.fiberhome.ml.raha.error.RahaErrorCode;
 import com.fiberhome.ml.raha.error.RahaException;
 import com.fiberhome.ml.raha.util.HashUtils;
-import org.junit.jupiter.api.Test;
-
 import java.util.Collections;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

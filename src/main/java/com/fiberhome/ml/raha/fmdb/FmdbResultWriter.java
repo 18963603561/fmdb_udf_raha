@@ -1,8 +1,7 @@
 package com.fiberhome.ml.raha.fmdb;
 
-import com.fiberhome.ml.raha.data.DetectionResult;
-import com.fiberhome.ml.raha.job.RahaJob;
-
+import com.fiberhome.ml.raha.data.domain.DetectionResult;
+import com.fiberhome.ml.raha.job.domain.RahaJob;
 import java.util.List;
 
 /**

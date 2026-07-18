@@ -1,20 +1,13 @@
 package com.fiberhome.ml.raha.evaluation;
 
-import com.fiberhome.ml.raha.data.CellCoordinate;
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import com.fiberhome.ml.raha.data.LabelSource;
-import com.fiberhome.ml.raha.data.RahaDataset;
+import com.fiberhome.ml.raha.data.domain.CellCoordinate;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.label.CellLabel;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.CellLabelRepository;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.CellLabelRepository;
 import com.fiberhome.ml.raha.util.ValueUtils;
-import org.apache.spark.sql.Column;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.functions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,6 +15,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.spark.sql.Column;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.Row;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 使用 Spark 全外连接比较脏表和真值表，生成全量单元格真值标签。

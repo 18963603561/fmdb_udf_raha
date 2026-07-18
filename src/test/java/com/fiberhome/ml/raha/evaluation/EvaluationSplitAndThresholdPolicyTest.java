@@ -1,16 +1,19 @@
 package com.fiberhome.ml.raha.evaluation;
 
-import com.fiberhome.ml.raha.data.ClassifierType;
-import com.fiberhome.ml.raha.data.LabelSource;
-import com.fiberhome.ml.raha.data.ModelStatus;
+import com.fiberhome.ml.raha.data.type.ClassifierType;
+import com.fiberhome.ml.raha.data.type.LabelSource;
+import com.fiberhome.ml.raha.data.type.ModelStatus;
+import com.fiberhome.ml.raha.evaluation.metrics.CellScore;
+import com.fiberhome.ml.raha.evaluation.metrics.DetectionEvaluationService;
+import com.fiberhome.ml.raha.evaluation.threshold.ThresholdComparisonResult;
+import com.fiberhome.ml.raha.evaluation.threshold.ThresholdComparisonService;
+import com.fiberhome.ml.raha.evaluation.threshold.ThresholdSelectionPolicy;
 import com.fiberhome.ml.raha.label.CellLabel;
-import com.fiberhome.ml.raha.model.RahaColumnModel;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.DefaultModelMetadataRepository;
-import com.fiberhome.ml.raha.repository.InMemoryRahaRepository;
-import com.fiberhome.ml.raha.repository.ModelMetadataRepository;
-import org.junit.jupiter.api.Test;
-
+import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
+import com.fiberhome.ml.raha.repository.adapter.DefaultModelMetadataRepository;
+import com.fiberhome.ml.raha.repository.adapter.InMemoryRahaRepository;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.ModelMetadataRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -20,6 +23,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

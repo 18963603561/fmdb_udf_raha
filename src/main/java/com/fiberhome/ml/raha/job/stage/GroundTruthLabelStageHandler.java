@@ -1,17 +1,13 @@
 package com.fiberhome.ml.raha.job.stage;
 
-import com.fiberhome.ml.raha.data.RahaDataset;
-import com.fiberhome.ml.raha.data.StageType;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.data.type.StageType;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.label.GroundTruthLabelAdapter;
 import com.fiberhome.ml.raha.label.GroundTruthLabelingResult;
-import com.fiberhome.ml.raha.repository.AnnotationTaskRepository;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.sampling.AnnotationTask;
-import com.fiberhome.ml.raha.job.StageAttributeKeys;
-import com.fiberhome.ml.raha.job.StageExecutionContext;
-import com.fiberhome.ml.raha.job.StageResult;
-
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.AnnotationTaskRepository;
+import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
 import java.util.ArrayList;
 import java.util.List;
 

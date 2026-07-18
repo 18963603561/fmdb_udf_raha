@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.label;
 
-import com.fiberhome.ml.raha.data.LabelSource;
+import com.fiberhome.ml.raha.data.type.LabelSource;
+import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
 import com.fiberhome.ml.raha.util.HashUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
 

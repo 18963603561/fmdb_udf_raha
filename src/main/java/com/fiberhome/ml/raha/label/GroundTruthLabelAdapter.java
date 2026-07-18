@@ -1,24 +1,23 @@
 package com.fiberhome.ml.raha.label;
 
-import com.fiberhome.ml.raha.data.CellCoordinate;
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import com.fiberhome.ml.raha.data.JobType;
-import com.fiberhome.ml.raha.data.LabelSource;
-import com.fiberhome.ml.raha.data.RahaDataset;
-import com.fiberhome.ml.raha.sampling.AnnotationTask;
-import com.fiberhome.ml.raha.sampling.AnnotationTaskStatus;
-import com.fiberhome.ml.raha.strategy.SparkStrategySupport;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.fiberhome.ml.raha.data.domain.CellCoordinate;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.data.type.JobType;
+import com.fiberhome.ml.raha.data.type.LabelSource;
+import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
+import com.fiberhome.ml.raha.sampling.domain.AnnotationTaskStatus;
+import com.fiberhome.ml.raha.strategy.execution.SparkStrategySupport;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 在评测模式下比较脏表和真值表同一位置，只生成错误零一标签。

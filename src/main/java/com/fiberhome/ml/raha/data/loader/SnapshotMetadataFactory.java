@@ -1,6 +1,6 @@
 package com.fiberhome.ml.raha.data.loader;
 
-import com.fiberhome.ml.raha.data.DatasetSnapshot;
+import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
 import com.fiberhome.ml.raha.util.HashUtils;
 
 /**

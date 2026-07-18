@@ -1,18 +1,17 @@
 package com.fiberhome.ml.raha.checkpoint;
 
-import com.fiberhome.ml.raha.data.StageType;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.DefaultStageCheckpointRepository;
-import com.fiberhome.ml.raha.repository.InMemoryRahaRepository;
-import com.fiberhome.ml.raha.repository.StageCheckpointRepository;
-import org.junit.jupiter.api.Test;
-
+import com.fiberhome.ml.raha.data.type.StageType;
+import com.fiberhome.ml.raha.repository.adapter.DefaultStageCheckpointRepository;
+import com.fiberhome.ml.raha.repository.adapter.InMemoryRahaRepository;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.StageCheckpointRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

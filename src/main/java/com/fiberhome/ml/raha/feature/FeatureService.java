@@ -1,17 +1,21 @@
 package com.fiberhome.ml.raha.feature;
 
-import com.fiberhome.ml.raha.config.FeatureConfig;
-import com.fiberhome.ml.raha.data.RahaDataset;
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import com.fiberhome.ml.raha.data.ColumnProfile;
+import com.fiberhome.ml.raha.config.dto.FeatureConfig;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.ColumnProfile;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.feature.assembly.FeatureAssembler;
+import com.fiberhome.ml.raha.feature.assembly.FeatureAssemblyMetrics;
+import com.fiberhome.ml.raha.feature.assembly.FeatureAssemblyResult;
+import com.fiberhome.ml.raha.feature.domain.FeatureDictionary;
+import com.fiberhome.ml.raha.feature.domain.SparseFeatureRow;
 import com.fiberhome.ml.raha.parallel.BoundedParallelExecutor;
 import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
 import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
-import com.fiberhome.ml.raha.repository.ArtifactVersion;
-import com.fiberhome.ml.raha.repository.FeatureRepository;
-import com.fiberhome.ml.raha.strategy.StrategyHit;
-import com.fiberhome.ml.raha.strategy.StrategyPlan;
-
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.repository.port.FeatureRepository;
+import com.fiberhome.ml.raha.strategy.domain.StrategyHit;
+import com.fiberhome.ml.raha.strategy.plan.StrategyPlan;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

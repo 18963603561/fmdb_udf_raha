@@ -1,12 +1,11 @@
 package com.fiberhome.ml.raha.data.loader;
 
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
-
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 
 /**
  * 根据 Spark 模式和字段范围配置生成 Raha 字段元数据。

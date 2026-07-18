@@ -1,10 +1,9 @@
 package com.fiberhome.ml.raha.data.loader;
 
+import java.util.Collections;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
-
-import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;

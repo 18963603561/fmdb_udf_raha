@@ -1,19 +1,18 @@
 package com.fiberhome.ml.raha.data.loader;
 
-import com.fiberhome.ml.raha.data.ColumnMetadata;
-import com.fiberhome.ml.raha.data.DatasetSnapshot;
-import com.fiberhome.ml.raha.data.RahaDataset;
+import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
+import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import java.time.Clock;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.spark.sql.DataFrameReader;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Clock;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 /**
  * 使用 Spark 文件数据源读取 CSV、JSON 或 Parquet，并生成只读 Raha 数据集。
