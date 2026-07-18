@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * 将统一属性转换为任务、算法和 UDF 配置对象。
+ * 将统一属性转换为任务和算法配置对象。
  */
 public final class RahaConfigFactory {
 
@@ -171,15 +171,6 @@ public final class RahaConfigFactory {
                 properties.getInt("raha.strategy.priority.pvd-null-placeholder"),
                 properties.getInt("raha.strategy.priority.pvd-type-format"),
                 properties.getInt("raha.strategy.priority.rvd-one-to-many"));
-    }
-
-    public UdfConfig udfConfig() {
-        return new UdfConfig(
-                properties.getRequired("raha.udf.train-function"),
-                properties.getRequired("raha.udf.detect-function"),
-                properties.getRequired("raha.udf.sample-function"),
-                properties.getInt("raha.udf.max-request-length"),
-                properties.getRequired("raha.udf.queue-directory"));
     }
 
     public int profileMaxValueFrequencyCount() {

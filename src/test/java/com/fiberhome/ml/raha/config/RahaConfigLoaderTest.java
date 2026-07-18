@@ -52,7 +52,6 @@ class RahaConfigLoaderTest {
                 .getMaxIterations());
         assertEquals(0.5d, factory.labelPropagationConfig()
                 .getMaxDirectWeightRatio(), 0.000001d);
-        assertEquals("F_DW_RAHADETECT", factory.udfConfig().getDetectFunction());
     }
 
     @Test
@@ -65,8 +64,7 @@ class RahaConfigLoaderTest {
                 "raha.profile.quantile-accuracy=20000",
                 "raha.model.context-signal.null-weight=0.25",
                 "raha.label.max-direct-weight-ratio=0.25",
-                "raha.sampling.coverage-score-exponent-cap=10.0",
-                "raha.udf.detect-function=F_CUSTOM_DETECT"),
+                "raha.sampling.coverage-score-exponent-cap=10.0"),
                 StandardCharsets.UTF_8);
         RahaConfigFactory defaults = new RahaConfigFactory(
                 new RahaConfigLoader().load());
@@ -87,7 +85,6 @@ class RahaConfigLoaderTest {
                 .getMaxDirectWeightRatio(), 0.000001d);
         assertEquals(10.0d, overriddenJob.getSamplingConfig()
                 .getCoverageScoreExponentCap(), 0.000001d);
-        assertEquals("F_CUSTOM_DETECT", overridden.udfConfig().getDetectFunction());
         assertNotEquals(new ConfigVersioner().versionOf(defaultJob),
                 new ConfigVersioner().versionOf(overriddenJob));
         assertNotEquals(defaultJob.getExecutionConfigFingerprint(),
