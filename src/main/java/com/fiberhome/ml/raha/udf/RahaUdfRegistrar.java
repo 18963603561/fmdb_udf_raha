@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 在 FMDB Spark 会话中统一注册三个异步表级 Raha UDF。
+ * 在 FMDB Spark 会话中分别注册三个同步表级 Raha UDF。
  */
 public final class RahaUdfRegistrar {
 
@@ -20,26 +20,27 @@ public final class RahaUdfRegistrar {
     private static final Logger LOGGER = LoggerFactory.getLogger(RahaUdfRegistrar.class);
 
     /**
-     * 配置当前进程提交器并注册三个字符串入参、JSON 文本返回的函数。
+     * 注册三个字符串入参、JSON 文本返回的同步执行函数。
      */
-    public void register(SparkSession sparkSession, RahaUdfJobSubmitter submitter) {
-        if (sparkSession == null || submitter == null) {
-            throw new IllegalArgumentException("UDF 注册会话和提交器不能为空");
+    public void register(SparkSession sparkSession,
+                         RahaSampleUdfHandler sampleHandler,
+                         RahaTrainUdfHandler trainHandler,
+                         RahaDetectUdfHandler detectHandler) {
+        if (sparkSession == null || sampleHandler == null
+                || trainHandler == null || detectHandler == null) {
+            throw new IllegalArgumentException("UDF 注册会话和三个 handler 不能为空");
         }
-        RahaUdfRuntime.configure(submitter);
         LOGGER.info("开始注册 Raha 表级 UDF");
         try {
             sparkSession.udf().register(TRAIN_FUNCTION,
-                    new F_DW_RAHATRAIN(submitter), DataTypes.StringType);
+                    new F_DW_RAHATRAIN(trainHandler), DataTypes.StringType);
             sparkSession.udf().register(DETECT_FUNCTION,
-                    new F_DW_RAHADETECT(submitter), DataTypes.StringType);
+                    new F_DW_RAHADETECT(detectHandler), DataTypes.StringType);
             sparkSession.udf().register(SAMPLE_FUNCTION,
-                    new F_DW_RAHASAMPLE(submitter), DataTypes.StringType);
+                    new F_DW_RAHASAMPLE(sampleHandler), DataTypes.StringType);
             LOGGER.info("Raha 表级 UDF 注册完成，functions={},{},{}",
                     TRAIN_FUNCTION, DETECT_FUNCTION, SAMPLE_FUNCTION);
         } catch (RuntimeException exception) {
-            // Spark 或 FMDB 函数注册失败时清理提交器，避免保留不可用运行时。
-            RahaUdfRuntime.clear();
             LOGGER.error("Raha 表级 UDF 注册失败", exception);
             throw exception;
         }

@@ -75,6 +75,7 @@ import com.fiberhome.ml.raha.service.RahaDetectRequest;
 import com.fiberhome.ml.raha.service.RahaDetectService;
 import com.fiberhome.ml.raha.service.RahaTaskResult;
 import com.fiberhome.ml.raha.service.RahaTaskStatus;
+import com.fiberhome.ml.raha.service.RahaTaskSummary;
 import com.fiberhome.ml.raha.service.RahaTaskType;
 import com.fiberhome.ml.raha.service.RahaTrainOutput;
 import com.fiberhome.ml.raha.service.RahaTrainRequest;
@@ -97,16 +98,22 @@ import com.fiberhome.ml.raha.strategy.StrategyExecutor;
 import com.fiberhome.ml.raha.strategy.StrategyPlanGenerator;
 import com.fiberhome.ml.raha.strategy.StrategyPlanService;
 import com.fiberhome.ml.raha.strategy.StrategyRegistry;
-import com.fiberhome.ml.raha.udf.FileRahaUdfJobSubmitter;
-import com.fiberhome.ml.raha.udf.FileRahaUdfJobWorker;
+import com.fiberhome.ml.raha.udf.F_DW_RAHADETECT;
+import com.fiberhome.ml.raha.udf.F_DW_RAHASAMPLE;
+import com.fiberhome.ml.raha.udf.F_DW_RAHATRAIN;
+import com.fiberhome.ml.raha.udf.RahaDetectUdfRequest;
+import com.fiberhome.ml.raha.udf.RahaDetectUdfHandler;
+import com.fiberhome.ml.raha.udf.RahaSampleUdfRequest;
+import com.fiberhome.ml.raha.udf.RahaSampleUdfHandler;
+import com.fiberhome.ml.raha.udf.RahaTrainUdfRequest;
+import com.fiberhome.ml.raha.udf.RahaTrainUdfHandler;
+import com.fiberhome.ml.raha.udf.RahaUdfExecutionResult;
 import com.fiberhome.ml.raha.udf.RahaUdfRegistrar;
-import com.fiberhome.ml.raha.udf.RahaUdfRequest;
-import com.fiberhome.ml.raha.udf.RahaUdfSubmissionResult;
 import com.fiberhome.ml.raha.util.FormDataCodec;
+import com.fiberhome.ml.raha.util.HashUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.functions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,10 +132,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BooleanSupplier;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 在 Spark 集群中使用样例脏表和真值表完成 UDF 建单、训练、检测与评估验收。
+ * 在 Spark 集群中使用样例脏表和真值表完成 UDF 直接采样、训练、检测与评估验收。
  */
 public final class RahaContainerValidationApplication {
 
@@ -219,31 +226,20 @@ public final class RahaContainerValidationApplication {
     }
 
     /**
-     * 串联 UDF 建单和生产服务，输出可复核的检测结果与评估摘要。
+     * 串联三个同步 UDF 和生产服务，输出可复核的检测结果与评估摘要。
      */
     private void run() {
-        String mode = System.getProperty("fmdb.validation.mode", "COMBINED")
-                .trim().toUpperCase(Locale.ROOT);
-        if ("SUBMITTER".equals(mode)) {
-            runSubmitter();
-            return;
-        }
-        if (!"COMBINED".equals(mode) && !"WORKER".equals(mode)) {
-            throw new IllegalArgumentException("不支持的容器验证运行模式：" + mode);
-        }
-        runWorkerLifecycle("COMBINED".equals(mode));
+        runDirectLifecycle();
     }
 
     /**
-     * 启动消费者生命周期并按运行模式决定是否在同一进程提交任务。
-     *
-     * @param submitLocally 是否由当前进程提交 SAMPLE、TRAIN 和 DETECT 请求
+     * 在当前进程按采样、训练、检测顺序同步执行三个 UDF。
      */
-    private void runWorkerLifecycle(boolean submitLocally) {
+    private void runDirectLifecycle() {
         long startedAt = System.currentTimeMillis();
-        LOGGER.info("开始 Raha 容器消费者验收，dirtyPath={}，cleanPath={}，"
-                        + "outputDirectory={}，submitLocally={}",
-                dirtyPath, cleanPath, outputDirectory, submitLocally);
+        LOGGER.info("开始 Raha 容器同步 UDF 验收，dirtyPath={}，cleanPath={}，"
+                        + "outputDirectory={}",
+                dirtyPath, cleanPath, outputDirectory);
         try {
             prepareOutputDirectory();
             loadCsvView(dirtyPath, DIRTY_TABLE);
@@ -265,54 +261,39 @@ public final class RahaContainerValidationApplication {
                     DATASET_ID + "-evaluation", dirtyDataset, cleanDataset,
                     version("ground-truth-stage"));
 
-            Path queueDirectory = outputDirectory.resolve("udf-requests");
-            ValidationWorkerState state = new ValidationWorkerState();
-            FileRahaUdfJobWorker worker = new FileRahaUdfJobWorker(queueDirectory,
-                    request -> dispatchUdfTask(request, dirtyDataset, truth,
-                            coreStorage, fmdbGateway, state), clock);
+            AtomicReference<SampledLabels> sampledReference =
+                    new AtomicReference<SampledLabels>();
+            AtomicReference<TrainingContext> trainingReference =
+                    new AtomicReference<TrainingContext>();
+            AtomicReference<RahaTaskResult<RahaDetectOutput>> detectedReference =
+                    new AtomicReference<RahaTaskResult<RahaDetectOutput>>();
+            RahaSampleUdfHandler sampleHandler = request -> executeSampleUdfTask(
+                    request, dirtyDataset, truth, coreStorage, sampledReference);
+            RahaTrainUdfHandler trainHandler = request -> executeTrainUdfTask(
+                    request, dirtyDataset, coreStorage, fmdbGateway,
+                    sampledReference, trainingReference);
+            RahaDetectUdfHandler detectHandler = request -> executeDetectUdfTask(
+                    request, dirtyDataset, coreStorage, fmdbGateway,
+                    trainingReference, detectedReference);
+            new RahaUdfRegistrar().register(spark, sampleHandler, trainHandler,
+                    detectHandler);
 
-            String sampleUdfResult;
-            String trainUdfResult;
-            String detectUdfResult;
-            if (submitLocally) {
-                RahaUdfRegistrar registrar = new RahaUdfRegistrar();
-                registrar.register(spark, new FileRahaUdfJobSubmitter(
-                        queueDirectory.toString()));
-                sampleUdfResult = callUdf(RahaUdfRegistrar.SAMPLE_FUNCTION,
-                        udfRequest(RahaTaskType.SAMPLE, null));
-                requireAccepted("采样", sampleUdfResult);
-                int sampleProcessed = worker.runOnce();
-                failIfTaskFailed(queueDirectory, "采样");
-                requireProcessed("采样", sampleProcessed);
-                trainUdfResult = callUdf(RahaUdfRegistrar.TRAIN_FUNCTION,
-                        udfRequest(RahaTaskType.TRAIN, null));
-                requireAccepted("训练", trainUdfResult);
-                int trainProcessed = worker.runOnce();
-                failIfTaskFailed(queueDirectory, "训练");
-                requireProcessed("训练", trainProcessed);
-                String modelVersion = firstModelVersion(
-                        requireValue("训练", state.training).trained);
-                detectUdfResult = callUdf(RahaUdfRegistrar.DETECT_FUNCTION,
-                        udfRequest(RahaTaskType.DETECT, modelVersion));
-                requireAccepted("检测", detectUdfResult);
-                int detectProcessed = worker.runOnce();
-                failIfTaskFailed(queueDirectory, "检测");
-                requireProcessed("检测", detectProcessed);
-            } else {
-                waitForWorkerState("采样", queueDirectory, worker,
-                        () -> state.sampled != null);
-                waitForWorkerState("训练", queueDirectory, worker,
-                        () -> state.training != null);
-                waitForWorkerState("检测", queueDirectory, worker,
-                        () -> state.detected != null);
-                sampleUdfResult = "EXTERNAL_SUBMITTER_ACCEPTED";
-                trainUdfResult = "EXTERNAL_SUBMITTER_ACCEPTED";
-                detectUdfResult = "EXTERNAL_SUBMITTER_ACCEPTED";
-            }
-            SampledLabels sampledLabels = requireValue("采样", state.sampled);
-            TrainingContext training = requireValue("训练", state.training);
+            F_DW_RAHASAMPLE sampleUdf = new F_DW_RAHASAMPLE(sampleHandler);
+            F_DW_RAHATRAIN trainUdf = new F_DW_RAHATRAIN(trainHandler);
+            F_DW_RAHADETECT detectUdf = new F_DW_RAHADETECT(detectHandler);
+            String sampleUdfResult = callSampleUdf(sampleUdf, sampleUdfRequest());
+            requireCompleted("采样", sampleUdfResult);
+            String trainUdfResult = callTrainUdf(trainUdf, trainUdfRequest());
+            requireCompleted("训练", trainUdfResult);
+            String detectUdfResult = callDetectUdf(detectUdf, detectUdfRequest(
+                    PublishedColumnModelLoader.CURRENT_PUBLISHED_VERSION));
+            requireCompleted("检测", detectUdfResult);
+            SampledLabels sampledLabels = requireValue(
+                    "采样", sampledReference.get());
+            TrainingContext training = requireValue(
+                    "训练", trainingReference.get());
             RahaTaskResult<RahaDetectOutput> detected = requireValue(
-                    "检测", state.detected);
+                    "检测", detectedReference.get());
             DetectionEvaluationMetrics fullMetrics = new DetectionEvaluationService()
                     .evaluate(detected.getPayload().getResults(), truth.getLabels());
             EvaluationSlice holdout = evaluationSlice(
@@ -325,7 +306,7 @@ public final class RahaContainerValidationApplication {
                     metrics, fullMetrics, sampledLabels, trainUdfResult, detectUdfResult,
                     sampleUdfResult,
                     System.currentTimeMillis() - startedAt);
-            LOGGER.info("Raha 容器消费者验收完成，rowCount={}，truthPositiveCount={}，"
+            LOGGER.info("Raha 容器同步 UDF 验收完成，rowCount={}，truthPositiveCount={}，"
                             + "detectedResultCount={}，precision={}，recall={}，f1={}，"
                             + "directLabelRowCount={}，elapsedMillis={}",
                     dirtyRowCount, truth.getPositiveCount(), resultCount,
@@ -339,37 +320,10 @@ public final class RahaContainerValidationApplication {
         }
     }
 
-    /**
-     * 启动独立提交端，仅注册并调用 UDF，不直接调用采样、训练或检测服务。
-     */
-    private void runSubmitter() {
-        LOGGER.info("开始 Raha 独立提交端验收，outputDirectory={}", outputDirectory);
-        prepareOutputDirectory();
-        Path queueDirectory = outputDirectory.resolve("udf-requests");
-        RahaUdfRegistrar registrar = new RahaUdfRegistrar();
-        registrar.register(spark, new FileRahaUdfJobSubmitter(
-                queueDirectory.toString()));
-        String sample = callUdf(RahaUdfRegistrar.SAMPLE_FUNCTION,
-                udfRequest(RahaTaskType.SAMPLE, null));
-        requireAccepted("采样", sample);
-        waitForCompletion(queueDirectory, SAMPLE_JOB_ID, RahaTaskType.SAMPLE);
-        String train = callUdf(RahaUdfRegistrar.TRAIN_FUNCTION,
-                udfRequest(RahaTaskType.TRAIN, null));
-        requireAccepted("训练", train);
-        waitForCompletion(queueDirectory, TRAIN_JOB_ID, RahaTaskType.TRAIN);
-        String detect = callUdf(RahaUdfRegistrar.DETECT_FUNCTION,
-                udfRequest(RahaTaskType.DETECT, "published-model"));
-        requireAccepted("检测", detect);
-        waitForCompletion(queueDirectory, DETECT_JOB_ID, RahaTaskType.DETECT);
-        writeSubmissionSummary(sample, train, detect);
-        LOGGER.info("Raha 独立提交端验收完成，outputDirectory={}", outputDirectory);
-    }
-
     private void prepareOutputDirectory() {
         try {
             LOGGER.info("开始准备验收文件目录，outputDirectory={}", outputDirectory);
             Files.createDirectories(outputDirectory);
-            Files.createDirectories(outputDirectory.resolve("udf-requests"));
         } catch (java.io.IOException exception) {
             LOGGER.error("准备验收文件目录失败，outputDirectory={}",
                     outputDirectory, exception);
@@ -415,7 +369,8 @@ public final class RahaContainerValidationApplication {
                 .profileAndSave(dataset, version("profile-stage"));
     }
 
-    private TrainingContext train(RahaDataset dataset,
+    private TrainingContext train(String jobId,
+                                  RahaDataset dataset,
                                   SampledLabels sampledLabels,
                                   InMemoryRahaRepository storage,
                                   InMemoryFmdbTableGateway fmdbGateway) {
@@ -448,9 +403,9 @@ public final class RahaContainerValidationApplication {
         RahaJobConfig jobConfig = configFactory.jobConfig(JobType.TRAINING,
                 DATASET_ID, DIRTY_TABLE, ROW_ID_COLUMN);
         LOGGER.info("开始执行训练服务，jobId={}，labelCount={}",
-                TRAIN_JOB_ID, sampledLabels.labels.size());
+                jobId, sampledLabels.labels.size());
         RahaTaskResult<RahaTrainOutput> trained = trainService.train(
-                new RahaTrainRequest(TRAIN_JOB_ID, "train-stage", dataset,
+                new RahaTrainRequest(jobId, "train-operation", dataset,
                         jobConfig, sampledLabels.labels,
                         LabelPropagationMethod.HOMOGENEITY,
                         configFactory.labelPropagationConfig(),
@@ -475,8 +430,8 @@ public final class RahaContainerValidationApplication {
                     entry.getValue().getModelVersion(), version("publish-stage"));
         }
         LOGGER.info("训练服务执行完成，jobId={}，candidateModelCount={}",
-                TRAIN_JOB_ID, trained.getPayload().getCandidateModels().size());
-        return new TrainingContext(trained, metadataRepository, modelStore, tunedModels);
+                jobId, trained.getPayload().getCandidateModels().size());
+        return new TrainingContext(trained, metadataRepository, tunedModels);
     }
 
     private Map<String, RahaColumnModel> tuneCandidateThresholds(
@@ -546,6 +501,9 @@ public final class RahaContainerValidationApplication {
     }
 
     private RahaTaskResult<RahaDetectOutput> detect(
+            String jobId,
+            String modelVersion,
+            String requestConfigVersion,
             RahaDataset dataset,
             TrainingContext training,
             InMemoryRahaRepository storage,
@@ -558,12 +516,14 @@ public final class RahaContainerValidationApplication {
                 new PublishedColumnModelLoader(training.metadataRepository,
                         restartedStore, new ColumnModelCompatibilityValidator()),
                 new ColumnModelPredictor(), detectionRepository, clock);
-        LOGGER.info("开始执行检测服务，jobId={}", DETECT_JOB_ID);
+        LOGGER.info("开始执行检测服务，jobId={}，modelVersion={}",
+                jobId, modelVersion);
         RahaTaskResult<RahaDetectOutput> detected = detectService.detect(
-                new RahaDetectRequest(DETECT_JOB_ID, "detect-stage", configVersion,
-                        dataset, training.trained.getPayload().getFeatures(),
+                new RahaDetectRequest(jobId, "detect-operation", requestConfigVersion,
+                        modelVersion, dataset,
+                        training.trained.getPayload().getFeatures(),
                         training.trained.getPayload().getStrategyPlanVersion(),
-                        version("detect-stage"), configFactory.resourceConfig()));
+                        version("detect-operation"), configFactory.resourceConfig()));
         if (detected.getStatus() == RahaTaskStatus.FAILED
                 || detected.getPayload() == null
                 || detected.getPayload().getResults().isEmpty()) {
@@ -573,10 +533,10 @@ public final class RahaContainerValidationApplication {
         // 单一类别字段不会生成模型，其他字段仍可按部分成功结果继续评估。
         if (detected.getStatus() != RahaTaskStatus.SUCCEEDED) {
             LOGGER.warn("检测服务部分成功，jobId={}，errorCode={}，errorMessage={}",
-                    DETECT_JOB_ID, detected.getErrorCode(), detected.getErrorMessage());
+                    jobId, detected.getErrorCode(), detected.getErrorMessage());
         }
         LOGGER.info("检测服务执行完成，jobId={}，resultCount={}",
-                DETECT_JOB_ID, detected.getPayload().getResults().size());
+                jobId, detected.getPayload().getResults().size());
         return detected;
     }
 
@@ -593,156 +553,124 @@ public final class RahaContainerValidationApplication {
         return resultCount;
     }
 
-    private String callUdf(String functionName, String encodedRequest) {
-        Dataset<Row> requests = spark.range(1L).repartition(1)
-                .select(functions.lit(encodedRequest).alias("request"));
-        LOGGER.info("开始通过 Spark SQL 调用 Raha UDF，functionName={}", functionName);
-        String result = requests.selectExpr(functionName + "(request) AS result")
-                .first().getString(0);
-        LOGGER.info("Spark SQL Raha UDF 调用完成，functionName={}，result={}",
-                functionName, result);
+    private String callSampleUdf(F_DW_RAHASAMPLE udf, String encodedRequest) {
+        LOGGER.info("开始直接调用采样 UDF");
+        String result = udf.call(encodedRequest);
+        LOGGER.info("采样 UDF 直接调用完成，result={}", result);
         return result;
     }
 
-    private String udfRequest(RahaTaskType taskType, String modelVersion) {
+    private String callTrainUdf(F_DW_RAHATRAIN udf, String encodedRequest) {
+        LOGGER.info("开始直接调用训练 UDF");
+        String result = udf.call(encodedRequest);
+        LOGGER.info("训练 UDF 直接调用完成，result={}", result);
+        return result;
+    }
+
+    private String callDetectUdf(F_DW_RAHADETECT udf, String encodedRequest) {
+        LOGGER.info("开始直接调用检测 UDF");
+        String result = udf.call(encodedRequest);
+        LOGGER.info("检测 UDF 直接调用完成，result={}", result);
+        return result;
+    }
+
+    private String sampleUdfRequest() {
+        Map<String, String> values = commonUdfValues(SAMPLE_JOB_ID);
+        values.put("labelingBudget", String.valueOf(
+                configFactory.samplingConfig().getLabelingBudget()));
+        return FormDataCodec.encode(values);
+    }
+
+    private String trainUdfRequest() {
+        Map<String, String> values = commonUdfValues(TRAIN_JOB_ID);
+        values.put("annotationReference", CLEAN_TABLE);
+        return FormDataCodec.encode(values);
+    }
+
+    private String detectUdfRequest(String modelVersion) {
+        Map<String, String> values = commonUdfValues(DETECT_JOB_ID);
+        values.put("modelVersion", modelVersion);
+        return FormDataCodec.encode(values);
+    }
+
+    private Map<String, String> commonUdfValues(String jobId) {
         Map<String, String> values = new LinkedHashMap<String, String>();
         values.put("datasetId", DATASET_ID);
         values.put("inputReference", DIRTY_TABLE);
         values.put("sourceType", "TABLE");
         values.put("rowIdColumn", ROW_ID_COLUMN);
         values.put("snapshotId", SNAPSHOT_ID);
-        values.put("idempotencyKey", taskType == RahaTaskType.TRAIN
-                ? TRAIN_JOB_ID : taskType == RahaTaskType.SAMPLE
-                ? SAMPLE_JOB_ID : DETECT_JOB_ID);
+        values.put("idempotencyKey", jobId);
         values.put("caller", "container-validation");
         values.put("resultTable", RESULT_TABLE);
-        if (taskType == RahaTaskType.TRAIN) {
-            values.put("annotationReference", CLEAN_TABLE);
-        } else if (taskType == RahaTaskType.DETECT) {
-            values.put("modelVersion", modelVersion);
-        } else {
-            values.put("labelingBudget", String.valueOf(
-                    configFactory.samplingConfig().getLabelingBudget()));
-        }
-        return FormDataCodec.encode(values);
+        return values;
     }
 
-    private String dispatchUdfTask(
-            RahaUdfRequest request,
+    private RahaUdfExecutionResult executeSampleUdfTask(
+            RahaSampleUdfRequest request,
             RahaDataset dirtyDataset,
             GroundTruthDifferenceResult truth,
             InMemoryRahaRepository coreStorage,
+            AtomicReference<SampledLabels> sampledReference) {
+        long executionStartedAt = Math.max(1L, clock.millis());
+        validateDataset(request.getDatasetId(), dirtyDataset);
+        SampledLabels sampled = sampleLabels(request.getIdempotencyKey(),
+                request.getLabelingBudget(), dirtyDataset, truth, coreStorage);
+        sampledReference.set(sampled);
+        Map<String, String> details = new LinkedHashMap<String, String>();
+        details.put("sampledRowCount", String.valueOf(sampled.rowIds.size()));
+        details.put("directLabelCount", String.valueOf(sampled.labels.size()));
+        RahaTaskSummary summary = new RahaTaskSummary(executionStartedAt,
+                Math.max(executionStartedAt, clock.millis()), sampled.rowIds.size(),
+                sampled.rowIds.size(), 0L, 0L, details);
+        return RahaUdfExecutionResult.completed(request.getIdempotencyKey(),
+                RahaTaskType.SAMPLE,
+                "repository://annotation-task/" + request.getIdempotencyKey(),
+                HashUtils.sha256Hex(request.toCanonicalConfiguration()), summary);
+    }
+
+    private RahaUdfExecutionResult executeTrainUdfTask(
+            RahaTrainUdfRequest request,
+            RahaDataset dirtyDataset,
+            InMemoryRahaRepository coreStorage,
             InMemoryFmdbTableGateway fmdbGateway,
-            ValidationWorkerState state) {
-        if (request.getTaskType() == RahaTaskType.SAMPLE) {
-            SampledLabels sampled = sampleLabels(dirtyDataset, truth, coreStorage);
-            state.sampled = sampled;
-            return "sampledRowCount=" + sampled.rowIds.size();
+            AtomicReference<SampledLabels> sampledReference,
+            AtomicReference<TrainingContext> trainingReference) {
+        validateDataset(request.getDatasetId(), dirtyDataset);
+        if (!CLEAN_TABLE.equals(request.getAnnotationReference())) {
+            throw new IllegalArgumentException("验收训练请求标注表不一致");
         }
-        if (request.getTaskType() == RahaTaskType.TRAIN) {
-            SampledLabels sampled = requireValue("采样", state.sampled);
-            TrainingContext training = train(dirtyDataset, sampled,
-                    coreStorage, fmdbGateway);
-            state.training = training;
-            return "candidateModelCount="
-                    + training.trained.getPayload().getCandidateModels().size();
-        }
-        TrainingContext training = requireValue("训练", state.training);
-        RahaTaskResult<RahaDetectOutput> detected = detect(dirtyDataset,
-                training, coreStorage, fmdbGateway);
-        state.detected = detected;
-        return "detectionResultCount=" + detected.getPayload().getResults().size();
+        SampledLabels sampled = requireValue("采样", sampledReference.get());
+        TrainingContext training = train(request.getIdempotencyKey(),
+                dirtyDataset, sampled, coreStorage, fmdbGateway);
+        trainingReference.set(training);
+        return RahaUdfExecutionResult.fromTaskResult(training.trained,
+                HashUtils.sha256Hex(request.toCanonicalConfiguration()));
     }
 
-    /**
-     * 持续轮询文件队列，直到当前消费者生成指定阶段结果。
-     *
-     * @param taskName 任务中文名称
-     * @param queueDirectory 文件任务目录
-     * @param worker 文件任务消费者
-     * @param completed 阶段完成条件
-     */
-    private void waitForWorkerState(String taskName,
-                                    Path queueDirectory,
-                                    FileRahaUdfJobWorker worker,
-                                    BooleanSupplier completed) {
-        long timeoutMillis = Long.parseLong(System.getProperty(
-                "fmdb.validation.worker-timeout-millis", "1800000"));
-        long deadline = System.currentTimeMillis() + timeoutMillis;
-        while (!completed.getAsBoolean()) {
-            worker.runOnce();
-            failIfTaskFailed(queueDirectory, taskName);
-            if (System.currentTimeMillis() >= deadline) {
-                throw new IllegalStateException(taskName + " 独立消费者等待超时");
-            }
-            sleepPolling();
-        }
+    private RahaUdfExecutionResult executeDetectUdfTask(
+            RahaDetectUdfRequest request,
+            RahaDataset dirtyDataset,
+            InMemoryRahaRepository coreStorage,
+            InMemoryFmdbTableGateway fmdbGateway,
+            AtomicReference<TrainingContext> trainingReference,
+            AtomicReference<RahaTaskResult<RahaDetectOutput>> detectedReference) {
+        validateDataset(request.getDatasetId(), dirtyDataset);
+        TrainingContext training = requireValue("训练", trainingReference.get());
+        String requestConfigVersion = HashUtils.sha256Hex(
+                request.toCanonicalConfiguration());
+        RahaTaskResult<RahaDetectOutput> detected = detect(
+                request.getIdempotencyKey(), request.getModelVersion(),
+                requestConfigVersion, dirtyDataset, training, coreStorage, fmdbGateway);
+        detectedReference.set(detected);
+        return RahaUdfExecutionResult.fromTaskResult(detected,
+                requestConfigVersion);
     }
 
-    /**
-     * 提交端等待消费者写出指定任务的成功终态。
-     *
-     * @param queueDirectory 文件任务目录
-     * @param jobId 任务标识
-     * @param taskType 任务类型
-     */
-    private void waitForCompletion(Path queueDirectory,
-                                   String jobId,
-                                   RahaTaskType taskType) {
-        long timeoutMillis = Long.parseLong(System.getProperty(
-                "fmdb.validation.worker-timeout-millis", "1800000"));
-        long deadline = System.currentTimeMillis() + timeoutMillis;
-        Path succeeded = queueDirectory.resolve(jobId + "-"
-                + taskType.name().toLowerCase(Locale.ROOT) + ".succeeded");
-        Path failed = queueDirectory.resolve(jobId + "-"
-                + taskType.name().toLowerCase(Locale.ROOT) + ".failed");
-        while (!Files.exists(succeeded)) {
-            if (Files.exists(failed)) {
-                throw new IllegalStateException(taskType + " 独立消费者执行失败");
-            }
-            if (System.currentTimeMillis() >= deadline) {
-                throw new IllegalStateException(taskType + " 独立消费者等待超时");
-            }
-            sleepPolling();
-        }
-    }
-
-    private static void failIfTaskFailed(Path queueDirectory, String taskName) {
-        try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(
-                queueDirectory, "*.failed")) {
-            for (Path failed : stream) {
-                throw new IllegalStateException(taskName + " 文件任务失败：" + failed);
-            }
-        } catch (java.io.IOException exception) {
-            throw new IllegalStateException("无法检查文件任务失败状态", exception);
-        }
-    }
-
-    private static void sleepPolling() {
-        try {
-            Thread.sleep(500L);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("独立消费者等待线程被中断", exception);
-        }
-    }
-
-    private void writeSubmissionSummary(String sample,
-                                        String train,
-                                        String detect) {
-        String content = "{\n"
-                + "  \"mode\": \"SUBMITTER\",\n"
-                + "  \"sampleUdfResult\": \"" + escape(sample) + "\",\n"
-                + "  \"trainUdfResult\": \"" + escape(train) + "\",\n"
-                + "  \"detectUdfResult\": \"" + escape(detect) + "\"\n"
-                + "}\n";
-        Path path = outputDirectory.resolve("udf-submission-summary.json");
-        try {
-            Files.write(path, content.getBytes(StandardCharsets.UTF_8),
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        } catch (java.io.IOException exception) {
-            LOGGER.error("写入独立提交端摘要失败，path={}", path, exception);
-            throw new IllegalStateException("无法写入独立提交端摘要", exception);
+    private static void validateDataset(String requestedDatasetId,
+                                        RahaDataset dataset) {
+        if (!dataset.getDatasetId().equals(requestedDatasetId)) {
+            throw new IllegalArgumentException("UDF 请求数据集与执行数据集不一致");
         }
     }
 
@@ -834,27 +762,16 @@ public final class RahaContainerValidationApplication {
         return new ArtifactVersion(configVersion, SNAPSHOT_ID, stageId, 1);
     }
 
-    private static String firstModelVersion(RahaTaskResult<RahaTrainOutput> trained) {
-        return trained.getPayload().getCandidateModels().values()
-                .iterator().next().getModelVersion();
-    }
-
-    private static void requireAccepted(String taskName, String result) {
-        if (result == null || (!result.contains("\"status\":\"ACCEPTED\"")
-                && !result.contains("\"status\":\"DUPLICATE\""))) {
-            throw new IllegalStateException(taskName + " UDF 未接受任务：" + result);
-        }
-    }
-
-    private static void requireProcessed(String taskName, int processedCount) {
-        if (processedCount != 1) {
-            throw new IllegalStateException(taskName + " UDF 文件任务未被唯一处理");
+    private static void requireCompleted(String taskName, String result) {
+        if (result == null || (!result.contains("\"status\":\"SUCCEEDED\"")
+                && !result.contains("\"status\":\"PARTIAL_SUCCESS\""))) {
+            throw new IllegalStateException(taskName + " UDF 未完成业务执行：" + result);
         }
     }
 
     private static <T> T requireValue(String taskName, T value) {
         if (value == null) {
-            throw new IllegalStateException(taskName + " UDF 文件任务没有生成结果");
+            throw new IllegalStateException(taskName + " UDF 没有生成结果");
         }
         return value;
     }
@@ -892,10 +809,11 @@ public final class RahaContainerValidationApplication {
         return Paths.get(value).toAbsolutePath().normalize().toUri().toString();
     }
 
-    private SampledLabels sampleLabels(RahaDataset dataset,
+    private SampledLabels sampleLabels(String jobId,
+                                       int budget,
+                                       RahaDataset dataset,
                                        GroundTruthDifferenceResult truth,
                                        InMemoryRahaRepository storage) {
-        int budget = configFactory.samplingConfig().getLabelingBudget();
         RahaJobConfig jobConfig = configFactory.jobConfig(JobType.TRAINING,
                 DATASET_ID, DIRTY_TABLE, ROW_ID_COLUMN);
         long randomSeed = jobConfig.getRandomSeed();
@@ -912,7 +830,7 @@ public final class RahaContainerValidationApplication {
                                 new DefaultFeatureRepository(storage), clock),
                         clock);
         RahaFeaturePreparationResult preparation = preparationService.prepare(
-                new RahaFeaturePreparationRequest(SAMPLE_JOB_ID,
+                new RahaFeaturePreparationRequest(jobId,
                         "sample-prepare", dataset, jobConfig,
                         version("sample-prepare")));
         int availableRowCount = featureRowCount(preparation.getFeatures());
@@ -942,7 +860,7 @@ public final class RahaContainerValidationApplication {
         }
         final long[] createdAt = new long[]{Math.max(1L, clock.millis())};
         ActiveSamplingResult activeResult = new ActiveSamplingOrchestrator(sampleService)
-                .sample(SAMPLE_JOB_ID, preparation.getFeatures(),
+                .sample(jobId, preparation.getFeatures(),
                         Collections.<CellLabel>emptyList(), activeClustering,
                         configFactory.samplingConfig(), samplingBudget, randomSeed,
                         version("sample-active"), configFactory.resourceConfig(),
@@ -979,9 +897,9 @@ public final class RahaContainerValidationApplication {
                 outputDirectory.resolve("java-strategy-alignment.jsonl"),
                 preparation.getStrategyPlans(), preparation.getStrategyBatch());
         int removedHitRecords = storage.removePartition(RepositoryNamespace.STRATEGY_HIT,
-                SAMPLE_JOB_ID);
+                jobId);
         LOGGER.info("策略命中中间结果已释放，jobId={}，removedRecordCount={}",
-                SAMPLE_JOB_ID, removedHitRecords);
+                jobId, removedHitRecords);
         preparation = preparation.withClustering(activeResult.getClustering())
                 .withoutStrategyHits();
         EvaluationSplit evaluationSplit = new EvaluationSplitService().split(
@@ -1055,33 +973,17 @@ public final class RahaContainerValidationApplication {
         private final RahaTaskResult<RahaTrainOutput> trained;
         /** 已发布模型元数据仓储。 */
         private final ModelMetadataRepository metadataRepository;
-        /** 训练阶段模型存储，仅用于保留生命周期引用。 */
-        private final FmdbModelStore modelStore;
         /** 完成独立验证阈值选择后的候选模型。 */
         private final Map<String, RahaColumnModel> tunedModels;
 
         private TrainingContext(RahaTaskResult<RahaTrainOutput> trained,
                                 ModelMetadataRepository metadataRepository,
-                                FmdbModelStore modelStore,
                                 Map<String, RahaColumnModel> tunedModels) {
             this.trained = trained;
             this.metadataRepository = metadataRepository;
-            this.modelStore = modelStore;
             this.tunedModels = Collections.unmodifiableMap(
                     new LinkedHashMap<String, RahaColumnModel>(tunedModels));
         }
-    }
-
-    /**
-     * 保存独立消费者进程内三个任务的顺序状态，下游只读取已完成上游结果。
-     */
-    private static final class ValidationWorkerState {
-        /** 主动采样和评测划分结果。 */
-        private SampledLabels sampled;
-        /** 训练、阈值和发布结果。 */
-        private TrainingContext training;
-        /** 最终检测服务结果。 */
-        private RahaTaskResult<RahaDetectOutput> detected;
     }
 
     /** 保存固定预算直接标签及其训练排除坐标。 */

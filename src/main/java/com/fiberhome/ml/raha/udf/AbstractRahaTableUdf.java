@@ -1,49 +1,41 @@
 package com.fiberhome.ml.raha.udf;
 
 import com.fiberhome.ml.raha.service.RahaTaskType;
+import com.fiberhome.ml.raha.util.HashUtils;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.spark.sql.api.java.UDF1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 统一表级 UDF 参数解析、异步提交、错误转换和安全日志行为。
+ * 提供表级 UDF 的公共日志和异常转换模板，具体入口保持强类型解析与直接执行。
  */
-abstract class AbstractRahaTableUdf extends UDF implements UDF1<String, String> {
+abstract class AbstractRahaTableUdf<T> extends UDF implements UDF1<String, String> {
 
     /** Java 序列化版本。 */
     private static final long serialVersionUID = 1L;
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractRahaTableUdf.class);
-    /** 当前 UDF 固定任务类型。 */
-    private final RahaTaskType taskType;
-    /** 请求解析器。 */
-    private final RahaUdfRequestParser parser;
-    /** 可序列化部署实现或测试注入的任务提交器。 */
-    private final RahaUdfJobSubmitter submitter;
-
-    AbstractRahaTableUdf(RahaTaskType taskType,
-                         RahaUdfRequestParser parser,
-                         RahaUdfJobSubmitter submitter) {
-        if (taskType == null || parser == null || submitter == null) {
-            throw new IllegalArgumentException("表级 UDF 依赖不能为空");
-        }
-        this.taskType = taskType;
-        this.parser = parser;
-        this.submitter = submitter;
-    }
-
     @Override
     public String call(String encodedRequest) {
         long startedAt = Math.max(1L, System.currentTimeMillis());
+        RahaTaskType taskType = taskType();
+        T request = null;
+        String configVersion = null;
         try {
-            RahaUdfRequest request = parser.parse(taskType, encodedRequest);
+            request = parse(encodedRequest);
+            RahaUdfCommonFields commonFields = commonFields(request);
+            configVersion = HashUtils.sha256Hex(canonicalConfiguration(request));
             LOGGER.info("开始处理 Raha 表级 UDF，taskType={}，datasetId={}，caller={}，"
                             + "requestLength={}",
-                    taskType, request.getDatasetId(), request.getCaller(),
+                    taskType, commonFields.getDatasetId(), commonFields.getCaller(),
                     encodedRequest == null ? 0 : encodedRequest.length());
-            RahaUdfSubmissionResult result = submitter.submit(request);
-            LOGGER.info("Raha 表级 UDF 处理完成，taskType={}，jobId={}，status={}，"
+            RahaUdfExecutionResult result = handle(request);
+            if (result == null || result.getTaskType() != taskType
+                    || !configVersion.equals(result.getConfigVersion())) {
+                throw new IllegalStateException("UDF handler 返回了无效业务结果");
+            }
+            LOGGER.info("Raha 表级 UDF 同步执行完成，taskType={}，jobId={}，status={}，"
                             + "elapsedMillis={}",
                     taskType, result.getJobId(), result.getStatus(),
                     System.currentTimeMillis() - startedAt);
@@ -53,15 +45,29 @@ abstract class AbstractRahaTableUdf extends UDF implements UDF1<String, String> 
                             + "requestLength={}",
                     taskType, exception.getErrorCode(),
                     encodedRequest == null ? 0 : encodedRequest.length(), exception);
-            return RahaUdfSubmissionResult.rejected(taskType,
-                    exception.getErrorCode(), exception.getMessage(), startedAt).toJson();
+            return RahaUdfExecutionResult.rejected(taskType,
+                    exception.getErrorCode(), exception.getMessage(), startedAt,
+                    Math.max(startedAt, System.currentTimeMillis())).toJson();
         } catch (RuntimeException exception) {
-            // 外部 FMDB 写入或任务仓储异常必须返回可追溯失败并记录完整堆栈。
-            LOGGER.error("Raha 表级 UDF 提交失败，taskType={}，requestLength={}",
-                    taskType, encodedRequest == null ? 0 : encodedRequest.length(), exception);
-            return RahaUdfSubmissionResult.rejected(taskType,
-                    "UDF_SUBMISSION_FAILED", exception.getClass().getSimpleName(),
-                    startedAt).toJson();
+            RahaUdfCommonFields commonFields = request == null
+                    ? null : commonFields(request);
+            LOGGER.error("Raha 表级 UDF 同步执行失败，taskType={}，jobId={}，"
+                            + "datasetId={}，caller={}，resultTable={}，requestLength={}",
+                    taskType,
+                    commonFields == null ? null : commonFields.getIdempotencyKey(),
+                    commonFields == null ? null : commonFields.getDatasetId(),
+                    commonFields == null ? null : commonFields.getCaller(),
+                    commonFields == null ? null : commonFields.getResultTable(),
+                    encodedRequest == null ? 0 : encodedRequest.length(), exception);
+            if (commonFields == null || configVersion == null) {
+                return RahaUdfExecutionResult.rejected(taskType,
+                        "UDF_EXECUTION_FAILED", exception.getClass().getSimpleName(),
+                        startedAt, Math.max(startedAt, System.currentTimeMillis())).toJson();
+            }
+            return RahaUdfExecutionResult.failed(commonFields.getIdempotencyKey(),
+                    taskType, configVersion, "UDF_EXECUTION_FAILED",
+                    exception.getClass().getSimpleName(), startedAt,
+                    Math.max(startedAt, System.currentTimeMillis())).toJson();
         }
     }
 
@@ -69,9 +75,24 @@ abstract class AbstractRahaTableUdf extends UDF implements UDF1<String, String> 
      * 提供 Hive 风格函数入口，支持通过 ADD JAR 和 CREATE FUNCTION 独立注册。
      *
      * @param encodedRequest 表单编码请求
-     * @return 异步任务提交结果 JSON
+     * @return 同步业务执行结果 JSON
      */
     public String evaluate(String encodedRequest) {
         return call(encodedRequest);
     }
+
+    /** 返回当前入口固定的结果类型，仅用于日志和返回值。 */
+    protected abstract RahaTaskType taskType();
+
+    /** 使用当前入口专属解析方法生成强类型请求。 */
+    protected abstract T parse(String encodedRequest);
+
+    /** 返回当前强类型请求的公共字段。 */
+    protected abstract RahaUdfCommonFields commonFields(T request);
+
+    /** 返回当前请求用于计算配置版本的稳定文本。 */
+    protected abstract String canonicalConfiguration(T request);
+
+    /** 调用当前入口专属直接执行 handler。 */
+    protected abstract RahaUdfExecutionResult handle(T request);
 }

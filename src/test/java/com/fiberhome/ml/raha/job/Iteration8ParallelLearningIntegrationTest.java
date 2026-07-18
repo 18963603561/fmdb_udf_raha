@@ -161,6 +161,7 @@ class Iteration8ParallelLearningIntegrationTest {
                 new ColumnModelPredictor(), detectionRepository, clock);
         RahaTaskResult<RahaDetectOutput> detected = detectService.detect(
                 new RahaDetectRequest("parallel-detect", "detect-stage", "config-v1",
+                        PublishedColumnModelLoader.CURRENT_PUBLISHED_VERSION,
                         dataset, trained.getPayload().getFeatures(),
                         trained.getPayload().getStrategyPlanVersion(),
                         version("detect-stage"), config.getResourceConfig()));

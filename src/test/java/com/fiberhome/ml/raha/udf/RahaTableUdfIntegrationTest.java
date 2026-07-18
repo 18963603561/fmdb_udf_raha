@@ -1,69 +1,31 @@
 package com.fiberhome.ml.raha.udf;
 
-import com.fiberhome.ml.raha.data.StageType;
-import com.fiberhome.ml.raha.fmdb.InMemoryFmdbTableGateway;
-import com.fiberhome.ml.raha.fmdb.SparkSqlFmdbResultWriter;
-import com.fiberhome.ml.raha.job.RahaIdGenerator;
-import com.fiberhome.ml.raha.repository.DefaultJobRepository;
-import com.fiberhome.ml.raha.repository.InMemoryRahaRepository;
+import com.fiberhome.ml.raha.service.RahaTaskSummary;
 import com.fiberhome.ml.raha.service.RahaTaskType;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import com.fiberhome.ml.raha.util.FormDataCodec;
+import com.fiberhome.ml.raha.util.HashUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.io.Serializable;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 验证三个 Raha 表级 UDF 的异步提交、幂等、参数和异常返回契约。
+ * 验证三个 Raha 表级 UDF 的直接执行、类型隔离和结果契约。
  */
 class RahaTableUdfIntegrationTest {
-
-    /** UDF 任务状态临时表。 */
-    private static final String JOB_TABLE = "raha_udf_jobs";
-    /** 当前测试 Spark 会话。 */
-    private SparkSession spark;
-    /** 当前测试真实仓储提交器。 */
-    private RahaUdfJobSubmitter submitter;
-    /** ADD JAR 独立注册模式使用的隔离共享目录。 */
-    @TempDir
-    Path queueDirectory;
-
-    @BeforeEach
-    void prepareSubmitter() {
-        spark = SparkTestSession.get();
-        spark.catalog().dropTempView(JOB_TABLE);
-        InMemoryFmdbTableGateway gateway = new InMemoryFmdbTableGateway(spark);
-        SparkSqlFmdbResultWriter writer = new SparkSqlFmdbResultWriter(
-                spark, gateway, fixedClock());
-        submitter = new RepositoryBackedRahaUdfJobSubmitter(
-                new DefaultJobRepository(new InMemoryRahaRepository()), writer,
-                JOB_TABLE, new SequentialIdGenerator(), fixedClock());
-    }
-
-    @AfterEach
-    void clearRuntime() {
-        RahaUdfRuntime.clear();
-    }
 
     @AfterAll
     static void stopSpark() {
@@ -71,77 +33,75 @@ class RahaTableUdfIntegrationTest {
     }
 
     @Test
-    void shouldSubmitTrainDetectAndSampleAsynchronouslyAndDeduplicate() {
-        F_DW_RAHATRAIN train = new F_DW_RAHATRAIN(submitter);
-        F_DW_RAHADETECT detect = new F_DW_RAHADETECT(submitter);
-        F_DW_RAHASAMPLE sample = new F_DW_RAHASAMPLE(submitter);
+    void shouldCallDedicatedHandlerAndReturnCompletedResult() {
+        TrackingHandlers handlers = new TrackingHandlers();
 
-        String acceptedTrain = train.call(request(RahaTaskType.TRAIN, "train-key"));
-        String duplicateTrain = train.call(request(RahaTaskType.TRAIN, "train-key"));
-        String acceptedDetect = detect.call(request(RahaTaskType.DETECT, "detect-key"));
-        String acceptedSample = sample.call(request(RahaTaskType.SAMPLE, "sample-key"));
+        String sample = new F_DW_RAHASAMPLE(handlers)
+                .call(sampleRequest("sample-job"));
+        String train = new F_DW_RAHATRAIN(handlers)
+                .call(trainRequest("train-job"));
+        String detect = new F_DW_RAHADETECT(handlers)
+                .call(detectRequest("detect-job"));
 
-        assertTrue(acceptedTrain.contains("\"status\":\"ACCEPTED\""));
-        assertTrue(acceptedTrain.contains("\"jobId\":\"job-1\""));
-        assertTrue(duplicateTrain.contains("\"status\":\"DUPLICATE\""));
-        assertTrue(duplicateTrain.contains("\"jobId\":\"job-1\""));
-        assertTrue(acceptedDetect.contains("\"taskType\":\"DETECT\""));
-        assertTrue(acceptedDetect.contains("\"jobId\":\"job-2\""));
-        assertTrue(acceptedSample.contains("\"taskType\":\"SAMPLE\""));
-        assertTrue(acceptedSample.contains("\"jobId\":\"job-3\""));
-        assertEquals(3L, spark.table(JOB_TABLE).count());
-        assertEquals(3L, spark.table(JOB_TABLE).filter("status = 'CREATED'").count());
+        assertEquals(1, handlers.sampleCount.get());
+        assertEquals(1, handlers.trainCount.get());
+        assertEquals(1, handlers.detectCount.get());
+        assertTrue(sample.contains("\"status\":\"SUCCEEDED\""));
+        assertTrue(train.contains("\"taskType\":\"TRAIN\""));
+        assertTrue(detect.contains("\"jobId\":\"detect-job\""));
+        assertTrue(detect.contains("\"summary\":{"));
+        assertFalse(sample.contains("ACCEPTED"));
+        assertFalse(sample.contains("DUPLICATE"));
     }
 
     @Test
-    void shouldReturnTraceableRejectionForInvalidArgumentsAndConflict() {
-        F_DW_RAHATRAIN train = new F_DW_RAHATRAIN(submitter);
-        F_DW_RAHADETECT detect = new F_DW_RAHADETECT(submitter);
-        F_DW_RAHASAMPLE sample = new F_DW_RAHASAMPLE(submitter);
-        train.call(request(RahaTaskType.TRAIN, "conflict-key"));
+    void shouldRejectInvalidAndCrossOperationArgumentsBeforeHandler() {
+        TrackingHandlers handlers = new TrackingHandlers();
+        Map<String, String> missingModel = commonValues("missing-model");
+        Map<String, String> crossTask = trainValues("cross-task");
+        crossTask.put("modelVersion", "model-v1");
 
-        Map<String, String> conflict = requestValues(RahaTaskType.TRAIN, "conflict-key");
-        conflict.put("inputReference", "other_table");
-        String conflictResult = train.call(FormDataCodec.encode(conflict));
-        String missingModel = detect.call(FormDataCodec.encode(
-                commonValues("missing-model")));
-        Map<String, String> invalidBudgetValues = commonValues("invalid-budget");
-        invalidBudgetValues.put("labelingBudget", "0");
-        String invalidBudget = sample.call(FormDataCodec.encode(invalidBudgetValues));
-        String unknown = train.call(request(RahaTaskType.TRAIN, "unknown")
-                + "&unexpected=value");
-        String malformed = train.call("not-a-form-request");
+        String detect = new F_DW_RAHADETECT(handlers)
+                .call(FormDataCodec.encode(missingModel));
+        String train = new F_DW_RAHATRAIN(handlers)
+                .call(FormDataCodec.encode(crossTask));
+        String unknown = new F_DW_RAHASAMPLE(handlers)
+                .call(sampleRequest("unknown") + "&unexpected=value");
+        String malformed = new F_DW_RAHATRAIN(handlers)
+                .call("not-a-form-request");
 
-        assertTrue(conflictResult.contains("\"errorCode\":\"IDEMPOTENCY_CONFLICT\""));
-        assertTrue(missingModel.contains("\"errorCode\":\"INVALID_UDF_ARGUMENT\""));
-        assertTrue(invalidBudget.contains("\"errorCode\":\"INVALID_UDF_ARGUMENT\""));
+        assertTrue(detect.contains("\"status\":\"REJECTED\""));
+        assertTrue(detect.contains("\"errorCode\":\"INVALID_UDF_ARGUMENT\""));
+        assertTrue(train.contains("\"errorCode\":\"INVALID_UDF_ARGUMENT\""));
         assertTrue(unknown.contains("\"errorCode\":\"UNKNOWN_UDF_ARGUMENT\""));
-        assertTrue(malformed.contains("\"status\":\"REJECTED\""));
         assertTrue(malformed.contains("\"jobId\":null"));
+        assertEquals(0, handlers.sampleCount.get());
+        assertEquals(0, handlers.trainCount.get());
+        assertEquals(0, handlers.detectCount.get());
     }
 
     @Test
-    void shouldConvertUnexpectedSubmitterFailureToStableResult() {
-        RahaUdfJobSubmitter failedSubmitter = request -> {
-            throw new IllegalStateException("模拟 FMDB 提交失败");
+    void shouldConvertHandlerExceptionToFailedResult() {
+        RahaDetectUdfHandler handler = request -> {
+            throw new IllegalStateException("模拟检测服务失败");
         };
 
-        String result = new F_DW_RAHADETECT(failedSubmitter)
-                .call(request(RahaTaskType.DETECT, "failure-key"));
+        String result = new F_DW_RAHADETECT(handler)
+                .call(detectRequest("failure-job"));
 
-        assertTrue(result.contains("\"status\":\"REJECTED\""));
-        assertTrue(result.contains("\"errorCode\":\"UDF_SUBMISSION_FAILED\""));
+        assertTrue(result.contains("\"status\":\"FAILED\""));
+        assertTrue(result.contains("\"jobId\":\"failure-job\""));
+        assertTrue(result.contains("\"errorCode\":\"UDF_EXECUTION_FAILED\""));
         assertTrue(result.contains("\"errorMessage\":\"IllegalStateException\""));
     }
 
     @Test
-    void shouldRegisterAndExecuteAsSparkSqlUdf() {
-        new RahaUdfRegistrar().register(spark, new SerializableStaticSubmitter());
-        // 清理驱动进程静态状态，验证执行器使用随 UDF 序列化的提交器。
-        RahaUdfRuntime.clear();
+    void shouldRegisterAndExecuteThreeDirectHandlersAsSparkSqlUdf() {
+        SparkSession spark = SparkTestSession.get();
+        StaticHandlers handlers = new StaticHandlers();
+        new RahaUdfRegistrar().register(spark, handlers, handlers, handlers);
         Dataset<Row> requests = spark.createDataset(Collections.singletonList(
-                request(RahaTaskType.DETECT, "spark-sql-key")), Encoders.STRING())
-                .toDF("request");
+                detectRequest("spark-sql-job")), Encoders.STRING()).toDF("request");
 
         String result = requests.selectExpr(
                 RahaUdfRegistrar.DETECT_FUNCTION + "(request) AS result")
@@ -150,143 +110,102 @@ class RahaTableUdfIntegrationTest {
         assertTrue(spark.catalog().functionExists(RahaUdfRegistrar.TRAIN_FUNCTION));
         assertTrue(spark.catalog().functionExists(RahaUdfRegistrar.DETECT_FUNCTION));
         assertTrue(spark.catalog().functionExists(RahaUdfRegistrar.SAMPLE_FUNCTION));
-        assertTrue(result.contains("\"status\":\"ACCEPTED\""));
+        assertTrue(result.contains("\"status\":\"SUCCEEDED\""));
         assertTrue(result.contains("\"jobId\":\"spark-sql-job\""));
-        assertTrue(result.contains("\"taskType\":\"DETECT\""));
     }
 
     @Test
-    void shouldReturnStableErrorWhenNoArgUdfRuntimeIsUnavailable() {
-        RahaUdfRuntime.clear();
-
-        String result = new F_DW_RAHASAMPLE()
-                .call(request(RahaTaskType.SAMPLE, "runtime-missing"));
-
-        assertTrue(result.contains("\"status\":\"REJECTED\""));
-        assertTrue(result.contains("\"errorCode\":\"UDF_RUNTIME_UNAVAILABLE\""));
+    void shouldNotExposeNoArgEntryConstructors() {
+        assertThrows(NoSuchMethodException.class,
+                () -> F_DW_RAHASAMPLE.class.getConstructor());
+        assertThrows(NoSuchMethodException.class,
+                () -> F_DW_RAHATRAIN.class.getConstructor());
+        assertThrows(NoSuchMethodException.class,
+                () -> F_DW_RAHADETECT.class.getConstructor());
     }
 
-    @Test
-    void shouldRegisterThreeFunctionsIndependentlyByClassName() {
-        System.setProperty("raha.udf.queue-directory", queueDirectory.toString());
-        String trainFunction = "RAHA_ADD_JAR_TRAIN_TEST";
-        String detectFunction = "RAHA_ADD_JAR_DETECT_TEST";
-        String sampleFunction = "RAHA_ADD_JAR_SAMPLE_TEST";
-        try {
-            spark.sql("CREATE TEMPORARY FUNCTION " + trainFunction
-                    + " AS 'com.fiberhome.ml.raha.udf.F_DW_RAHATRAIN'");
-            spark.sql("CREATE TEMPORARY FUNCTION " + detectFunction
-                    + " AS 'com.fiberhome.ml.raha.udf.F_DW_RAHADETECT'");
-            spark.sql("CREATE TEMPORARY FUNCTION " + sampleFunction
-                    + " AS 'com.fiberhome.ml.raha.udf.F_DW_RAHASAMPLE'");
-
-            String train = callRegisteredFunction(trainFunction,
-                    request(RahaTaskType.TRAIN, "add-jar-train"));
-            String detect = callRegisteredFunction(detectFunction,
-                    request(RahaTaskType.DETECT, "add-jar-detect"));
-            String sample = callRegisteredFunction(sampleFunction,
-                    request(RahaTaskType.SAMPLE, "add-jar-sample"));
-            String duplicateTrain = callRegisteredFunction(trainFunction,
-                    request(RahaTaskType.TRAIN, "add-jar-train"));
-            Map<String, String> conflictValues = requestValues(
-                    RahaTaskType.TRAIN, "add-jar-train");
-            conflictValues.put("inputReference", "other_table");
-            String conflict = callRegisteredFunction(trainFunction,
-                    FormDataCodec.encode(conflictValues));
-            String unsafePath = callRegisteredFunction(trainFunction,
-                    request(RahaTaskType.TRAIN, "../unsafe"));
-
-            assertTrue(train.contains("\"status\":\"ACCEPTED\""));
-            assertTrue(detect.contains("\"status\":\"ACCEPTED\""));
-            assertTrue(sample.contains("\"status\":\"ACCEPTED\""));
-            assertTrue(duplicateTrain.contains("\"status\":\"DUPLICATE\""));
-            assertTrue(conflict.contains("\"errorCode\":\"IDEMPOTENCY_CONFLICT\""));
-            assertTrue(unsafePath.contains("\"errorCode\":\"INVALID_UDF_ARGUMENT\""));
-            assertTrue(Files.exists(queueDirectory.resolve(
-                    "add-jar-train-train.request")));
-            assertTrue(Files.exists(queueDirectory.resolve(
-                    "add-jar-detect-detect.request")));
-            assertTrue(Files.exists(queueDirectory.resolve(
-                    "add-jar-sample-sample.request")));
-        } finally {
-            spark.sql("DROP TEMPORARY FUNCTION IF EXISTS " + trainFunction);
-            spark.sql("DROP TEMPORARY FUNCTION IF EXISTS " + detectFunction);
-            spark.sql("DROP TEMPORARY FUNCTION IF EXISTS " + sampleFunction);
-            System.clearProperty("raha.udf.queue-directory");
-        }
+    private static String sampleRequest(String jobId) {
+        Map<String, String> values = commonValues(jobId);
+        values.put("labelingBudget", "10");
+        return FormDataCodec.encode(values);
     }
 
-    private String callRegisteredFunction(String functionName, String request) {
-        return spark.createDataset(Collections.singletonList(request), Encoders.STRING())
-                .toDF("request")
-                .selectExpr(functionName + "(request) AS result")
-                .first().getString(0);
+    private static String trainRequest(String jobId) {
+        return FormDataCodec.encode(trainValues(jobId));
     }
 
-    private static String request(RahaTaskType taskType, String idempotencyKey) {
-        return FormDataCodec.encode(requestValues(taskType, idempotencyKey));
-    }
-
-    private static Map<String, String> requestValues(RahaTaskType taskType,
-                                                      String idempotencyKey) {
-        Map<String, String> values = commonValues(idempotencyKey);
-        if (taskType == RahaTaskType.TRAIN) {
-            values.put("annotationReference", "raha_labels");
-        } else if (taskType == RahaTaskType.DETECT) {
-            values.put("modelVersion", "model-v1");
-        } else {
-            values.put("labelingBudget", "10");
-        }
+    private static Map<String, String> trainValues(String jobId) {
+        Map<String, String> values = commonValues(jobId);
+        values.put("annotationReference", "raha_labels");
         return values;
     }
 
-    private static Map<String, String> commonValues(String idempotencyKey) {
+    private static String detectRequest(String jobId) {
+        Map<String, String> values = commonValues(jobId);
+        values.put("modelVersion", "model-v1");
+        return FormDataCodec.encode(values);
+    }
+
+    private static Map<String, String> commonValues(String jobId) {
         Map<String, String> values = new LinkedHashMap<String, String>();
         values.put("datasetId", "dataset");
         values.put("inputReference", "source_table");
         values.put("sourceType", "TABLE");
         values.put("rowIdColumn", "id");
         values.put("snapshotId", "snapshot-v1");
-        values.put("idempotencyKey", idempotencyKey);
+        values.put("idempotencyKey", jobId);
         values.put("caller", "tester");
         values.put("resultTable", "raha_result_table");
         return values;
     }
 
-    private static Clock fixedClock() {
-        return Clock.fixed(Instant.ofEpochMilli(1000L), ZoneOffset.UTC);
+    private static RahaUdfExecutionResult completed(String jobId,
+                                                     RahaTaskType taskType,
+                                                     String canonicalConfiguration) {
+        Map<String, String> details = new LinkedHashMap<String, String>();
+        details.put("processedCount", "1");
+        RahaTaskSummary summary = new RahaTaskSummary(
+                1000L, 1001L, 1L, 1L, 0L, 0L, details);
+        return RahaUdfExecutionResult.completed(jobId, taskType,
+                "repository://result/" + jobId,
+                HashUtils.sha256Hex(canonicalConfiguration), summary);
     }
 
-    /**
-     * 为测试生成可预测任务标识。
-     */
-    private static final class SequentialIdGenerator implements RahaIdGenerator {
-        /** 当前任务序号。 */
-        private final AtomicInteger sequence = new AtomicInteger();
+    /** 验证三个入口只调用各自强类型 handler。 */
+    private static class TrackingHandlers implements RahaSampleUdfHandler,
+            RahaTrainUdfHandler, RahaDetectUdfHandler {
+        /** 采样执行次数。 */
+        private final AtomicInteger sampleCount = new AtomicInteger();
+        /** 训练执行次数。 */
+        private final AtomicInteger trainCount = new AtomicInteger();
+        /** 检测执行次数。 */
+        private final AtomicInteger detectCount = new AtomicInteger();
 
         @Override
-        public String newJobId() {
-            return "job-" + sequence.incrementAndGet();
+        public RahaUdfExecutionResult handle(RahaSampleUdfRequest request) {
+            sampleCount.incrementAndGet();
+            return completed(request.getIdempotencyKey(), RahaTaskType.SAMPLE,
+                    request.toCanonicalConfiguration());
         }
 
         @Override
-        public String newStageId(String jobId, StageType stageType, int attemptId) {
-            return "stage-" + attemptId;
+        public RahaUdfExecutionResult handle(RahaTrainUdfRequest request) {
+            trainCount.incrementAndGet();
+            return completed(request.getIdempotencyKey(), RahaTaskType.TRAIN,
+                    request.toCanonicalConfiguration());
+        }
+
+        @Override
+        public RahaUdfExecutionResult handle(RahaDetectUdfRequest request) {
+            detectCount.incrementAndGet();
+            return completed(request.getIdempotencyKey(), RahaTaskType.DETECT,
+                    request.toCanonicalConfiguration());
         }
     }
 
-    /**
-     * 验证 Spark UDF 序列化的无外部状态提交器。
-     */
-    private static final class SerializableStaticSubmitter
-            implements RahaUdfJobSubmitter, Serializable {
+    /** Spark 序列化测试使用的无外部状态 handler。 */
+    private static final class StaticHandlers extends TrackingHandlers {
+        /** Java 序列化版本。 */
         private static final long serialVersionUID = 1L;
-
-        @Override
-        public RahaUdfSubmissionResult submit(RahaUdfRequest request) {
-            return RahaUdfSubmissionResult.accepted("spark-sql-job",
-                    request.getTaskType(), "fmdb://result/spark-sql-job",
-                    "config-v1", 1000L);
-        }
     }
 }

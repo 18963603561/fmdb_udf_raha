@@ -80,8 +80,10 @@ public final class RahaDetectService {
             throw new IllegalArgumentException("检测服务请求不能为空");
         }
         long startedAt = clock.millis();
-        LOGGER.info("开始 Raha 已发布模型检测，jobId={}，datasetId={}，columnCount={}",
+        LOGGER.info("开始 Raha 指定版本模型检测，jobId={}，datasetId={}，"
+                        + "modelVersion={}，columnCount={}",
                 request.getJobId(), request.getDataset().getDatasetId(),
+                request.getModelVersion(),
                 request.getFeatures().getDictionaries().size());
         List<DetectionResult> results = new ArrayList<DetectionResult>();
         Map<String, String> modelVersions = new LinkedHashMap<String, String>();
@@ -163,6 +165,7 @@ public final class RahaDetectService {
                                              FeatureDictionary dictionary) {
         ColumnModelArtifact model = modelLoader.load(
                 request.getDataset().getDatasetId(), columnName,
+                request.getModelVersion(),
                 request.getDataset().getSchemaHash(), dictionary.getVersion(),
                 request.getStrategyPlanVersion());
         List<SparseFeatureRow> rows = request.getFeatures().getRowsByColumn(columnName);

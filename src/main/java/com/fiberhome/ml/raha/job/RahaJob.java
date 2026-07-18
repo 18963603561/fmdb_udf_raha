@@ -5,9 +5,7 @@ import com.fiberhome.ml.raha.data.JobType;
 import com.fiberhome.ml.raha.util.ValueUtils;
 
 /**
- * 保存 Raha 任务的生命周期状态和失败上下文。
- *
- * <p>状态修改方法使用同步控制，后续任务编排层仍需结合仓储版本实现跨进程并发保护。</p>
+ * 保存单个 Raha 异步任务的生命周期状态和失败上下文。
  */
 public final class RahaJob {
 
@@ -27,8 +25,6 @@ public final class RahaJob {
     private final long createdAt;
     /** 当前任务状态。 */
     private JobStatus status;
-    /** 当前正在执行或最后执行的阶段标识。 */
-    private String currentStageId;
     /** 任务实际开始时间。 */
     private long startedAt;
     /** 任务结束时间。 */
@@ -62,31 +58,16 @@ public final class RahaJob {
     }
 
     /**
-     * 启动任务并绑定第一个阶段。
+     * 启动任务。
      *
-     * @param stageId 首个阶段标识
      * @param startTime 开始时间
      */
-    public synchronized void start(String stageId, long startTime) {
+    public synchronized void start(long startTime) {
         if (startTime < createdAt) {
             throw new IllegalArgumentException("任务开始时间不能早于创建时间");
         }
-        String validatedStageId = ValueUtils.requireNotBlank(stageId, "阶段标识");
         transitionTo(JobStatus.RUNNING);
-        this.currentStageId = validatedStageId;
         this.startedAt = startTime;
-    }
-
-    /**
-     * 将运行中任务切换到下一个阶段。
-     *
-     * @param stageId 新阶段标识
-     */
-    public synchronized void moveToStage(String stageId) {
-        if (status != JobStatus.RUNNING) {
-            throw new IllegalStateException("只有运行中任务可以切换阶段");
-        }
-        this.currentStageId = ValueUtils.requireNotBlank(stageId, "阶段标识");
     }
 
     /**
@@ -175,7 +156,6 @@ public final class RahaJob {
         RahaJob copy = new RahaJob(jobId, idempotentKey, jobType, datasetId,
                 snapshotId, configVersion, createdAt);
         copy.status = status;
-        copy.currentStageId = currentStageId;
         copy.startedAt = startedAt;
         copy.finishedAt = finishedAt;
         copy.errorCode = errorCode;
@@ -213,10 +193,6 @@ public final class RahaJob {
 
     public synchronized JobStatus getStatus() {
         return status;
-    }
-
-    public synchronized String getCurrentStageId() {
-        return currentStageId;
     }
 
     public synchronized long getStartedAt() {

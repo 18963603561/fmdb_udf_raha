@@ -38,7 +38,6 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
                     field("snapshot_id", DataTypes.StringType, true),
                     field("config_version", DataTypes.StringType, false),
                     field("status", DataTypes.StringType, false),
-                    field("current_stage_id", DataTypes.StringType, false),
                     field("created_at", DataTypes.LongType, false),
                     field("started_at", DataTypes.LongType, false),
                     field("finished_at", DataTypes.LongType, false),
@@ -97,13 +96,12 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
         Row row = RowFactory.create(job.getJobId(), job.getIdempotentKey(),
                 job.getJobType().name(), job.getDatasetId(), job.getSnapshotId(),
                 job.getConfigVersion(), job.getStatus().name(),
-                job.getCurrentStageId() == null ? "JOB_ROOT" : job.getCurrentStageId(),
                 job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt(),
                 job.getErrorCode(), job.getErrorMessage(), positiveNow());
         Dataset<Row> frame = sparkSession.createDataFrame(
                 Collections.singletonList(row), JOB_SCHEMA);
         return tableGateway.appendIdempotent(tableName, frame,
-                Arrays.asList("job_id", "status", "current_stage_id"));
+                Arrays.asList("job_id", "status"));
     }
 
     @Override

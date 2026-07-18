@@ -208,7 +208,8 @@ class Iteration7RahaLearningPipelineIntegrationTest {
                         new ColumnModelCompatibilityValidator()),
                 new ColumnModelPredictor(), detectionRepository, clock);
         RahaDetectRequest beforePublishRequest = detectRequest(
-                "detect-before-publish", dirty, trained.getPayload(), version("detect-before"));
+                "detect-before-publish", candidate.getModelVersion(), dirty,
+                trained.getPayload(), version("detect-before"));
         RahaTaskResult<RahaDetectOutput> beforePublish =
                 detectService.detect(beforePublishRequest);
         assertEquals(RahaTaskStatus.FAILED, beforePublish.getStatus());
@@ -234,7 +235,8 @@ class Iteration7RahaLearningPipelineIntegrationTest {
                 version("publish-stage"));
 
         RahaTaskResult<RahaDetectOutput> detected = detectService.detect(detectRequest(
-                "detect-job", dirty, trained.getPayload(), version("detect-stage")));
+                "detect-job", candidate.getModelVersion(), dirty,
+                trained.getPayload(), version("detect-stage")));
         assertEquals(RahaTaskStatus.SUCCEEDED, detected.getStatus());
         assertNotNull(detected.getResultLocation());
         assertEquals(1L, detected.getSummary().getSuccessfulCount());
@@ -251,11 +253,13 @@ class Iteration7RahaLearningPipelineIntegrationTest {
     }
 
     private RahaDetectRequest detectRequest(String jobId,
+                                            String modelVersion,
                                             RahaDataset dataset,
                                             RahaTrainOutput output,
                                             ArtifactVersion version) {
-        return new RahaDetectRequest(jobId, "detect-stage", "config-v1", dataset,
-                output.getFeatures(), output.getStrategyPlanVersion(), version);
+        return new RahaDetectRequest(jobId, "detect-stage", "config-v1",
+                modelVersion, dataset, output.getFeatures(),
+                output.getStrategyPlanVersion(), version);
     }
 
     private static RahaJobConfig trainingConfig() {

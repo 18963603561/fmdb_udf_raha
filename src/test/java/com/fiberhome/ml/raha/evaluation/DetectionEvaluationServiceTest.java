@@ -100,7 +100,8 @@ class DetectionEvaluationServiceTest {
                 "dataset", "code", modelVersion, version("publish"));
         ColumnModelArtifact published = new PublishedColumnModelLoader(repository,
                 store, new ColumnModelCompatibilityValidator()).load(
-                "dataset", "code", "schema-v1", "dictionary-v1", "plan-v1");
+                "dataset", "code", modelVersion, "schema-v1",
+                "dictionary-v1", "plan-v1");
         assertEquals(0.5d, published.getThreshold(), 0.000001d);
         assertThrows(IllegalStateException.class,
                 () -> result.getUpdatedModel().withStatus(ModelStatus.PUBLISHED)

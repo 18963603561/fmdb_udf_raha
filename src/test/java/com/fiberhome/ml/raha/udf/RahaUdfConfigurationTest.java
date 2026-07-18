@@ -1,6 +1,5 @@
 package com.fiberhome.ml.raha.udf;
 
-import com.fiberhome.ml.raha.service.RahaTaskType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,7 +14,7 @@ class RahaUdfConfigurationTest {
     void shouldApplyFixedRequestLengthAndFunctionNames() {
         RahaUdfException exception = assertThrows(RahaUdfException.class,
                 () -> new RahaUdfRequestParser(10)
-                        .parse(RahaTaskType.DETECT, "12345678901"));
+                        .parseDetect("12345678901"));
 
         assertEquals("INVALID_UDF_ARGUMENT", exception.getErrorCode());
         assertEquals("F_DW_RAHATRAIN", RahaUdfRegistrar.TRAIN_FUNCTION);

@@ -71,12 +71,14 @@ class ModelLifecycleIntegrationTest {
         ModelReleaseManager firstManager = releaseManager(repository, 3000L);
         firstManager.markCandidate(first, version("candidate-first"));
         assertThrows(IllegalStateException.class,
-                () -> loader.load("dataset", "code", "schema-v1",
+                () -> loader.load("dataset", "code", first.getModelVersion(),
+                        "schema-v1",
                         "dictionary-v1", "plan-v1"));
         firstManager.publish("dataset", "code", first.getModelVersion(),
                 version("publish-first"));
         assertEquals(first.getModelVersion(), loader.load("dataset", "code",
-                "schema-v1", "dictionary-v1", "plan-v1").getModelVersion());
+                first.getModelVersion(), "schema-v1", "dictionary-v1",
+                "plan-v1").getModelVersion());
 
         ModelReleaseManager secondManager = releaseManager(repository, 4000L);
         secondManager.markCandidate(neverPublished, version("candidate-never"));
@@ -93,13 +95,16 @@ class ModelLifecycleIntegrationTest {
         assertEquals("plan-v1", storedSecond.getStrategyPlanVersion());
         assertEquals(ModelStatus.PUBLISHED, storedSecond.getStatus());
         assertThrows(IllegalStateException.class,
-                () -> loader.load("dataset", "code", "schema-v2",
+                () -> loader.load("dataset", "code", second.getModelVersion(),
+                        "schema-v2",
                         "dictionary-v1", "plan-v1"));
         assertThrows(IllegalStateException.class,
-                () -> loader.load("dataset", "code", "schema-v1",
+                () -> loader.load("dataset", "code", second.getModelVersion(),
+                        "schema-v1",
                         "dictionary-v2", "plan-v1"));
         assertThrows(IllegalStateException.class,
-                () -> loader.load("dataset", "code", "schema-v1",
+                () -> loader.load("dataset", "code", second.getModelVersion(),
+                        "schema-v1",
                         "dictionary-v1", "plan-v2"));
 
         RahaColumnModel restored = releaseManager(repository, 5000L).rollback(
@@ -109,7 +114,8 @@ class ModelLifecycleIntegrationTest {
         assertEquals(ModelStatus.PUBLISHED, repository.findPublished(
                 "dataset", "code").get().getStatus());
         assertEquals(first.getModelVersion(), loader.load("dataset", "code",
-                "schema-v1", "dictionary-v1", "plan-v1").getModelVersion());
+                first.getModelVersion(), "schema-v1", "dictionary-v1",
+                "plan-v1").getModelVersion());
         RahaColumnModel storedNever = repository.find(
                 "dataset", "code", neverPublished.getModelVersion()).get();
         assertEquals(ModelStatus.DISABLED, storedNever.getStatus());

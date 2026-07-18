@@ -185,7 +185,8 @@ class Iteration9FmdbPipelineIntegrationTest {
                 new ColumnModelPredictor(), detectionRepository, clock);
         RahaTaskResult<RahaDetectOutput> detected = detectService.detect(
                 new RahaDetectRequest("fmdb-detect", "detect-stage", "config-v1",
-                        dataset, trained.getPayload().getFeatures(),
+                        candidate.getModelVersion(), dataset,
+                        trained.getPayload().getFeatures(),
                         trained.getPayload().getStrategyPlanVersion(),
                         version("detect-stage"), ResourceConfig.defaults()));
 

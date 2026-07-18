@@ -12,8 +12,8 @@ public final class DefaultJobRepository implements JobRepository {
 
     /** 快照尚未生成时使用的占位版本。 */
     private static final String PENDING_SNAPSHOT = "PENDING_SNAPSHOT";
-    /** 任务尚未进入阶段时使用的占位阶段。 */
-    private static final String JOB_ROOT_STAGE = "JOB_ROOT";
+    /** 作业记录使用的固定产物作用域。 */
+    private static final String JOB_ARTIFACT_SCOPE = "JOB";
     /** 统一仓储。 */
     private final RahaRepository repository;
 
@@ -30,10 +30,9 @@ public final class DefaultJobRepository implements JobRepository {
             throw new IllegalArgumentException("任务不能为空");
         }
         String snapshotId = isBlank(job.getSnapshotId()) ? PENDING_SNAPSHOT : job.getSnapshotId();
-        String stageId = isBlank(job.getCurrentStageId()) ? JOB_ROOT_STAGE : job.getCurrentStageId();
         RepositoryKey key = key(job.getDatasetId(), job.getIdempotentKey());
         ArtifactVersion version = new ArtifactVersion(
-                job.getConfigVersion(), snapshotId, stageId, 0);
+                job.getConfigVersion(), snapshotId, JOB_ARTIFACT_SCOPE, 0);
         return repository.save(new RepositoryRecord<RahaJob>(
                 key, version, job.snapshot(), updatedAt));
     }
@@ -58,4 +57,3 @@ public final class DefaultJobRepository implements JobRepository {
         return value == null || value.trim().isEmpty();
     }
 }
-

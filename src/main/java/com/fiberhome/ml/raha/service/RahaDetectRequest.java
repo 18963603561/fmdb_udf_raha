@@ -17,6 +17,8 @@ public final class RahaDetectRequest {
     private final String stageId;
     /** 当前完整配置版本。 */
     private final String configVersion;
+    /** 精确模型版本或按字段选择当前发布模型的固定选择器。 */
+    private final String modelVersion;
     /** 当前只读数据集及模式哈希。 */
     private final RahaDataset dataset;
     /** 当前数据的列级特征和字典。 */
@@ -31,17 +33,19 @@ public final class RahaDetectRequest {
     public RahaDetectRequest(String jobId,
                              String stageId,
                              String configVersion,
+                             String modelVersion,
                              RahaDataset dataset,
                              FeatureAssemblyResult features,
                              String strategyPlanVersion,
                              ArtifactVersion artifactVersion) {
-        this(jobId, stageId, configVersion, dataset, features,
+        this(jobId, stageId, configVersion, modelVersion, dataset, features,
                 strategyPlanVersion, artifactVersion, ResourceConfig.defaults());
     }
 
     public RahaDetectRequest(String jobId,
                              String stageId,
                              String configVersion,
+                             String modelVersion,
                              RahaDataset dataset,
                              FeatureAssemblyResult features,
                              String strategyPlanVersion,
@@ -50,6 +54,7 @@ public final class RahaDetectRequest {
         this.jobId = ValueUtils.requireNotBlank(jobId, "检测任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "检测阶段标识");
         this.configVersion = ValueUtils.requireNotBlank(configVersion, "检测配置版本");
+        this.modelVersion = ValueUtils.requireNotBlank(modelVersion, "检测模型版本");
         this.strategyPlanVersion = ValueUtils.requireNotBlank(
                 strategyPlanVersion, "检测策略计划版本");
         if (dataset == null || dataset.getDataFrame() == null
@@ -66,6 +71,7 @@ public final class RahaDetectRequest {
     public String getJobId() { return jobId; }
     public String getStageId() { return stageId; }
     public String getConfigVersion() { return configVersion; }
+    public String getModelVersion() { return modelVersion; }
     public RahaDataset getDataset() { return dataset; }
     public FeatureAssemblyResult getFeatures() { return features; }
     public String getStrategyPlanVersion() { return strategyPlanVersion; }
