@@ -14,10 +14,10 @@ import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
 import com.fiberhome.ml.raha.parallel.ParallelFailure;
 import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
 import com.fiberhome.ml.raha.repository.port.DetectionResultRepository;
-import com.fiberhome.ml.raha.service.common.RahaTaskResult;
-import com.fiberhome.ml.raha.service.common.RahaTaskStatus;
-import com.fiberhome.ml.raha.service.common.RahaTaskSummary;
-import com.fiberhome.ml.raha.service.common.RahaTaskType;
+import com.fiberhome.ml.raha.service.common.RahaServiceResult;
+import com.fiberhome.ml.raha.data.type.JobStatus;
+import com.fiberhome.ml.raha.service.common.RahaServiceSummary;
+import com.fiberhome.ml.raha.data.type.JobType;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -79,7 +79,7 @@ public final class RahaDetectService {
      * @param request 检测服务输入
      * @return 统一检测任务结果
      */
-    public RahaTaskResult<RahaDetectOutput> detect(RahaDetectRequest request) {
+    public RahaServiceResult<RahaDetectOutput> detect(RahaDetectRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("检测服务请求不能为空");
         }
@@ -120,19 +120,19 @@ public final class RahaDetectService {
             }
             RahaDetectOutput output = new RahaDetectOutput(
                     results, modelVersions, failedColumns);
-            RahaTaskStatus status;
+            JobStatus status;
             String errorCode = null;
             String errorMessage = null;
             if (modelVersions.isEmpty()) {
-                status = RahaTaskStatus.FAILED;
+                status = JobStatus.FAILED;
                 errorCode = "NO_PUBLISHED_MODEL_RESULT";
                 errorMessage = "没有字段完成已发布模型检测";
             } else if (!failedColumns.isEmpty()) {
-                status = RahaTaskStatus.PARTIAL_SUCCESS;
+                status = JobStatus.PARTIAL_SUCCESS;
                 errorCode = "PARTIAL_DETECTION_FAILURE";
                 errorMessage = "部分字段没有可用的兼容已发布模型";
             } else {
-                status = RahaTaskStatus.SUCCEEDED;
+                status = JobStatus.SUCCEEDED;
             }
             Map<String, String> details = new LinkedHashMap<String, String>();
             details.put("detectedCellCount", String.valueOf(results.size()));
@@ -140,24 +140,24 @@ public final class RahaDetectService {
             details.put("scoreDiagnostics", scoreDiagnostics(results));
             details.put("maxObservedColumnConcurrency",
                     String.valueOf(parallel.getMaxObservedConcurrency()));
-            RahaTaskSummary summary = new RahaTaskSummary(startedAt, clock.millis(),
+            RahaServiceSummary summary = new RahaServiceSummary(startedAt, clock.millis(),
                     request.getFeatures().getDictionaries().size(), modelVersions.size(),
                     0L, failedColumns.size(), details);
             LOGGER.info("Raha 已发布模型检测完成，jobId={}，status={}，"
                             + "detectedCellCount={}，failedColumnCount={}",
                     request.getJobId(), status, results.size(), failedColumns.size());
-            return new RahaTaskResult<RahaDetectOutput>(request.getJobId(),
-                    RahaTaskType.DETECT, status,
+            return new RahaServiceResult<RahaDetectOutput>(request.getJobId(),
+                    JobType.DETECTION, status,
                     "repository://detection-result/" + request.getJobId(), summary,
                     output, errorCode, errorMessage);
         } catch (RuntimeException exception) {
             // 检测结果事务保存等任务级异常必须转换为统一失败结果。
             LOGGER.error("Raha 已发布模型检测失败，jobId={}，datasetId={}",
                     request.getJobId(), request.getDataset().getDatasetId(), exception);
-            RahaTaskSummary summary = new RahaTaskSummary(startedAt, clock.millis(),
+            RahaServiceSummary summary = new RahaServiceSummary(startedAt, clock.millis(),
                     1L, 0L, 0L, 1L, Collections.<String, String>emptyMap());
-            return new RahaTaskResult<RahaDetectOutput>(request.getJobId(),
-                    RahaTaskType.DETECT, RahaTaskStatus.FAILED, null, summary, null,
+            return new RahaServiceResult<RahaDetectOutput>(request.getJobId(),
+                    JobType.DETECTION, JobStatus.FAILED, null, summary, null,
                     "DETECT_SERVICE_FAILED", exception.getClass().getSimpleName());
         }
     }

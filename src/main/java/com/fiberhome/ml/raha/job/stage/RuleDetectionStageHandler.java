@@ -9,16 +9,16 @@ import com.fiberhome.ml.raha.strategy.domain.StrategyHit;
 import java.util.List;
 
 /**
- * 使用规则加权模型生成最终检测判断并持久化。
+ * 使用规则加权评分生成检测结果，不加载已发布列级模型。
  */
-public final class DetectionStageHandler implements StageHandler {
+public final class RuleDetectionStageHandler implements StageHandler {
 
-    /** 基础检测服务。 */
+    /** 基础规则检测服务。 */
     private final BasicDetectionService detectionService;
 
-    public DetectionStageHandler(BasicDetectionService detectionService) {
+    public RuleDetectionStageHandler(BasicDetectionService detectionService) {
         if (detectionService == null) {
-            throw new IllegalArgumentException("基础检测服务不能为空");
+            throw new IllegalArgumentException("基础规则检测服务不能为空");
         }
         this.detectionService = detectionService;
     }
@@ -31,11 +31,12 @@ public final class DetectionStageHandler implements StageHandler {
     @Override
     @SuppressWarnings("unchecked")
     public StageResult execute(StageExecutionContext context) {
-        Object featureValue = context.getAttributes().get(StageAttributeKeys.FEATURE_ASSEMBLY_RESULT);
+        Object featureValue = context.getAttributes().get(
+                StageAttributeKeys.FEATURE_ASSEMBLY_RESULT);
         Object hitValue = context.getAttributes().get(StageAttributeKeys.STRATEGY_HITS);
         if (!(featureValue instanceof FeatureAssemblyResult) || !(hitValue instanceof List)) {
             return StageResult.failure("DETECTION_INPUT_REQUIRED",
-                    "检测阶段缺少特征或策略命中", false, 0L, 0L);
+                    "规则检测阶段缺少特征或策略命中", false, 0L, 0L);
         }
         FeatureAssemblyResult features = (FeatureAssemblyResult) featureValue;
         ArtifactVersion version = new ArtifactVersion(

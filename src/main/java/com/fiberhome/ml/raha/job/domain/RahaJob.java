@@ -119,6 +119,17 @@ public final class RahaJob {
     }
 
     /**
+     * 将运行中任务标记为部分成功。
+     *
+     * @param finishTime 结束时间
+     */
+    public synchronized void partialSucceed(long finishTime) {
+        validateFinishTime(finishTime);
+        transitionTo(JobStatus.PARTIAL_SUCCESS);
+        finish(finishTime, null, null);
+    }
+
+    /**
      * 将已创建或运行中任务标记为失败。
      *
      * @param code 失败编码

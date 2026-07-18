@@ -105,7 +105,8 @@ class RahaJobOrchestratorTest {
                         "PARTIAL_FAILURE", "部分策略失败", true, 1L, 10L)),
                 nextStage));
 
-        assertEquals(JobStatus.SUCCEEDED, result.getJob().getStatus());
+        assertEquals(JobStatus.PARTIAL_SUCCESS, result.getJob().getStatus());
+        assertEquals(StageStatus.FAILED, result.getStages().get(0).getStatus());
         assertSame(Boolean.TRUE, result.getAttributes().get("continued"));
     }
 

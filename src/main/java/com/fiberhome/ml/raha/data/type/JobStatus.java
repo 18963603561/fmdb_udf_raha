@@ -10,6 +10,8 @@ public enum JobStatus {
     RUNNING,
     /** 任务已经成功完成。 */
     SUCCEEDED,
+    /** 任务产生可用结果，但存在可容忍的阶段或数据项失败。 */
+    PARTIAL_SUCCESS,
     /** 任务执行失败。 */
     FAILED,
     /** 任务被调用方取消。 */
@@ -31,7 +33,8 @@ public enum JobStatus {
         }
         // 运行中任务只能进入三种终态，终态之间禁止相互转换。
         if (this == RUNNING) {
-            return target == SUCCEEDED || target == FAILED || target == CANCELLED;
+            return target == SUCCEEDED || target == PARTIAL_SUCCESS
+                    || target == FAILED || target == CANCELLED;
         }
         return false;
     }

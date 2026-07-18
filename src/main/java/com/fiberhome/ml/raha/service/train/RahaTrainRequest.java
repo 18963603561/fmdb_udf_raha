@@ -6,6 +6,7 @@ import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
+import com.fiberhome.ml.raha.label.propagation.LabelPropagationResult;
 import com.fiberhome.ml.raha.model.training.LogisticRegressionTrainingConfig;
 import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationResult;
@@ -41,6 +42,8 @@ public final class RahaTrainRequest {
     private final ArtifactVersion artifactVersion;
     /** SAMPLE 阶段已经生成的可复用策略和特征产物。 */
     private final RahaFeaturePreparationResult preparedFeatures;
+    /** PROPAGATE 阶段已经生成的可复用标签传播结果。 */
+    private final LabelPropagationResult preparedPropagation;
 
     public RahaTrainRequest(String jobId,
                             String stageId,
@@ -54,7 +57,7 @@ public final class RahaTrainRequest {
                             ArtifactVersion artifactVersion) {
         this(jobId, stageId, dataset, config, directLabels, propagationMethod,
                 propagationConfig, trainingConfig, modelNamePrefix,
-                artifactVersion, null);
+                artifactVersion, null, null);
     }
 
     public RahaTrainRequest(String jobId,
@@ -68,6 +71,23 @@ public final class RahaTrainRequest {
                             String modelNamePrefix,
                             ArtifactVersion artifactVersion,
                             RahaFeaturePreparationResult preparedFeatures) {
+        this(jobId, stageId, dataset, config, directLabels, propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix,
+                artifactVersion, preparedFeatures, null);
+    }
+
+    public RahaTrainRequest(String jobId,
+                            String stageId,
+                            RahaDataset dataset,
+                            RahaJobConfig config,
+                            List<CellLabel> directLabels,
+                            LabelPropagationMethod propagationMethod,
+                            LabelPropagationConfig propagationConfig,
+                            LogisticRegressionTrainingConfig trainingConfig,
+                            String modelNamePrefix,
+                            ArtifactVersion artifactVersion,
+                            RahaFeaturePreparationResult preparedFeatures,
+                            LabelPropagationResult preparedPropagation) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "训练任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "训练阶段标识");
         this.modelNamePrefix = ValueUtils.requireNotBlank(modelNamePrefix, "模型名称前缀");
@@ -99,6 +119,12 @@ public final class RahaTrainRequest {
             throw new IllegalArgumentException("复用特征产物与训练数据集快照不一致");
         }
         this.preparedFeatures = preparedFeatures;
+        if (preparedPropagation != null
+                && preparedPropagation.getMetrics().getDirectLabelCount()
+                != this.directLabels.size()) {
+            throw new IllegalArgumentException("复用传播结果与训练直接标签数量不一致");
+        }
+        this.preparedPropagation = preparedPropagation;
     }
 
     public String getJobId() { return jobId; }
@@ -112,4 +138,5 @@ public final class RahaTrainRequest {
     public String getModelNamePrefix() { return modelNamePrefix; }
     public ArtifactVersion getArtifactVersion() { return artifactVersion; }
     public RahaFeaturePreparationResult getPreparedFeatures() { return preparedFeatures; }
+    public LabelPropagationResult getPreparedPropagation() { return preparedPropagation; }
 }

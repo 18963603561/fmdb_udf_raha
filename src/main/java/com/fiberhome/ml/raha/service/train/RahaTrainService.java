@@ -25,10 +25,10 @@ import com.fiberhome.ml.raha.parallel.BoundedParallelExecutor;
 import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
 import com.fiberhome.ml.raha.parallel.ParallelFailure;
 import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
-import com.fiberhome.ml.raha.service.common.RahaTaskResult;
-import com.fiberhome.ml.raha.service.common.RahaTaskStatus;
-import com.fiberhome.ml.raha.service.common.RahaTaskSummary;
-import com.fiberhome.ml.raha.service.common.RahaTaskType;
+import com.fiberhome.ml.raha.service.common.RahaServiceResult;
+import com.fiberhome.ml.raha.data.type.JobStatus;
+import com.fiberhome.ml.raha.service.common.RahaServiceSummary;
+import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationRequest;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationResult;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationService;
@@ -139,7 +139,7 @@ public final class RahaTrainService {
      * @param request 训练服务输入
      * @return 包含状态、位置、摘要和候选模型的统一结果
      */
-    public RahaTaskResult<RahaTrainOutput> train(RahaTrainRequest request) {
+    public RahaServiceResult<RahaTrainOutput> train(RahaTrainRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("训练服务请求不能为空");
         }
@@ -185,10 +185,19 @@ public final class RahaTrainService {
                 LOGGER.info("训练服务复用已准备聚类，jobId={}，assignmentCount={}",
                         request.getJobId(), clustering.getMetrics().getAssignmentCount());
             }
-            LabelPropagationResult propagation = propagationService.propagateAndSave(
-                    request.getJobId(), assignments(clustering), request.getDirectLabels(),
-                    request.getPropagationMethod(), request.getPropagationConfig(),
-                    request.getArtifactVersion());
+            LabelPropagationResult propagation = request.getPreparedPropagation();
+            if (propagation == null) {
+                propagation = propagationService.propagateAndSave(
+                        request.getJobId(), assignments(clustering), request.getDirectLabels(),
+                        request.getPropagationMethod(), request.getPropagationConfig(),
+                        request.getArtifactVersion());
+            } else {
+                LOGGER.info("训练服务复用标签传播结果，jobId={}，directLabelCount={}，"
+                                + "propagatedLabelCount={}",
+                        request.getJobId(), propagation.getMetrics().getDirectLabelCount(),
+                        propagation.getMetrics().getPropagatedLabelCount());
+            }
+            final LabelPropagationResult trainingPropagation = propagation;
             String planVersion = preparation.getStrategyPlanVersion();
             Map<String, ColumnModelTrainingResult> trainingResults =
                     new LinkedHashMap<String, ColumnModelTrainingResult>();
@@ -202,7 +211,7 @@ public final class RahaTrainService {
                     : features.getDictionaries().entrySet()) {
                 trainingItems.add(new ParallelWorkItem<String, ColumnTrainingOutcome>(
                         entry.getKey(), () -> trainColumn(request, features,
-                        propagation, planVersion, entry.getKey(), entry.getValue())));
+                        trainingPropagation, planVersion, entry.getKey(), entry.getValue())));
             }
             ParallelBatchResult<String, ColumnTrainingOutcome> parallelTraining =
                     parallelExecutor.execute(trainingItems,
@@ -234,38 +243,38 @@ public final class RahaTrainService {
             Map<String, String> details = details(plans, strategyBatch, features,
                     propagation, candidates, planVersion,
                     parallelTraining.getMaxObservedConcurrency());
-            RahaTaskSummary summary = new RahaTaskSummary(startedAt, completedAt,
+            RahaServiceSummary summary = new RahaServiceSummary(startedAt, completedAt,
                     features.getDictionaries().size(), candidates.size(), skippedCount,
                     failedCount, details);
-            RahaTaskStatus status;
+            JobStatus status;
             String errorCode = null;
             String errorMessage = null;
             if (candidates.isEmpty()) {
-                status = RahaTaskStatus.FAILED;
+                status = JobStatus.FAILED;
                 errorCode = "NO_CANDIDATE_MODEL";
                 errorMessage = "训练完成但没有字段产出候选模型";
             } else if (failedCount > 0L || strategyBatch.getFailedCount() > 0L) {
-                status = RahaTaskStatus.PARTIAL_SUCCESS;
+                status = JobStatus.PARTIAL_SUCCESS;
                 errorCode = "PARTIAL_TRAINING_FAILURE";
                 errorMessage = "部分策略或字段训练失败";
             } else {
-                status = RahaTaskStatus.SUCCEEDED;
+                status = JobStatus.SUCCEEDED;
             }
             LOGGER.info("Raha 训练服务完成，jobId={}，status={}，candidateCount={}，"
                             + "skippedCount={}，failedCount={}",
                     request.getJobId(), status, candidates.size(), skippedCount, failedCount);
-            return new RahaTaskResult<RahaTrainOutput>(request.getJobId(),
-                    RahaTaskType.TRAIN, status,
+            return new RahaServiceResult<RahaTrainOutput>(request.getJobId(),
+                    JobType.TRAINING, status,
                     "repository://column-model/" + request.getDataset().getDatasetId(),
                     summary, output, errorCode, errorMessage);
         } catch (RuntimeException | LinkageError exception) {
             // 核心训练编排异常必须转换为统一失败结果，并保留任务上下文和堆栈。
             LOGGER.error("Raha 训练服务失败，jobId={}，datasetId={}",
                     request.getJobId(), request.getDataset().getDatasetId(), exception);
-            RahaTaskSummary summary = new RahaTaskSummary(startedAt, clock.millis(),
+            RahaServiceSummary summary = new RahaServiceSummary(startedAt, clock.millis(),
                     1L, 0L, 0L, 1L, Collections.<String, String>emptyMap());
-            return new RahaTaskResult<RahaTrainOutput>(request.getJobId(),
-                    RahaTaskType.TRAIN, RahaTaskStatus.FAILED, null, summary, null,
+            return new RahaServiceResult<RahaTrainOutput>(request.getJobId(),
+                    JobType.TRAINING, JobStatus.FAILED, null, summary, null,
                     "TRAIN_SERVICE_FAILED", exception.getClass().getSimpleName());
         } finally {
             if (ownsInputCache) {

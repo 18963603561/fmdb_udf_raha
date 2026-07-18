@@ -61,8 +61,8 @@ import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.repository.port.DetectionResultRepository;
 import com.fiberhome.ml.raha.repository.port.ModelMetadataRepository;
 import com.fiberhome.ml.raha.repository.port.StrategyRepository;
-import com.fiberhome.ml.raha.service.common.RahaTaskResult;
-import com.fiberhome.ml.raha.service.common.RahaTaskStatus;
+import com.fiberhome.ml.raha.service.common.RahaServiceResult;
+import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.detect.RahaDetectOutput;
 import com.fiberhome.ml.raha.service.detect.RahaDetectRequest;
 import com.fiberhome.ml.raha.service.detect.RahaDetectService;
@@ -151,7 +151,7 @@ class Iteration9FmdbPipelineIntegrationTest {
                 modelStore, new ColumnModelMetadataFactory(clock),
                 releaseManager, clock);
 
-        RahaTaskResult<RahaTrainOutput> trained = trainService.train(
+        RahaServiceResult<RahaTrainOutput> trained = trainService.train(
                 new RahaTrainRequest("fmdb-train", "train-stage", dataset,
                         trainingConfig(), directLabels(),
                         LabelPropagationMethod.HOMOGENEITY,
@@ -159,7 +159,7 @@ class Iteration9FmdbPipelineIntegrationTest {
                         LogisticRegressionTrainingConfig.defaults(), "raha",
                         version("train-stage")));
 
-        assertEquals(RahaTaskStatus.SUCCEEDED, trained.getStatus());
+        assertEquals(JobStatus.SUCCEEDED, trained.getStatus());
         assertEquals(1, trained.getPayload().getCandidateModels().size());
         for (FeatureDictionary dictionary
                 : trained.getPayload().getFeatures().getDictionaries().values()) {
@@ -182,13 +182,13 @@ class Iteration9FmdbPipelineIntegrationTest {
                 new PublishedColumnModelLoader(metadataRepository, restartedStore,
                         new ColumnModelCompatibilityValidator()),
                 new ColumnModelPredictor(), detectionRepository, clock);
-        RahaTaskResult<RahaDetectOutput> detected = detectService.detect(
+        RahaServiceResult<RahaDetectOutput> detected = detectService.detect(
                 new RahaDetectRequest("fmdb-detect", "detect-stage", "config-v1",
                         dataset, trained.getPayload().getFeatures(),
                         trained.getPayload().getStrategyPlanVersion(),
                         version("detect-stage"), ResourceConfig.defaults()));
 
-        assertEquals(RahaTaskStatus.SUCCEEDED, detected.getStatus());
+        assertEquals(JobStatus.SUCCEEDED, detected.getStatus());
         assertEquals(8, detected.getPayload().getResults().size());
         SparkSqlFmdbResultWriter resultWriter = new SparkSqlFmdbResultWriter(
                 spark, fmdbGateway, clock);

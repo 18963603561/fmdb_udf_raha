@@ -44,7 +44,7 @@ import com.fiberhome.ml.raha.job.id.IdempotencyKeyGenerator;
 import com.fiberhome.ml.raha.job.stage.ClusterStageHandler;
 import com.fiberhome.ml.raha.job.stage.ColumnProfileStageHandler;
 import com.fiberhome.ml.raha.job.stage.DataLoadStageHandler;
-import com.fiberhome.ml.raha.job.stage.DetectionStageHandler;
+import com.fiberhome.ml.raha.job.stage.RuleDetectionStageHandler;
 import com.fiberhome.ml.raha.job.stage.FeatureStageHandler;
 import com.fiberhome.ml.raha.job.stage.GroundTruthLabelStageHandler;
 import com.fiberhome.ml.raha.job.stage.SamplingStageHandler;
@@ -166,7 +166,7 @@ class Iteration5PipelineIntegrationTest {
                 new StrategyPlanStageHandler(planService),
                 new StrategyRunStageHandler(executionService),
                 new FeatureStageHandler(featureService),
-                new DetectionStageHandler(detectionService),
+                new RuleDetectionStageHandler(detectionService),
                 new ClusterStageHandler(clusteringService),
                 new SamplingStageHandler(samplingService, 1),
                 new GroundTruthLabelStageHandler(

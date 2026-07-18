@@ -5,6 +5,7 @@ import com.fiberhome.ml.raha.data.type.StageType;
 import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlan;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlanService;
+import com.fiberhome.ml.raha.strategy.plan.StrategyPlanVersioner;
 import java.util.List;
 
 /**
@@ -41,6 +42,8 @@ public final class StrategyPlanStageHandler implements StageHandler {
         List<StrategyPlan> plans = planService.generateAndSave(dataset,
                 context.getConfig().getStrategyConfig(), version);
         context.getAttributes().put(StageAttributeKeys.STRATEGY_PLANS, plans);
+        context.getAttributes().put(StageAttributeKeys.STRATEGY_PLAN_VERSION,
+                StrategyPlanVersioner.versionOf(plans));
         return plans.isEmpty() ? StageResult.skipped("当前画像没有适用的 OD 或 PVD 策略")
                 : StageResult.success();
     }

@@ -129,6 +129,7 @@ public final class RahaJobOrchestrator {
         List<RahaStage> stages = new ArrayList<RahaStage>();
         Map<String, Object> attributes = new LinkedHashMap<String, Object>();
         boolean firstStage = true;
+        boolean partialSuccess = false;
         Set<StageType> stageTypes = new HashSet<StageType>();
         for (StageHandler handler : handlers) {
             if (handler == null || handler.getStageType() == null) {
@@ -188,6 +189,19 @@ public final class RahaJobOrchestrator {
                             result.getTotalItemCount(), result.getFailedItemCount());
                     break;
                 }
+                if (result.getOutcome() == StageOutcome.PARTIAL_SUCCESS) {
+                    stage.partialSucceed(clock.millis());
+                    saveStage(stage, job);
+                    stages.add(stage.snapshot());
+                    partialSuccess = true;
+                    jobRepository.save(job, clock.millis());
+                    LOGGER.warn("Raha 阶段部分成功，context={}，stageType={}，errorCode={}，"
+                                    + "elapsedMillis={}，totalItemCount={}，failedItemCount={}",
+                            logContext.toLogText(), handler.getStageType(), result.getErrorCode(),
+                            stage.getFinishedAt() - stage.getStartedAt(),
+                            result.getTotalItemCount(), result.getFailedItemCount());
+                    break;
+                }
                 if (result.getOutcome() == StageOutcome.SKIPPED) {
                     stage.skip(clock.millis());
                     saveStage(stage, job);
@@ -215,6 +229,7 @@ public final class RahaJobOrchestrator {
                     continue;
                 }
                 if (decision == FailureDecision.CONTINUE) {
+                    partialSuccess = true;
                     LOGGER.warn("阶段存在可容忍失败，继续后续阶段，jobId={}，stageType={}",
                             job.getJobId(), handler.getStageType());
                     break;
@@ -231,10 +246,15 @@ public final class RahaJobOrchestrator {
         }
 
         long executionFinishedAt = clock.millis();
-        job.succeed(executionFinishedAt);
+        if (partialSuccess) {
+            job.partialSucceed(executionFinishedAt);
+        } else {
+            job.succeed(executionFinishedAt);
+        }
         jobRepository.save(job, clock.millis());
-        LOGGER.info("Raha 任务执行成功，jobId={}，stageAttemptCount={}，elapsedMillis={}",
-                job.getJobId(), stages.size(), executionFinishedAt - executionStartedAt);
+        LOGGER.info("Raha 任务执行完成，jobId={}，status={}，stageAttemptCount={}，elapsedMillis={}",
+                job.getJobId(), job.getStatus(), stages.size(),
+                executionFinishedAt - executionStartedAt);
         return new JobRunResult(job, stages, attributes);
     }
 

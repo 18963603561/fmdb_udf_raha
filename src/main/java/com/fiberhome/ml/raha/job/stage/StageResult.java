@@ -35,8 +35,9 @@ public final class StageResult {
         if (failedItemCount < 0L || totalItemCount < 0L || failedItemCount > totalItemCount) {
             throw new IllegalArgumentException("阶段失败数量和总数量非法");
         }
-        if (outcome == StageOutcome.FAILED && isBlank(errorCode)) {
-            throw new IllegalArgumentException("失败阶段必须包含错误编码");
+        if ((outcome == StageOutcome.FAILED || outcome == StageOutcome.PARTIAL_SUCCESS)
+                && isBlank(errorCode)) {
+            throw new IllegalArgumentException("失败或部分成功阶段必须包含错误编码");
         }
         this.outcome = outcome;
         this.errorCode = errorCode;
@@ -60,6 +61,24 @@ public final class StageResult {
     public static StageResult skipped(String message) {
         return new StageResult(StageOutcome.SKIPPED, null, message,
                 false, 0L, 0L, null);
+    }
+
+    /**
+     * 创建包含可用结果和部分失败摘要的阶段结果。
+     *
+     * @param errorCode 部分失败编码
+     * @param message 脱敏后的部分失败说明
+     * @param failedItemCount 失败数据项数量
+     * @param totalItemCount 总处理数据项数量
+     * @return 部分成功阶段结果
+     */
+    public static StageResult partialSuccess(String errorCode,
+                                             String message,
+                                             long failedItemCount,
+                                             long totalItemCount) {
+        return new StageResult(StageOutcome.PARTIAL_SUCCESS,
+                ValueUtils.requireNotBlank(errorCode, "部分失败编码"), message,
+                false, failedItemCount, totalItemCount, null);
     }
 
     public static StageResult failure(String errorCode,
@@ -111,4 +130,3 @@ public final class StageResult {
         return value == null || value.trim().isEmpty();
     }
 }
-

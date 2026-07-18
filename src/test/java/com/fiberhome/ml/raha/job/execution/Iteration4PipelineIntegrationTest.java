@@ -38,7 +38,7 @@ import com.fiberhome.ml.raha.job.id.DefaultRahaIdGenerator;
 import com.fiberhome.ml.raha.job.id.IdempotencyKeyGenerator;
 import com.fiberhome.ml.raha.job.stage.ColumnProfileStageHandler;
 import com.fiberhome.ml.raha.job.stage.DataLoadStageHandler;
-import com.fiberhome.ml.raha.job.stage.DetectionStageHandler;
+import com.fiberhome.ml.raha.job.stage.RuleDetectionStageHandler;
 import com.fiberhome.ml.raha.job.stage.FeatureStageHandler;
 import com.fiberhome.ml.raha.job.stage.StageAttributeKeys;
 import com.fiberhome.ml.raha.job.stage.StrategyPlanStageHandler;
@@ -149,7 +149,7 @@ class Iteration4PipelineIntegrationTest {
                 new StrategyPlanStageHandler(planService),
                 new StrategyRunStageHandler(executionService),
                 new FeatureStageHandler(featureService),
-                new DetectionStageHandler(detectionService)));
+                new RuleDetectionStageHandler(detectionService)));
 
         assertEquals(JobStatus.SUCCEEDED, run.getJob().getStatus());
         List<StrategyPlan> plans = castList(

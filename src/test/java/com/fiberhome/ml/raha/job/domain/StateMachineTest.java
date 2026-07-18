@@ -56,6 +56,20 @@ class StateMachineTest {
     }
 
     @Test
+    void shouldCompleteJobWithPartialSuccess() {
+        RahaJob job = new RahaJob(
+                "job-1", "key-1", JobType.TRAINING, "dataset", null, "config-v1", 100L);
+
+        job.start("stage-1", 110L);
+        job.partialSucceed(200L);
+
+        assertEquals(JobStatus.PARTIAL_SUCCESS, job.getStatus());
+        assertEquals(200L, job.getFinishedAt());
+        assertThrows(IllegalStateException.class,
+                () -> job.succeed(210L));
+    }
+
+    @Test
     void shouldCompleteStageLifecycle() {
         RahaStage stage = new RahaStage("stage-1", "job-1", StageType.INITIALIZE, 1);
 
@@ -68,6 +82,19 @@ class StateMachineTest {
     }
 
     @Test
+    void shouldCompleteStageWithPartialSuccess() {
+        RahaStage stage = new RahaStage("stage-1", "job-1", StageType.LOAD_DATA, 1);
+
+        stage.start(100L);
+        stage.partialSucceed(120L);
+
+        assertEquals(StageStatus.PARTIAL_SUCCESS, stage.getStatus());
+        assertEquals(120L, stage.getFinishedAt());
+        assertThrows(IllegalStateException.class,
+                () -> stage.fail("LATE_FAILURE", "阶段已经结束", 130L));
+    }
+
+    @Test
     void shouldKeepStageStateWhenStartValidationFails() {
         RahaStage stage = new RahaStage("stage-1", "job-1", StageType.LOAD_DATA, 1);
 
@@ -77,4 +104,3 @@ class StateMachineTest {
         assertEquals(0L, stage.getStartedAt());
     }
 }
-

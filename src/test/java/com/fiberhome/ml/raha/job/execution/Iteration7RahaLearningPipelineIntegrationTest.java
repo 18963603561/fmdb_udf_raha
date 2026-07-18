@@ -66,8 +66,8 @@ import com.fiberhome.ml.raha.sampling.ClusterCoverageScorer;
 import com.fiberhome.ml.raha.sampling.service.SamplingService;
 import com.fiberhome.ml.raha.sampling.service.SamplingVersioner;
 import com.fiberhome.ml.raha.sampling.TupleSampler;
-import com.fiberhome.ml.raha.service.common.RahaTaskResult;
-import com.fiberhome.ml.raha.service.common.RahaTaskStatus;
+import com.fiberhome.ml.raha.service.common.RahaServiceResult;
+import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.detect.RahaDetectOutput;
 import com.fiberhome.ml.raha.service.detect.RahaDetectRequest;
 import com.fiberhome.ml.raha.service.detect.RahaDetectService;
@@ -169,14 +169,14 @@ class Iteration7RahaLearningPipelineIntegrationTest {
                 modelStore, new ColumnModelMetadataFactory(clock),
                 releaseManager, clock);
         RahaJobConfig config = trainingConfig();
-        RahaTaskResult<RahaTrainOutput> trained = trainService.train(
+        RahaServiceResult<RahaTrainOutput> trained = trainService.train(
                 new RahaTrainRequest("train-job", "train-stage", dirty, config,
                         directLabels, LabelPropagationMethod.HOMOGENEITY,
                         LabelPropagationConfig.defaults(),
                         LogisticRegressionTrainingConfig.defaults(), "raha",
                         version("train-stage")));
 
-        assertEquals(RahaTaskStatus.SUCCEEDED, trained.getStatus());
+        assertEquals(JobStatus.SUCCEEDED, trained.getStatus());
         assertNotNull(trained.getResultLocation());
         assertEquals(1, trained.getPayload().getStrategyPlans().size());
         assertEquals(StrategyTypes.PVD_CHARACTER_SET,
@@ -190,12 +190,12 @@ class Iteration7RahaLearningPipelineIntegrationTest {
         RahaColumnModel candidate = trained.getPayload()
                 .getCandidateModels().get("code");
 
-        RahaTaskResult<RahaSampleOutput> sampled = sampleService.sample(
+        RahaServiceResult<RahaSampleOutput> sampled = sampleService.sample(
                 new RahaSampleRequest("sample-job", trained.getPayload().getFeatures(),
                         Collections.<CellLabel>emptyList(), config.getClusteringConfig(),
                         config.getSamplingConfig(), 1, config.getRandomSeed(),
                         version("sample-stage")));
-        assertEquals(RahaTaskStatus.SUCCEEDED, sampled.getStatus());
+        assertEquals(JobStatus.SUCCEEDED, sampled.getStatus());
         assertNotNull(sampled.getResultLocation());
         assertEquals(2L, sampled.getSummary().getSuccessfulCount());
         assertEquals(2, sampled.getPayload().getSampling().getTasks().size());
@@ -209,9 +209,9 @@ class Iteration7RahaLearningPipelineIntegrationTest {
                 new ColumnModelPredictor(), detectionRepository, clock);
         RahaDetectRequest beforePublishRequest = detectRequest(
                 "detect-before-publish", dirty, trained.getPayload(), version("detect-before"));
-        RahaTaskResult<RahaDetectOutput> beforePublish =
+        RahaServiceResult<RahaDetectOutput> beforePublish =
                 detectService.detect(beforePublishRequest);
-        assertEquals(RahaTaskStatus.FAILED, beforePublish.getStatus());
+        assertEquals(JobStatus.FAILED, beforePublish.getStatus());
         assertEquals("NO_PUBLISHED_MODEL_RESULT", beforePublish.getErrorCode());
 
         List<ColumnPrediction> predictions = new ColumnModelPredictor().predict(
@@ -233,9 +233,9 @@ class Iteration7RahaLearningPipelineIntegrationTest {
         releaseManager.publish("dataset", "code", candidate.getModelVersion(),
                 version("publish-stage"));
 
-        RahaTaskResult<RahaDetectOutput> detected = detectService.detect(detectRequest(
+        RahaServiceResult<RahaDetectOutput> detected = detectService.detect(detectRequest(
                 "detect-job", dirty, trained.getPayload(), version("detect-stage")));
-        assertEquals(RahaTaskStatus.SUCCEEDED, detected.getStatus());
+        assertEquals(JobStatus.SUCCEEDED, detected.getStatus());
         assertNotNull(detected.getResultLocation());
         assertEquals(1L, detected.getSummary().getSuccessfulCount());
         assertEquals(8, detected.getPayload().getResults().size());

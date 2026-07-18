@@ -5,36 +5,36 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 保存服务任务耗时、处理数量和不含原始值的结果摘要。
+ * 保存一次业务服务执行的数量、耗时和诊断摘要。
  */
-public final class RahaTaskSummary {
+public final class RahaServiceSummary {
 
-    /** 任务开始时间。 */
+    /** 服务开始时间。 */
     private final long startedAt;
-    /** 任务完成时间。 */
+    /** 服务完成时间。 */
     private final long completedAt;
-    /** 计划处理对象数量。 */
+    /** 总处理数量。 */
     private final long totalCount;
-    /** 成功处理对象数量。 */
+    /** 成功处理数量。 */
     private final long successfulCount;
-    /** 因不可训练等明确原因跳过的对象数量。 */
+    /** 跳过处理数量。 */
     private final long skippedCount;
-    /** 处理失败对象数量。 */
+    /** 失败处理数量。 */
     private final long failedCount;
-    /** 不包含敏感值的阶段摘要。 */
+    /** 不包含敏感值的服务诊断详情。 */
     private final Map<String, String> details;
 
-    public RahaTaskSummary(long startedAt,
-                           long completedAt,
-                           long totalCount,
-                           long successfulCount,
-                           long skippedCount,
-                           long failedCount,
-                           Map<String, String> details) {
-        if (startedAt <= 0L || completedAt < startedAt || totalCount < 0L
+    public RahaServiceSummary(long startedAt,
+                              long completedAt,
+                              long totalCount,
+                              long successfulCount,
+                              long skippedCount,
+                              long failedCount,
+                              Map<String, String> details) {
+        if (startedAt < 0L || completedAt < startedAt || totalCount < 0L
                 || successfulCount < 0L || skippedCount < 0L || failedCount < 0L
                 || successfulCount + skippedCount + failedCount > totalCount) {
-            throw new IllegalArgumentException("任务摘要时间和数量必须有效");
+            throw new IllegalArgumentException("服务摘要时间或数量非法");
         }
         this.startedAt = startedAt;
         this.completedAt = completedAt;
@@ -42,8 +42,7 @@ public final class RahaTaskSummary {
         this.successfulCount = successfulCount;
         this.skippedCount = skippedCount;
         this.failedCount = failedCount;
-        this.details = details == null
-                ? Collections.<String, String>emptyMap()
+        this.details = details == null ? Collections.<String, String>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, String>(details));
     }
 

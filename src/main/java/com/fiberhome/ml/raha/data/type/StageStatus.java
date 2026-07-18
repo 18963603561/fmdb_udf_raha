@@ -10,6 +10,8 @@ public enum StageStatus {
     RUNNING,
     /** 阶段执行成功。 */
     SUCCEEDED,
+    /** 阶段产生可用结果，但存在部分数据项失败。 */
+    PARTIAL_SUCCESS,
     /** 阶段执行失败。 */
     FAILED,
     /** 阶段因结果复用或条件不满足被跳过。 */
@@ -33,7 +35,8 @@ public enum StageStatus {
         }
         // 运行阶段只能进入执行终态。
         if (this == RUNNING) {
-            return target == SUCCEEDED || target == FAILED || target == CANCELLED;
+            return target == SUCCEEDED || target == PARTIAL_SUCCESS
+                    || target == FAILED || target == CANCELLED;
         }
         return false;
     }

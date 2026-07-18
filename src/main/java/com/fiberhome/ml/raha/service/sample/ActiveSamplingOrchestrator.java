@@ -10,8 +10,8 @@ import com.fiberhome.ml.raha.feature.domain.SparseFeatureRow;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
-import com.fiberhome.ml.raha.service.common.RahaTaskResult;
-import com.fiberhome.ml.raha.service.common.RahaTaskStatus;
+import com.fiberhome.ml.raha.service.common.RahaServiceResult;
+import com.fiberhome.ml.raha.data.type.JobStatus;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -91,11 +91,11 @@ public final class ActiveSamplingOrchestrator {
                         + "effectiveBudget={}，randomSeed={}",
                 jobId, totalBudget, effectiveBudget, randomSeed);
         for (int round = 1; round <= effectiveBudget; round++) {
-            RahaTaskResult<RahaSampleOutput> result = sampleService.sample(
+            RahaServiceResult<RahaSampleOutput> result = sampleService.sample(
                     new RahaSampleRequest(jobId, features, labels,
                             clusteringConfig, roundConfig, round, randomSeed,
                             artifactVersion, resourceConfig, reusableClustering));
-            if (result.getStatus() == RahaTaskStatus.FAILED
+            if (result.getStatus() == JobStatus.FAILED
                     || result.getPayload() == null
                     || result.getPayload().getSampling().getTasks().size() != 1) {
                 throw new IllegalStateException("主动采样第 " + round

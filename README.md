@@ -2,36 +2,75 @@
 
 ## 工程定位
 
-本工程是面向 FMDB 和 Spark 的单元格级数据错误检测组件，采用任务模型组织数据加载、字段画像、策略生成、特征组装、聚类采样、标签传播、模型训练、检测评估和结果持久化。
+本工程是面向 FMDB 和 Spark 的单元格级数据检测组件，采用任务模型组织数据加载、字段画像、策略生成、特征组装、聚类采样、标签传播、模型训练、模型预测、规则检测、结果评估和结果登记。
 
-当前工程只保留任务模型主线，不包含 UDF、文件任务队列、后台消费者和容器验收入口。调用方在同一进程内创建任务、组装阶段处理器并直接执行，任务状态和阶段状态由仓储端口统一管理。
+当前工程只保留任务模型主线，不包含 UDF、文件任务队列、后台消费者和容器验收入口。业务调用方在同一进程内提交任务并直接执行，不需要先生成任务文件，再由另一个进程消费。
 
-## 核心执行方式
+## 统一入口
 
-任务执行分为两个明确动作，但都在同一调用进程内完成，不依赖第二个消费者进程：
+训练、预测和采样统一通过 `RahaTaskApplicationService.execute` 执行。该入口负责：
 
-1. `RahaJobOrchestrator.submit` 校验配置、计算配置版本和幂等键，并创建或返回已有任务。
-2. `RahaJobOrchestrator.execute` 按顺序执行阶段处理器，处理重试、可容忍失败、任务终止和状态持久化。
+1. 校验任务请求和任务类型。
+2. 通过 `RahaJobOrchestrator.submit` 完成幂等建单。
+3. 根据 `JobType` 选择对应工作流。
+4. 创建阶段处理器并调用 `RahaJobOrchestrator.execute`。
+5. 返回任务状态、阶段轨迹、业务输出和结果位置。
 
-典型调用关系如下：
-
-```text
-外部调用方
-  -> job.execution.RahaJobOrchestrator
-  -> job.stage.StageHandler
-  -> 领域服务和算法组件
-  -> repository.port 仓储端口
-  -> repository.adapter 或 fmdb 基础设施实现
-```
-
-最小调用形式：
+最小调用形式如下：
 
 ```java
-RahaJob job = orchestrator.submit(config);
-JobRunResult result = orchestrator.execute(job, config, handlers);
+RahaTaskExecutionRequest request = RahaTaskExecutionRequest.training(
+        config,
+        dataLoadRequest,
+        trainConfig,
+        labelPropagationConfig,
+        labels);
+
+RahaTaskExecutionResult result = applicationService.execute(request);
 ```
 
-`submit` 只负责幂等建单，`execute` 才真正运行阶段。调用方可以在一个方法中连续调用两者，实现直接提交并执行。
+直接执行的调用链如下：
+
+```text
+业务调用方
+  -> service.task.RahaTaskApplicationService
+  -> service.task.RahaWorkflow
+  -> job.execution.RahaJobOrchestrator
+  -> job.stage.StageHandler
+  -> service.* 和领域算法组件
+  -> repository.port
+```
+
+`submit` 和 `execute` 仍然保留在任务编排层，分别负责建单和执行；业务方不再需要自行拼装这两个动作。统一入口不是队列消费者，也不会启动定时器或常驻线程。
+
+## 支持的工作流
+
+| 任务类型 | 工作流 | 主要阶段 | 主要输出 |
+| --- | --- | --- | --- |
+| `TRAINING` | `TrainingWorkflow` | 加载、画像、策略、特征、聚类、标签、传播、训练、评估、结果登记 | 候选模型和训练结果 |
+| `DETECTION` | `DetectionWorkflow` | 加载、画像、策略、特征、已发布模型预测、评估、结果登记 | 检测结果 |
+| `SAMPLING` | `SamplingWorkflow` | 加载、画像、策略、特征、聚类、主动采样、结果登记 | 采样任务和样本结果 |
+
+训练阶段生成的是候选模型。模型是否成为生产可用模型，仍由 `model.release` 中的发布服务单独完成，这是审批边界，不是第二个任务消费进程。预测工作流只读取已发布模型，避免把训练候选模型直接当成生产模型。
+
+## 任务模型和服务的关系
+
+任务模型负责记录执行过程和生命周期，服务包负责完成具体业务动作：
+
+| 模块 | 职责 |
+| --- | --- |
+| `job.domain` | 任务、阶段和任务运行结果领域对象 |
+| `job.execution` | 幂等提交、阶段编排、重试、失败决策和终态管理 |
+| `job.stage` | 阶段上下文、阶段结果和具体阶段适配器 |
+| `service.task` | 统一业务入口、工作流注册和训练预测采样编排 |
+| `service.prepare` | 数据画像、策略计划和特征准备 |
+| `service.train` | 候选模型训练 |
+| `service.detect` | 已发布模型预测 |
+| `service.sample` | 主动采样和采样任务生成 |
+| `repository.port` | 任务、阶段、结果和模型存储接口 |
+| `repository.adapter` | 内存或持久化仓储实现 |
+
+服务包不再自行维护一套 `RahaTaskType`、`RahaTaskStatus` 和 `RahaTaskResult`。任务类型和生命周期统一使用 `data.type.JobType`、`data.type.JobStatus`，服务返回统一使用 `service.common.RahaServiceResult`。
 
 ## 包结构
 
@@ -54,7 +93,6 @@ com.fiberhome.ml.raha
     explanation
     scoring
     service
-  error
   evaluation
     metrics
     threshold
@@ -75,8 +113,6 @@ com.fiberhome.ml.raha
     prediction
     release
     training
-  observability
-  parallel
   repository
     adapter
     core
@@ -89,47 +125,28 @@ com.fiberhome.ml.raha
     detect
     prepare
     sample
+    task
     train
   strategy
     api
     domain
     execution
     impl
-      od
-      pvd
     plan
-  util
 ```
 
-## 分层职责
+## 结果和状态
 
-| 包 | 职责 |
-| --- | --- |
-| `job.domain` | 任务、阶段和任务运行结果等任务领域模型 |
-| `job.execution` | 幂等提交、阶段编排、失败决策和任务终态管理 |
-| `job.stage` | 阶段上下文、阶段结果、属性键和具体阶段处理器 |
-| `service.*` | 采样、训练、检测和特征准备等用例级服务 |
-| `repository.core` | 通用仓储键、记录、事务和版本对象 |
-| `repository.port` | 任务模型和领域服务依赖的仓储接口 |
-| `repository.adapter` | 通用仓储适配器和内存实现 |
-| `data.domain` | 数据集、字段、单元格、快照和检测结果 |
-| `data.type` | 任务、阶段、策略、模型和特征相关枚举 |
-| `strategy.*` | 策略契约、计划生成、执行模型和具体策略实现 |
-| `model.*` | 列级模型、训练、预测和发布生命周期 |
-| `fmdb.*` | FMDB 数据读取、表访问、结果写入和模型存储适配 |
+成功执行返回 `RahaTaskExecutionResult`。调用方可以读取：
 
-接口、领域对象、请求结果和基础设施实现已经分开，新增实现时应继续遵守现有依赖方向，不要重新把接口和实现放回同一层包。
+- `getJob()`：任务标识、类型、状态和时间信息。
+- `getStages()`：每个阶段的执行状态和失败信息。
+- `getPayload()`：训练模型、检测结果或采样输出。
+- `getResultLocation()`：业务结果的逻辑存储位置。
 
-## 主要能力
+任务终态包括 `SUCCEEDED`、`PARTIAL_SUCCESS`、`FAILED` 和 `CANCELLED`。可容忍失败的阶段不会阻断后续阶段，但最终任务会标记为 `PARTIAL_SUCCESS`，避免把不完整结果误报为完全成功。
 
-- 支持 CSV、JSON、Parquet 和 FMDB 来源的数据加载。
-- 支持稳定快照、行标识校验、模式摘要和字段画像。
-- 支持 OD、PVD、RVD 检测策略及策略并行执行。
-- 支持稀疏特征组装、列内聚类、主动采样和标签传播。
-- 支持 Spark MLlib 逻辑回归、规则降级、质量门禁和模型发布。
-- 支持检测评分、解释、评估切分、阈值比较和真值差异分析。
-- 支持任务幂等、阶段状态、失败重试、检查点和内存事务回滚。
-- 支持 FMDB 表网关、数据加载、结果写入和模型存储适配。
+同一个幂等键重复提交时，入口返回已有任务及其阶段轨迹，不会重复执行阶段。当前仓储接口主要保存任务和阶段状态，重复请求不会重新恢复内存中的业务 payload；业务方应根据结果位置重新读取持久化结果。
 
 ## 配置
 
@@ -139,81 +156,47 @@ com.fiberhome.ml.raha
 src/main/resources/raha-defaults.properties
 ```
 
-配置按以下职责划分：
+常用配置前缀如下：
 
 | 前缀 | 用途 |
 | --- | --- |
-| `raha.job.*` | 任务级行为和随机种子 |
+| `raha.job.*` | 任务行为和随机种子 |
 | `raha.strategy.*` | 策略范围、优先级、数量和超时 |
-| `raha.feature.*` | 值规范化、上下文特征和特征规模 |
-| `raha.profile.*` | 字段画像参数 |
-| `raha.model.*` | 分类器、阈值、训练和质量门禁 |
+| `raha.feature.*` | 特征归一化、上下文特征和特征规模 |
+| `raha.model.*` | 分类器、阈值、训练参数和质量门禁 |
 | `raha.clustering.*` | 聚类算法参数 |
 | `raha.sampling.*` | 主动采样预算和任务有效期 |
 | `raha.label.*` | 标签传播权重和多数比例 |
 | `raha.resource.*` | 并行度、广播、缓存和阶段超时 |
 | `raha.failure.*` | 失败容忍和重试次数 |
 
-配置加载入口位于 `config.core.RahaConfigLoader`，配置对象位于 `config.dto`，校验和版本计算位于 `config.validation`。
-
-## 构建要求
+## 运行要求
 
 - JDK 8
 - Maven 3.8 或更高版本
 - Spark 3.3.1
 - Scala 2.12 对应的 Spark 依赖
 
-工程通过 Maven Enforcer 强制使用 JDK 8。Spark 依赖使用 `provided` 范围，由实际运行环境提供。
-
-编译：
+编译、测试和打包命令：
 
 ```powershell
 mvn clean compile
-```
-
-运行测试：
-
-```powershell
 mvn clean test
-```
-
-打包：
-
-```powershell
 mvn clean package
 ```
 
-主要产物：
-
-| 文件 | 用途 |
-| --- | --- |
-| `target/fmdb-udf-raha-1.0.0-SNAPSHOT.jar` | 普通工程 Jar |
-| `target/fmdb-udf-raha-1.0.0-SNAPSHOT-all.jar` | 包含非 Spark 依赖的完整交付 Jar |
-
-## 测试范围
-
-测试覆盖以下内容：
-
-- 配置加载、配置校验和稳定版本计算。
-- 数据加载、快照、字段画像和领域对象约束。
-- 策略计划、OD、PVD、RVD 和并行恢复。
-- 特征组装、聚类、采样和标签传播。
-- 模型训练、预测、质量门禁、发布和回滚。
-- 检测、解释、评估、阈值选择和真值对比。
-- 任务状态机、阶段编排、检查点和失败策略。
-- 仓储事务、FMDB 适配和 Spark 资源管理。
+Spark 依赖使用 `provided` 范围，实际运行环境需要提供对应 Spark 运行时。生产调用方需要负责创建和关闭 `SparkSession`，并注入仓储、FMDB 网关、模型发布服务及各领域服务实现。
 
 ## 当前边界
 
-- 工程当前是组件库，没有默认生产 `Application` 或依赖注入容器。
-- 工程不包含常驻 Worker，也不需要文件队列消费者。
-- 生产调用方需要负责创建 Spark 会话、选择仓储实现、组装服务和阶段处理器。
-- `InMemoryRahaRepository` 只适合测试和单进程临时运行，生产环境应使用可持久化实现。
-- `RahaJobOrchestrator.submit` 和 `execute` 是当前任务模型的统一主线，新增入口应调用该主线，不应重新引入 UDF 或文件队列。
+- 工程不是 Spring Boot 应用，不提供默认 `Application` 启动类。
+- 工程不包含常驻 Worker，不创建定时器，也不轮询文件目录。
+- 统一入口是同步执行接口；需要异步执行时，应在工程外部使用已有调度系统调用该入口，并由外部系统管理重试、超时和并发。
+- `EVALUATION`、`STRATEGY_ANALYSIS` 等类型暂未接入统一入口，需要先定义对应工作流后再注册。
 
 ## 相关文档
 
 | 文档 | 用途 |
 | --- | --- |
-| `doc/20260718/Raha包结构分层重构分析-202607181231.md` | 包结构问题、分层原则和迁移依据 |
-| `doc/20260718/Raha包结构分层重构落地报告-202607181320.md` | 实际迁移范围、验证结果和后续约束 |
+| `doc/20260718/Raha任务编排与训练预测统一入口分析-202607181400.md` | 统一入口、训练预测工作流和边界分析 |
+| `doc/20260718/Raha统一任务编排入口代码落地报告-202607181450.md` | 本轮代码落地范围、验证结果和后续边界 |

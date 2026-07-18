@@ -61,6 +61,17 @@ public final class RahaStage {
         finish(finishTime, null, null);
     }
 
+    /**
+     * 将运行中阶段标记为部分成功。
+     *
+     * @param finishTime 结束时间
+     */
+    public synchronized void partialSucceed(long finishTime) {
+        validateFinishTime(finishTime);
+        transitionTo(StageStatus.PARTIAL_SUCCESS);
+        finish(finishTime, null, null);
+    }
+
     public synchronized void fail(String code, String message, long finishTime) {
         validateFinishTime(finishTime);
         String validatedCode = ValueUtils.requireNotBlank(code, "失败编码");

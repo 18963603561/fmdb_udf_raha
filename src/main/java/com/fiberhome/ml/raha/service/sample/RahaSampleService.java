@@ -6,10 +6,10 @@ import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
 import com.fiberhome.ml.raha.sampling.service.SamplingBatchResult;
 import com.fiberhome.ml.raha.sampling.service.SamplingService;
-import com.fiberhome.ml.raha.service.common.RahaTaskResult;
-import com.fiberhome.ml.raha.service.common.RahaTaskStatus;
-import com.fiberhome.ml.raha.service.common.RahaTaskSummary;
-import com.fiberhome.ml.raha.service.common.RahaTaskType;
+import com.fiberhome.ml.raha.service.common.RahaServiceResult;
+import com.fiberhome.ml.raha.data.type.JobStatus;
+import com.fiberhome.ml.raha.service.common.RahaServiceSummary;
+import com.fiberhome.ml.raha.data.type.JobType;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -48,7 +48,7 @@ public final class RahaSampleService {
      * @param request 采样服务输入
      * @return 统一采样任务结果
      */
-    public RahaTaskResult<RahaSampleOutput> sample(RahaSampleRequest request) {
+    public RahaServiceResult<RahaSampleOutput> sample(RahaSampleRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("采样服务请求不能为空");
         }
@@ -79,7 +79,7 @@ public final class RahaSampleService {
             details.put("candidateTupleCount", String.valueOf(
                     sampling.getMetrics().getCandidateTupleCount()));
             details.put("samplingVersion", sampling.getSamplingVersion());
-            RahaTaskSummary summary = new RahaTaskSummary(startedAt, clock.millis(),
+            RahaServiceSummary summary = new RahaServiceSummary(startedAt, clock.millis(),
                     sampling.getMetrics().getCandidateTupleCount(),
                     sampling.getTasks().size(),
                     Math.max(0L, sampling.getMetrics().getCandidateTupleCount()
@@ -87,18 +87,18 @@ public final class RahaSampleService {
             LOGGER.info("Raha 采样服务完成，jobId={}，samplingRound={}，taskCount={}",
                     request.getJobId(), request.getSamplingRound(),
                     sampling.getTasks().size());
-            return new RahaTaskResult<RahaSampleOutput>(request.getJobId(),
-                    RahaTaskType.SAMPLE, RahaTaskStatus.SUCCEEDED,
+            return new RahaServiceResult<RahaSampleOutput>(request.getJobId(),
+                    JobType.SAMPLING, JobStatus.SUCCEEDED,
                     "repository://annotation-task/" + request.getJobId(), summary,
                     new RahaSampleOutput(clustering, sampling), null, null);
         } catch (RuntimeException exception) {
             // 聚类或标注任务仓储异常统一转换为失败结果，并保留完整异常堆栈。
             LOGGER.error("Raha 采样服务失败，jobId={}，samplingRound={}",
                     request.getJobId(), request.getSamplingRound(), exception);
-            RahaTaskSummary summary = new RahaTaskSummary(startedAt, clock.millis(),
+            RahaServiceSummary summary = new RahaServiceSummary(startedAt, clock.millis(),
                     1L, 0L, 0L, 1L, Collections.<String, String>emptyMap());
-            return new RahaTaskResult<RahaSampleOutput>(request.getJobId(),
-                    RahaTaskType.SAMPLE, RahaTaskStatus.FAILED, null, summary, null,
+            return new RahaServiceResult<RahaSampleOutput>(request.getJobId(),
+                    JobType.SAMPLING, JobStatus.FAILED, null, summary, null,
                     "SAMPLE_SERVICE_FAILED", exception.getClass().getSimpleName());
         }
     }

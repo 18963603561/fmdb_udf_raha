@@ -6,10 +6,8 @@ import com.fiberhome.ml.raha.strategy.execution.StrategyBatchResult;
 import com.fiberhome.ml.raha.strategy.execution.StrategyExecutionService;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlan;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlanService;
-import com.fiberhome.ml.raha.util.HashUtils;
+import com.fiberhome.ml.raha.strategy.plan.StrategyPlanVersioner;
 import java.time.Clock;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.List;
 import org.apache.spark.sql.Dataset;
@@ -88,7 +86,7 @@ public final class RahaFeaturePreparationService {
                     request.getJobId(), request.getDataset(), plans,
                     strategyBatch.getHits(), request.getConfig().getFeatureConfig(),
                     request.getArtifactVersion());
-            String planVersion = strategyPlanVersion(plans);
+            String planVersion = StrategyPlanVersioner.versionOf(plans);
             long runtimeMillis = Math.max(0L, TimeUnit.NANOSECONDS.toMillis(
                     System.nanoTime() - startNanos));
             LOGGER.info("Raha 策略和特征准备完成，jobId={}，planCount={}，hitCount={}，"
@@ -111,12 +109,4 @@ public final class RahaFeaturePreparationService {
         }
     }
 
-    private static String strategyPlanVersion(List<StrategyPlan> plans) {
-        List<String> signatures = new ArrayList<String>(plans.size());
-        for (StrategyPlan plan : plans) {
-            signatures.add(plan.getStrategyId() + ":" + plan.getConfigurationHash());
-        }
-        Collections.sort(signatures);
-        return HashUtils.sha256Hex(String.join("|", signatures));
-    }
 }

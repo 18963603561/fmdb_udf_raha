@@ -51,8 +51,8 @@ import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.repository.port.DetectionResultRepository;
 import com.fiberhome.ml.raha.repository.port.ModelMetadataRepository;
 import com.fiberhome.ml.raha.repository.port.StrategyRepository;
-import com.fiberhome.ml.raha.service.common.RahaTaskResult;
-import com.fiberhome.ml.raha.service.common.RahaTaskStatus;
+import com.fiberhome.ml.raha.service.common.RahaServiceResult;
+import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.detect.RahaDetectOutput;
 import com.fiberhome.ml.raha.service.detect.RahaDetectRequest;
 import com.fiberhome.ml.raha.service.detect.RahaDetectService;
@@ -133,14 +133,14 @@ class Iteration8ParallelLearningIntegrationTest {
                 modelStore, new ColumnModelMetadataFactory(clock),
                 releaseManager, clock);
 
-        RahaTaskResult<RahaTrainOutput> trained = trainService.train(
+        RahaServiceResult<RahaTrainOutput> trained = trainService.train(
                 new RahaTrainRequest("parallel-train", "train-stage", dataset,
                         config, directLabels(), LabelPropagationMethod.HOMOGENEITY,
                         LabelPropagationConfig.defaults(),
                         LogisticRegressionTrainingConfig.defaults(), "raha",
                         version("train-stage")));
 
-        assertEquals(RahaTaskStatus.SUCCEEDED, trained.getStatus());
+        assertEquals(JobStatus.SUCCEEDED, trained.getStatus());
         assertEquals(2, trained.getPayload().getFeatures().getDictionaries().size());
         assertEquals(2, trained.getPayload().getClustering().getResults().size());
         assertEquals(2, trained.getPayload().getCandidateModels().size());
@@ -158,13 +158,13 @@ class Iteration8ParallelLearningIntegrationTest {
                 new PublishedColumnModelLoader(modelRepository, modelStore,
                         new ColumnModelCompatibilityValidator()),
                 new ColumnModelPredictor(), detectionRepository, clock);
-        RahaTaskResult<RahaDetectOutput> detected = detectService.detect(
+        RahaServiceResult<RahaDetectOutput> detected = detectService.detect(
                 new RahaDetectRequest("parallel-detect", "detect-stage", "config-v1",
                         dataset, trained.getPayload().getFeatures(),
                         trained.getPayload().getStrategyPlanVersion(),
                         version("detect-stage"), config.getResourceConfig()));
 
-        assertEquals(RahaTaskStatus.SUCCEEDED, detected.getStatus());
+        assertEquals(JobStatus.SUCCEEDED, detected.getStatus());
         assertEquals(2, detected.getPayload().getModelVersions().size());
         assertEquals(16, detected.getPayload().getResults().size());
         assertBoundedConcurrency(detected.getSummary().getDetails()
