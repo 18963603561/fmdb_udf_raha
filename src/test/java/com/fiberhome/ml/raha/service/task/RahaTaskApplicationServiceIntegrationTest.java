@@ -251,7 +251,7 @@ class RahaTaskApplicationServiceIntegrationTest {
                 Collections.<String>emptySet(),
                 Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(jobType, "dataset", "snapshot-v1",
-                "memory", "id", true, 20260715L, strategyConfig,
+                "memory", "id", 20260715L, strategyConfig,
                 FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, true),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 2, 100),

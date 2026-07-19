@@ -54,8 +54,9 @@ class FmdbSchemaInitializerTest {
     @Test
     void shouldSkipInitializationWhenPersistenceIsDisabled() {
         SparkSession spark = SparkTestSession.get();
-        FmdbPersistenceConfig config = new FmdbPersistenceConfig(
-                false, true, "db/fmdb/raha-fmdb-schema.sql");
+        FmdbPersistenceConfig config = FmdbPersistenceConfig.builder()
+                .enabled(false)
+                .build();
 
         assertDoesNotThrow(() -> new FmdbSchemaInitializer(spark, config).initialize());
     }

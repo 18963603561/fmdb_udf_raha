@@ -113,7 +113,7 @@ class RahaJobOrchestratorTest {
     @Test
     void shouldTerminateWhenLoadedSnapshotConflictsWithSubmittedSnapshot() {
         RahaJobConfig config = new RahaJobConfig(JobType.DETECTION, "dataset", "expected-snapshot",
-                "input", "id", false, 1L,
+                "input", "id", 1L,
                 StrategyConfig.defaults(), FeatureConfig.defaults(), ModelConfig.defaults(),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
         Fixture fixture = new Fixture(config);
@@ -159,7 +159,7 @@ class RahaJobOrchestratorTest {
 
     private static RahaJobConfig configWithFailureTolerance(FailureToleranceConfig toleranceConfig) {
         return new RahaJobConfig(JobType.DETECTION, "dataset", null,
-                "input", "id", false, 1L,
+                "input", "id", 1L,
                 StrategyConfig.defaults(), FeatureConfig.defaults(), ModelConfig.defaults(),
                 ResourceConfig.defaults(), toleranceConfig);
     }

@@ -40,7 +40,6 @@ class RahaConfigLoaderTest {
         RahaJobConfig job = factory.jobConfig(JobType.DETECTION,
                 "dataset", "source_table", "id");
         new RahaConfigValidator().validate(job);
-        assertTrue(job.isSaveIntermediate());
         assertEquals(20260714L, job.getRandomSeed());
         assertEquals(1000, job.getStrategyConfig().getMaxStrategyCount());
         assertTrue(job.getStrategyConfig().getStrategyFamilies()

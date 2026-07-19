@@ -79,6 +79,8 @@ public final class FmdbModelStore implements ColumnModelStore {
     private final String dictionaryTable;
     /** 提供可测试存储时间的时钟。 */
     private final Clock clock;
+    /** 控制模型和特征字典是否写入 FMDB。 */
+    private final FmdbPersistenceConfig persistenceConfig;
     /** 按完整路径缓存已加载模型。 */
     private final Map<String, ColumnModelArtifact> modelCache =
             new ConcurrentHashMap<String, ColumnModelArtifact>();
@@ -86,12 +88,24 @@ public final class FmdbModelStore implements ColumnModelStore {
     private final Map<String, FeatureDictionary> dictionaryCache =
             new ConcurrentHashMap<String, FeatureDictionary>();
 
+    /**
+     * 创建受统一持久化配置控制的 FMDB 模型存储。
+     *
+     * @param sparkSession Spark 会话
+     * @param tableGateway FMDB 表网关
+     * @param modelTable 模型参数表
+     * @param dictionaryTable 特征字典表
+     * @param clock 存储时间来源
+     * @param persistenceConfig 模型和字典持久化配置
+     */
     public FmdbModelStore(SparkSession sparkSession,
                           FmdbTableGateway tableGateway,
                           String modelTable,
                           String dictionaryTable,
-                          Clock clock) {
-        if (sparkSession == null || tableGateway == null || clock == null) {
+                          Clock clock,
+                          FmdbPersistenceConfig persistenceConfig) {
+        if (sparkSession == null || tableGateway == null || clock == null
+                || persistenceConfig == null) {
             throw new IllegalArgumentException("FMDB 模型存储依赖不能为空");
         }
         this.modelTable = SparkSqlFmdbTableGateway.validateTableName(modelTable);
@@ -99,6 +113,7 @@ public final class FmdbModelStore implements ColumnModelStore {
         this.sparkSession = sparkSession;
         this.tableGateway = tableGateway;
         this.clock = clock;
+        this.persistenceConfig = persistenceConfig;
     }
 
     @Override
@@ -107,6 +122,15 @@ public final class FmdbModelStore implements ColumnModelStore {
             throw new IllegalArgumentException("FMDB 模型参数不能为空");
         }
         String path = modelPath(artifact.getModelVersion());
+        // 模型表关闭时仅保留当前存储实例的缓存，进程重启后不能再次加载。
+        if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT)) {
+            modelCache.put(path, artifact);
+            LOGGER.info("FMDB 模型产物入库已关闭，仅缓存当前模型，modelVersion={}，"
+                            + "columnName={}，configKey={}", artifact.getModelVersion(),
+                    artifact.getColumnName(),
+                    FmdbPhysicalTable.MODEL_ARTIFACT.getConfigKey());
+            return path;
+        }
         LOGGER.info("开始保存 FMDB 列级模型，modelVersion={}，columnName={}",
                 artifact.getModelVersion(), artifact.getColumnName());
         ColumnModelArtifact existing = findModel(artifact.getModelVersion());
@@ -143,6 +167,11 @@ public final class FmdbModelStore implements ColumnModelStore {
         if (cached != null) {
             return cached;
         }
+        // 未入库模型只能由创建它的同一存储实例从缓存读取。
+        if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT)) {
+            throw new IllegalStateException("FMDB 模型产物入库已关闭且当前缓存不存在模型："
+                    + version);
+        }
         LOGGER.info("开始加载 FMDB 列级模型，modelVersion={}", version);
         ColumnModelArtifact artifact = findModel(version);
         if (artifact == null) {
@@ -160,6 +189,15 @@ public final class FmdbModelStore implements ColumnModelStore {
     public synchronized String saveDictionary(FeatureDictionary dictionary) {
         if (dictionary == null) {
             throw new IllegalArgumentException("FMDB 特征字典不能为空");
+        }
+        // 字典停写时仍缓存当前任务所需定义，但不执行任何 FMDB 读写。
+        if (!persistenceConfig.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY)) {
+            dictionaryCache.put(dictionary.getVersion(), dictionary);
+            LOGGER.info("FMDB 特征字典入库已关闭，仅缓存当前字典，dictionaryVersion={}，"
+                            + "featureCount={}，configKey={}", dictionary.getVersion(),
+                    dictionary.getDefinitions().size(),
+                    FmdbColumnArtifact.FEATURE_DICTIONARY.getConfigKey());
+            return dictionaryPath(dictionary.getVersion());
         }
         FeatureDictionary existing = findDictionary(dictionary.getVersion());
         if (existing != null) {
@@ -201,6 +239,11 @@ public final class FmdbModelStore implements ColumnModelStore {
         FeatureDictionary cached = dictionaryCache.get(version);
         if (cached != null) {
             return cached;
+        }
+        // 未入库字典不能在进程重启后从 FMDB 恢复。
+        if (!persistenceConfig.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY)) {
+            throw new IllegalStateException("FMDB 特征字典入库已关闭且当前缓存不存在字典："
+                    + version);
         }
         FeatureDictionary dictionary = findDictionary(version);
         if (dictionary == null) {

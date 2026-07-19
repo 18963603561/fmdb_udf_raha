@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.fmdb.gateway;
 
 import com.fiberhome.ml.raha.fmdb.FmdbPersistenceConfig;
+import com.fiberhome.ml.raha.fmdb.FmdbPhysicalTable;
 import com.fiberhome.ml.raha.fmdb.FmdbSchemaInitializer;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.Arrays;
@@ -32,6 +33,8 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
             "[A-Za-z_][A-Za-z0-9_]*");
     /** FMDB 平台 Spark 会话。 */
     private final SparkSession sparkSession;
+    /** 控制标准九张物理表是否允许写入。 */
+    private final FmdbPersistenceConfig persistenceConfig;
 
     public SparkSqlFmdbTableGateway(SparkSession sparkSession) {
         this(sparkSession, FmdbPersistenceConfig.fromDefaults());
@@ -52,6 +55,7 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
             throw new IllegalArgumentException("FMDB 持久化配置不能为空");
         }
         this.sparkSession = sparkSession;
+        this.persistenceConfig = persistenceConfig;
         // 网关首次创建时初始化默认表，自定义表仍保留首次写入自动创建能力。
         new FmdbSchemaInitializer(sparkSession, persistenceConfig).initialize();
     }
@@ -74,6 +78,13 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
                                               List<String> keyColumns) {
         String validated = validateTableName(tableName);
         validateRowsAndKeys(rows, keyColumns);
+        FmdbPhysicalTable physicalTable = FmdbPhysicalTable.fromTableName(validated);
+        // 标准九表在网关层再次执行开关，防止专用写入器遗漏判断。
+        if (physicalTable != null && !persistenceConfig.shouldPersist(physicalTable)) {
+            //LOGGER.info("FMDB 物理表入库已关闭，跳过网关写入，tableName={}，configKey={}",
+            //        validated, physicalTable.getConfigKey());
+            return 0L;
+        }
         LOGGER.info("开始向 FMDB 表幂等写入，tableName={}，keyColumns={}",
                 validated, keyColumns);
         try {

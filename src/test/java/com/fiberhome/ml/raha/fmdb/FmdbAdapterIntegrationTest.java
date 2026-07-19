@@ -131,7 +131,7 @@ class FmdbAdapterIntegrationTest {
         SparkSession spark = SparkTestSession.get();
         SparkSqlFmdbResultWriter writer = new SparkSqlFmdbResultWriter(
                 spark, gateway, fixedClock(2000L),
-                new FmdbPersistenceConfig(false, false, "unused.sql"));
+                FmdbPersistenceConfig.builder().enabled(false).build());
         RahaJob job = new RahaJob("job-disabled", "request-disabled", JobType.DETECTION,
                 "dataset", "snapshot-v1", "config-v1", 1000L);
 
@@ -143,17 +143,37 @@ class FmdbAdapterIntegrationTest {
     }
 
     @Test
+    void shouldDisableDetectionTableWithoutDisablingJobTable() {
+        SparkSession spark = SparkTestSession.get();
+        FmdbPersistenceConfig config = FmdbPersistenceConfig.builder()
+                .table(FmdbPhysicalTable.DETECTION_RESULT, false)
+                .build();
+        SparkSqlFmdbResultWriter writer = new SparkSqlFmdbResultWriter(
+                spark, gateway, fixedClock(2000L), config);
+        RahaJob job = new RahaJob("job-1", "request-table-switch",
+                JobType.DETECTION, "dataset", "snapshot-v1", "config-v1", 1000L);
+
+        assertEquals(1L, writer.writeJob(JOB_TABLE, job));
+        assertEquals(0L, writer.writeDetectionResults(RESULT_TABLE,
+                "job-1", Collections.singletonList(detection("1", true, 0.9d))));
+        assertTrue(gateway.tableExists(JOB_TABLE));
+        assertFalse(gateway.tableExists(RESULT_TABLE));
+    }
+
+    @Test
     void shouldReloadImmutableModelAndFeatureDictionaryFromFmdb() {
         SparkSession spark = SparkTestSession.get();
         FmdbModelStore first = new FmdbModelStore(spark, gateway,
-                MODEL_TABLE, DICTIONARY_TABLE, fixedClock(2000L));
+                MODEL_TABLE, DICTIONARY_TABLE, fixedClock(2000L),
+                FmdbPersistenceConfig.fromDefaults());
         ColumnModelArtifact artifact = artifact(0.25d);
         FeatureDictionary dictionary = dictionary();
 
         String modelPath = first.save(artifact);
         String dictionaryPath = first.saveDictionary(dictionary);
         FmdbModelStore restarted = new FmdbModelStore(spark, gateway,
-                MODEL_TABLE, DICTIONARY_TABLE, fixedClock(3000L));
+                MODEL_TABLE, DICTIONARY_TABLE, fixedClock(3000L),
+                FmdbPersistenceConfig.fromDefaults());
 
         ColumnModelArtifact loadedModel = restarted.load(modelPath);
         FeatureDictionary loadedDictionary = restarted.loadDictionary(dictionary.getVersion());
@@ -169,6 +189,28 @@ class FmdbAdapterIntegrationTest {
         assertEquals(2L, gateway.read(DICTIONARY_TABLE).count());
         assertThrows(IllegalStateException.class,
                 () -> restarted.save(artifact(0.75d)));
+    }
+
+    @Test
+    void shouldKeepModelInCurrentCacheWhenModelTableIsDisabled() {
+        SparkSession spark = SparkTestSession.get();
+        FmdbPersistenceConfig config = FmdbPersistenceConfig.builder()
+                .table(FmdbPhysicalTable.MODEL_ARTIFACT, false)
+                .build();
+        FmdbModelStore current = new FmdbModelStore(spark, gateway,
+                MODEL_TABLE, DICTIONARY_TABLE, fixedClock(2000L), config);
+        ColumnModelArtifact artifact = artifact(0.25d);
+
+        String modelPath = current.save(artifact);
+
+        assertEquals(artifact.getModelVersion(),
+                current.load(modelPath).getModelVersion());
+        assertFalse(gateway.tableExists(MODEL_TABLE));
+
+        FmdbModelStore restarted = new FmdbModelStore(spark, gateway,
+                MODEL_TABLE, DICTIONARY_TABLE, fixedClock(3000L), config);
+        assertThrows(IllegalStateException.class,
+                () -> restarted.load(modelPath));
     }
 
     @Test

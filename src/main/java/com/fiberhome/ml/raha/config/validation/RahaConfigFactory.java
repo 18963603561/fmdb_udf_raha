@@ -49,8 +49,7 @@ public final class RahaConfigFactory {
                                    String inputReference,
                                    String rowIdColumn) {
         return new RahaJobConfig(jobType, datasetId, null, inputReference,
-                rowIdColumn, properties.getBoolean("raha.job.save-intermediate"),
-                properties.getLong("raha.job.random-seed"),
+                rowIdColumn, properties.getLong("raha.job.random-seed"),
                 strategyConfig(), featureConfig(), modelConfig(),
                 clusteringConfig(), samplingConfig(), resourceConfig(),
                 failureToleranceConfig(), executionFingerprint());

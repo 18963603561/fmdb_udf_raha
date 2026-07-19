@@ -189,7 +189,7 @@ class Iteration4PipelineIntegrationTest {
                 Collections.singleton(StrategyTypes.RVD_ONE_TO_MANY),
                 Collections.<String>emptySet(), Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(JobType.DETECTION, "dataset", null,
-                csv.toString(), "id", true, 1L,
+                csv.toString(), "id", 1L,
                 strategyConfig, FeatureConfig.defaults(),
                 new ModelConfig(com.fiberhome.ml.raha.data.type.ClassifierType.WEIGHTED_RULE,
                         0.5d, false),

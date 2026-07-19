@@ -33,6 +33,7 @@ import com.fiberhome.ml.raha.feature.FeatureService;
 import com.fiberhome.ml.raha.fmdb.DefaultFmdbSchemaResolver;
 import com.fiberhome.ml.raha.fmdb.FmdbDatasetLoader;
 import com.fiberhome.ml.raha.fmdb.FmdbModelStore;
+import com.fiberhome.ml.raha.fmdb.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.fmdb.gateway.InMemoryFmdbTableGateway;
 import com.fiberhome.ml.raha.fmdb.SparkSqlFmdbResultWriter;
 import com.fiberhome.ml.raha.label.CellLabel;
@@ -133,7 +134,8 @@ class Iteration9FmdbPipelineIntegrationTest {
         ModelMetadataRepository metadataRepository =
                 new DefaultModelMetadataRepository(coreStorage);
         FmdbModelStore modelStore = new FmdbModelStore(spark, fmdbGateway,
-                MODEL_TABLE, DICTIONARY_TABLE, clock);
+                MODEL_TABLE, DICTIONARY_TABLE, clock,
+                FmdbPersistenceConfig.fromDefaults());
         ModelReleaseManager releaseManager = new ModelReleaseManager(
                 metadataRepository, clock);
         RahaTrainService trainService = new RahaTrainService(
@@ -172,7 +174,8 @@ class Iteration9FmdbPipelineIntegrationTest {
 
         // 使用新存储实例模拟服务重启，确保检测不依赖训练进程内缓存。
         FmdbModelStore restartedStore = new FmdbModelStore(spark, fmdbGateway,
-                MODEL_TABLE, DICTIONARY_TABLE, clock);
+                MODEL_TABLE, DICTIONARY_TABLE, clock,
+                FmdbPersistenceConfig.fromDefaults());
         FeatureDictionary reloadedDictionary = restartedStore.loadDictionary(
                 trained.getPayload().getFeatures().getDictionaries().get("code").getVersion());
         assertEquals("code", reloadedDictionary.getColumnName());
@@ -222,7 +225,7 @@ class Iteration9FmdbPipelineIntegrationTest {
                 1, 60000L, false, strategyTypes,
                 Collections.<String>emptySet(), Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(JobType.TRAINING, "fmdb-dataset", "snapshot-v1",
-                INPUT_TABLE, "id", true, 20260715L, strategyConfig,
+                INPUT_TABLE, "id", 20260715L, strategyConfig,
                 FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, true),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 2, 100),
