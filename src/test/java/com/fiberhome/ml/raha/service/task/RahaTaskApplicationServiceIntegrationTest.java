@@ -22,6 +22,10 @@ import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.LoadedDataset;
 import com.fiberhome.ml.raha.data.loader.RahaDatasetLoader;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.RowIdentityColumns;
+import com.fiberhome.ml.raha.data.loader.RowIdentityResult;
+import com.fiberhome.ml.raha.data.loader.RowIdentityService;
 import com.fiberhome.ml.raha.data.profile.ColumnProfileService;
 import com.fiberhome.ml.raha.data.profile.ColumnProfiler;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
@@ -33,6 +37,10 @@ import com.fiberhome.ml.raha.data.type.StrategyFamily;
 import com.fiberhome.ml.raha.feature.FeatureDictionaryVersioner;
 import com.fiberhome.ml.raha.feature.FeatureService;
 import com.fiberhome.ml.raha.feature.assembly.FeatureAssembler;
+import com.fiberhome.ml.raha.fmdb.FmdbPersistenceConfig;
+import com.fiberhome.ml.raha.fmdb.FmdbPhysicalTable;
+import com.fiberhome.ml.raha.fmdb.FmdbSampleRecordRepository;
+import com.fiberhome.ml.raha.fmdb.gateway.InMemoryFmdbTableGateway;
 import com.fiberhome.ml.raha.job.execution.RahaJobOrchestrator;
 import com.fiberhome.ml.raha.job.execution.StageFailureDecider;
 import com.fiberhome.ml.raha.job.id.DefaultRahaIdGenerator;
@@ -73,6 +81,7 @@ import com.fiberhome.ml.raha.sampling.ClusterCoverageScorer;
 import com.fiberhome.ml.raha.sampling.TupleSampler;
 import com.fiberhome.ml.raha.sampling.service.SamplingService;
 import com.fiberhome.ml.raha.sampling.service.SamplingVersioner;
+import com.fiberhome.ml.raha.sampling.service.SampleRecordService;
 import com.fiberhome.ml.raha.service.detect.RahaDetectOutput;
 import com.fiberhome.ml.raha.service.detect.RahaDetectService;
 import com.fiberhome.ml.raha.service.sample.RahaSampleOutput;
@@ -128,7 +137,13 @@ class RahaTaskApplicationServiceIntegrationTest {
         RahaDataset dataset = dataset();
         RahaDatasetLoader loader = request -> new LoadedDataset(dataset,
                 new DatasetSnapshot("dataset", "snapshot-v1", "memory", "dataset",
-                        "id", "schema-v1", 8L, 2, "source-v1", 1000L));
+                        RowIdentityColumns.ROW_ID, "schema-v1", 8L, 2,
+                        "source-v1", 1000L));
+        InMemoryFmdbTableGateway fmdbGateway = new InMemoryFmdbTableGateway(
+                SparkTestSession.get());
+        SampleRecordService sampleRecordService = new SampleRecordService(
+                new FmdbSampleRecordRepository(SparkTestSession.get(), fmdbGateway,
+                        FmdbPersistenceConfig.fromDefaults()), clock);
         InMemoryRahaRepository storage = new InMemoryRahaRepository();
         DefaultStageRepository stageRepository = new DefaultStageRepository(storage);
         DefaultStrategyRepository strategyRepository =
@@ -175,7 +190,7 @@ class RahaTaskApplicationServiceIntegrationTest {
                 clusteringService, propagationService, trainService);
         SamplingWorkflow samplingWorkflow = new SamplingWorkflow(loader,
                 profileService, planService, executionService, featureService,
-                clusteringService, sampleService);
+                clusteringService, sampleService, sampleRecordService);
         DetectionWorkflow detectionWorkflow = new DetectionWorkflow(loader,
                 profileService, planService, executionService, featureService,
                 detectService);
@@ -184,7 +199,7 @@ class RahaTaskApplicationServiceIntegrationTest {
                 samplingWorkflow, detectionWorkflow);
 
         RahaTaskExecutionRequest trainingRequest = RahaTaskExecutionRequest.training(
-                config(JobType.TRAINING), loadRequest(), directLabels(),
+                config(JobType.TRAINING), loadRequest(), directLabels(dataset),
                 LabelPropagationMethod.HOMOGENEITY,
                 LabelPropagationConfig.defaults(),
                 LogisticRegressionTrainingConfig.defaults(), "raha");
@@ -210,6 +225,11 @@ class RahaTaskApplicationServiceIntegrationTest {
         assertEquals(JobStatus.SUCCEEDED, sampled.getJob().getStatus());
         assertNotNull(sampleOutput);
         assertFalse(sampleOutput.getSampling().getTasks().isEmpty());
+        assertNotNull(sampleOutput.getSampleBatch());
+        assertTrue(sampled.getResultLocation().startsWith("fmdb://"));
+        assertEquals(sampleOutput.getSampleBatch().getRecords().size(),
+                fmdbGateway.read(FmdbPhysicalTable.SAMPLE_RECORD.getTableName())
+                        .count());
 
         RahaColumnModel candidate = trainOutput.getCandidateModels().get("code");
         releaseManager.publish("dataset", "code", candidate.getModelVersion(),
@@ -251,7 +271,8 @@ class RahaTaskApplicationServiceIntegrationTest {
                 Collections.<String>emptySet(),
                 Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(jobType, "dataset", "snapshot-v1",
-                "memory", "id", 20260715L, strategyConfig,
+                "memory", RowIdentityConfig.sourceKey("id"), 20260715L,
+                strategyConfig,
                 FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, true),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 2, 100),
@@ -260,7 +281,8 @@ class RahaTaskApplicationServiceIntegrationTest {
     }
 
     private static DataLoadRequest loadRequest() {
-        return new DataLoadRequest("dataset", "memory", "dataset", "id",
+        return new DataLoadRequest("dataset", "memory", "dataset",
+                RowIdentityConfig.sourceKey("id"),
                 DataFormat.CSV, Collections.<String, String>emptyMap(),
                 Collections.<String>emptySet(), Collections.<String>emptySet(),
                 Collections.<String>emptySet(), "snapshot-v1", "source-v1");
@@ -275,18 +297,27 @@ class RahaTaskApplicationServiceIntegrationTest {
         StructType schema = new StructType()
                 .add("id", DataTypes.StringType, false)
                 .add("code", DataTypes.StringType, true);
-        return new RahaDataset("dataset", "snapshot-v1", "dataset", "id",
+        RowIdentityResult identity = new RowIdentityService().identify(
+                SparkTestSession.get().createDataFrame(rows, schema),
+                RowIdentityConfig.sourceKey("id"));
+        return new RahaDataset("dataset", "snapshot-v1", "dataset",
+                RowIdentityColumns.ROW_ID,
                 Arrays.asList(
                         new ColumnMetadata("id", 0, "string", false, false, false),
                         new ColumnMetadata("code", 1, "string", true, true, false)),
-                SparkTestSession.get().createDataFrame(rows, schema),
+                identity.getDataFrame(),
                 "schema-v1", Collections.emptyMap());
     }
 
-    private static List<CellLabel> directLabels() {
+    private static List<CellLabel> directLabels(RahaDataset dataset) {
         return Arrays.asList(
-                label("1", 0, 1000L),
-                label("7", 1, 1001L));
+                label(rowId(dataset, "1"), 0, 1000L),
+                label(rowId(dataset, "7"), 1, 1001L));
+    }
+
+    private static String rowId(RahaDataset dataset, String businessId) {
+        return dataset.getDataFrame().filter("id = '" + businessId + "'")
+                .select(dataset.getRowIdColumn()).first().getString(0);
     }
 
     private static CellLabel label(String rowId, int value, long createdAt) {

@@ -2,6 +2,7 @@ package com.fiberhome.ml.raha.model;
 
 import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
+import com.fiberhome.ml.raha.model.domain.ModelPersistenceContext;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -37,8 +38,10 @@ public final class FileColumnModelStore implements ColumnModelStore {
     }
 
     @Override
-    public String save(ColumnModelArtifact artifact) {
-        if (artifact == null || !artifact.getModelVersion().matches("[0-9a-f]{64}")) {
+    public String save(ColumnModelArtifact artifact,
+                       ModelPersistenceContext context) {
+        if (artifact == null || context == null
+                || !artifact.getModelVersion().matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("模型参数和版本必须有效");
         }
         Path target = rootDirectory.resolve(artifact.getModelVersion() + ".properties").normalize();

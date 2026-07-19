@@ -89,7 +89,7 @@ public final class RahaSampleService {
                     sampling.getTasks().size());
             return new RahaServiceResult<RahaSampleOutput>(request.getJobId(),
                     JobType.SAMPLING, JobStatus.SUCCEEDED,
-                    "repository://annotation-task/" + request.getJobId(), summary,
+                    "memory://annotation-task/" + request.getJobId(), summary,
                     new RahaSampleOutput(clustering, sampling), null, null);
         } catch (RuntimeException exception) {
             // 聚类或标注任务仓储异常统一转换为失败结果，并保留完整异常堆栈。

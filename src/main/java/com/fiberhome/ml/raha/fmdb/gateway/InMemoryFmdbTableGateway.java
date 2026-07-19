@@ -49,6 +49,18 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
     }
 
     @Override
+    public synchronized Dataset<Row> read(String tableName,
+                                           List<String> columns,
+                                           Column condition) {
+        Dataset<Row> selected = read(tableName);
+        List<String> validatedColumns = validateProjection(selected, columns);
+        if (condition != null) {
+            selected = selected.filter(condition);
+        }
+        return selected.selectExpr(validatedColumns.toArray(new String[0]));
+    }
+
+    @Override
     public synchronized long appendIdempotent(String tableName,
                                               Dataset<Row> rows,
                                               List<String> keyColumns) {
@@ -57,7 +69,7 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
         Dataset<Row> existing = tables.get(validated);
         Dataset<Row> pending = rows;
         if (existing != null) {
-            if (!existing.schema().equals(rows.schema())) {
+            if (!schemasCompatible(existing.schema(), rows.schema())) {
                 throw new IllegalStateException("内存 FMDB 表模式与写入模式不一致：" + validated);
             }
             Dataset<Row> incoming = rows.alias("incoming");
@@ -128,5 +140,37 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
                 throw new IllegalArgumentException("内存 FMDB 业务主键缺失或重复：" + validated);
             }
         }
+    }
+
+    private static List<String> validateProjection(Dataset<Row> rows,
+                                                    List<String> columns) {
+        if (columns == null || columns.isEmpty()) {
+            throw new IllegalArgumentException("FMDB 查询投影字段不能为空");
+        }
+        Set<String> available = new LinkedHashSet<String>(Arrays.asList(rows.columns()));
+        Set<String> unique = new LinkedHashSet<String>();
+        for (String column : columns) {
+            String validated = SparkSqlFmdbTableGateway.validateColumnName(column);
+            if (!available.contains(validated) || !unique.add(validated)) {
+                throw new IllegalArgumentException("FMDB 查询字段缺失或重复：" + validated);
+            }
+        }
+        return new java.util.ArrayList<String>(unique);
+    }
+
+    private static boolean schemasCompatible(
+            org.apache.spark.sql.types.StructType first,
+            org.apache.spark.sql.types.StructType second) {
+        if (first.fields().length != second.fields().length) {
+            return false;
+        }
+        for (int index = 0; index < first.fields().length; index++) {
+            if (!first.fields()[index].name().equals(second.fields()[index].name())
+                    || !first.fields()[index].dataType().equals(
+                    second.fields()[index].dataType())) {
+                return false;
+            }
+        }
+        return true;
     }
 }

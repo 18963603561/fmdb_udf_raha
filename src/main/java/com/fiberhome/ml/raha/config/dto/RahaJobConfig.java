@@ -3,6 +3,7 @@ package com.fiberhome.ml.raha.config.dto;
 import com.fiberhome.ml.raha.config.core.ConfigTextUtils;
 import com.fiberhome.ml.raha.config.core.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.data.type.JobType;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
 
 /**
  * Raha 任务完整配置，是任务提交、幂等计算和后续阶段执行的统一输入。
@@ -17,8 +18,8 @@ public final class RahaJobConfig {
     private final String snapshotId;
     /** 输入表、SQL 或文件等数据引用。 */
     private final String inputReference;
-    /** 稳定唯一的行标识字段。 */
-    private final String rowIdColumn;
+    /** 输入业务键或全字段内容哈希行身份配置。 */
+    private final RowIdentityConfig rowIdentityConfig;
     /** 聚类、采样和模型使用的随机种子。 */
     private final long randomSeed;
     /** 策略生成和执行配置。 */
@@ -42,14 +43,14 @@ public final class RahaJobConfig {
                          String datasetId,
                          String snapshotId,
                          String inputReference,
-                         String rowIdColumn,
+                         RowIdentityConfig rowIdentityConfig,
                          long randomSeed,
                          StrategyConfig strategyConfig,
                          FeatureConfig featureConfig,
                          ModelConfig modelConfig,
                          ResourceConfig resourceConfig,
                          FailureToleranceConfig failureToleranceConfig) {
-        this(jobType, datasetId, snapshotId, inputReference, rowIdColumn,
+        this(jobType, datasetId, snapshotId, inputReference, rowIdentityConfig,
                 randomSeed,
                 strategyConfig, featureConfig, modelConfig,
                 ClusteringConfig.defaults(), SamplingConfig.defaults(),
@@ -60,7 +61,7 @@ public final class RahaJobConfig {
                          String datasetId,
                          String snapshotId,
                          String inputReference,
-                         String rowIdColumn,
+                         RowIdentityConfig rowIdentityConfig,
                          long randomSeed,
                          StrategyConfig strategyConfig,
                          FeatureConfig featureConfig,
@@ -69,7 +70,7 @@ public final class RahaJobConfig {
                          SamplingConfig samplingConfig,
                          ResourceConfig resourceConfig,
                          FailureToleranceConfig failureToleranceConfig) {
-        this(jobType, datasetId, snapshotId, inputReference, rowIdColumn,
+        this(jobType, datasetId, snapshotId, inputReference, rowIdentityConfig,
                 randomSeed,
                 strategyConfig, featureConfig, modelConfig, clusteringConfig,
                 samplingConfig, resourceConfig, failureToleranceConfig,
@@ -80,7 +81,7 @@ public final class RahaJobConfig {
                          String datasetId,
                          String snapshotId,
                          String inputReference,
-                         String rowIdColumn,
+                         RowIdentityConfig rowIdentityConfig,
                          long randomSeed,
                          StrategyConfig strategyConfig,
                          FeatureConfig featureConfig,
@@ -94,7 +95,7 @@ public final class RahaJobConfig {
         this.datasetId = datasetId;
         this.snapshotId = snapshotId;
         this.inputReference = inputReference;
-        this.rowIdColumn = rowIdColumn;
+        this.rowIdentityConfig = rowIdentityConfig;
         this.randomSeed = randomSeed;
         this.strategyConfig = strategyConfig;
         this.featureConfig = featureConfig;
@@ -112,15 +113,15 @@ public final class RahaJobConfig {
      * @param jobType 任务类型
      * @param datasetId 数据集标识
      * @param inputReference 输入数据引用
-     * @param rowIdColumn 行标识字段
+     * @param rowIdentityConfig 行身份配置
      * @return 默认任务配置
      */
     public static RahaJobConfig defaults(JobType jobType,
                                          String datasetId,
                                          String inputReference,
-                                         String rowIdColumn) {
+                                         RowIdentityConfig rowIdentityConfig) {
         return RahaDefaultConfigProvider.factory().jobConfig(
-                jobType, datasetId, inputReference, rowIdColumn);
+                jobType, datasetId, inputReference, rowIdentityConfig);
     }
 
     public JobType getJobType() {
@@ -139,8 +140,8 @@ public final class RahaJobConfig {
         return inputReference;
     }
 
-    public String getRowIdColumn() {
-        return rowIdColumn;
+    public RowIdentityConfig getRowIdentityConfig() {
+        return rowIdentityConfig;
     }
 
     public long getRandomSeed() {
@@ -191,7 +192,8 @@ public final class RahaJobConfig {
                 + ConfigTextUtils.token(datasetId)
                 + ConfigTextUtils.token(snapshotId)
                 + ConfigTextUtils.token(inputReference)
-                + ConfigTextUtils.token(rowIdColumn)
+                + ConfigTextUtils.token(rowIdentityConfig == null
+                ? null : rowIdentityConfig.toCanonicalString())
                 + ConfigTextUtils.token(randomSeed)
                 + ConfigTextUtils.token(strategyConfig == null ? null : strategyConfig.toCanonicalString())
                 + ConfigTextUtils.token(featureConfig == null ? null : featureConfig.toCanonicalString())

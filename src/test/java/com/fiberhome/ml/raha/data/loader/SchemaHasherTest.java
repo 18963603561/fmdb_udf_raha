@@ -38,7 +38,8 @@ class SchemaHasherTest {
     @Test
     void shouldRejectConflictingColumnFilters() {
         assertThrows(IllegalArgumentException.class, () -> new DataLoadRequest(
-                "dataset", "input", "table", "id", DataFormat.CSV,
+                "dataset", "input", "table", RowIdentityConfig.sourceKey("id"),
+                DataFormat.CSV,
                 Collections.<String, String>emptyMap(),
                 Collections.singleton("name"),
                 Collections.singleton("name"),

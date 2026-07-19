@@ -25,6 +25,8 @@ public final class FileRahaDatasetLoader implements RahaDatasetLoader {
     private final SparkSession sparkSession;
     /** 行标识校验器。 */
     private final RowIdValidator rowIdValidator;
+    /** 行身份生成和逻辑去重服务。 */
+    private final RowIdentityService rowIdentityService;
     /** 模式哈希生成器。 */
     private final SchemaHasher schemaHasher;
     /** 字段元数据生成器。 */
@@ -35,16 +37,19 @@ public final class FileRahaDatasetLoader implements RahaDatasetLoader {
     private final Clock clock;
 
     public FileRahaDatasetLoader(SparkSession sparkSession,
+                                 RowIdentityService rowIdentityService,
                                  RowIdValidator rowIdValidator,
                                  SchemaHasher schemaHasher,
                                  ColumnMetadataFactory columnMetadataFactory,
                                  SnapshotMetadataFactory snapshotMetadataFactory,
                                  Clock clock) {
-        if (sparkSession == null || rowIdValidator == null || schemaHasher == null
+        if (sparkSession == null || rowIdentityService == null
+                || rowIdValidator == null || schemaHasher == null
                 || columnMetadataFactory == null || snapshotMetadataFactory == null || clock == null) {
             throw new IllegalArgumentException("文件数据加载器依赖不能为空");
         }
         this.sparkSession = sparkSession;
+        this.rowIdentityService = rowIdentityService;
         this.rowIdValidator = rowIdValidator;
         this.schemaHasher = schemaHasher;
         this.columnMetadataFactory = columnMetadataFactory;
@@ -67,19 +72,27 @@ public final class FileRahaDatasetLoader implements RahaDatasetLoader {
             for (Map.Entry<String, String> option : request.getOptions().entrySet()) {
                 reader = reader.option(option.getKey(), option.getValue());
             }
-            Dataset<Row> dataFrame = reader.load(request.getInputReference());
+            Dataset<Row> source = reader.load(request.getInputReference());
+            org.apache.spark.sql.types.StructType businessSchema =
+                    rowIdentityService.businessSchema(source.schema());
+            String schemaHash = schemaHasher.hash(businessSchema);
+            List<ColumnMetadata> columns = columnMetadataFactory.create(
+                    businessSchema, request);
+            RowIdentityResult identity = rowIdentityService.identify(
+                    source, request.getRowIdentityConfig());
+            Dataset<Row> dataFrame = identity.getDataFrame();
             RowIdValidationResult rowIdResult = rowIdValidator.validate(
-                    dataFrame, request.getRowIdColumn());
-            String schemaHash = schemaHasher.hash(dataFrame.schema());
-            List<ColumnMetadata> columns = columnMetadataFactory.create(dataFrame.schema(), request);
+                    dataFrame, RowIdentityColumns.ROW_ID);
             DatasetSnapshot snapshot = snapshotMetadataFactory.create(request, schemaHash,
                     rowIdResult.getRowCount(), columns.size(), clock.millis());
             RahaDataset dataset = new RahaDataset(request.getDatasetId(), snapshot.getSnapshotId(),
-                    request.getTableName(), request.getRowIdColumn(), columns, dataFrame,
+                    request.getTableName(), RowIdentityColumns.ROW_ID, columns, dataFrame,
                     schemaHash, Collections.emptyMap());
-            LOGGER.info("外部文件数据读取完成，datasetId={}，snapshotId={}，rowCount={}，columnCount={}",
+            LOGGER.info("外部文件数据读取完成，datasetId={}，snapshotId={}，"
+                            + "sourceRowCount={}，logicalRowCount={}，columnCount={}",
                     request.getDatasetId(), snapshot.getSnapshotId(),
-                    snapshot.getRowCount(), snapshot.getColumnCount());
+                    identity.getMetrics().getSourceRowCount(), snapshot.getRowCount(),
+                    snapshot.getColumnCount());
             return new LoadedDataset(dataset, snapshot);
         } catch (DataValidationException exception) {
             LOGGER.error("外部文件数据校验失败，datasetId={}，errorCode={}",

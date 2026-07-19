@@ -7,6 +7,8 @@ import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.FileRahaDatasetLoader;
 import com.fiberhome.ml.raha.data.loader.LoadedDataset;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.RowIdentityService;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
 import com.fiberhome.ml.raha.data.type.JobType;
@@ -44,7 +46,9 @@ class GroundTruthLabelAdapterIntegrationTest {
         Clock clock = Clock.fixed(Instant.ofEpochMilli(1000L), ZoneOffset.UTC);
         RahaDataset dirty = load("alignment/iteration5-dirty.csv", "dirty", clock);
         RahaDataset clean = load("alignment/iteration5-clean.csv", "clean", clock);
-        AnnotationTask task = new AnnotationTask("task", "job", "6", 1, 1.0d,
+        String rowId = dirty.getDataFrame().filter("id = '6'")
+                .select(dirty.getRowIdColumn()).first().getString(0);
+        AnnotationTask task = new AnnotationTask("task", "job", rowId, 1, 1.0d,
                 Collections.singletonMap("amount", "cluster-v1|cluster-1"),
                 "sampling-v1", 500L, 2000L);
         GroundTruthLabelAdapter adapter = new GroundTruthLabelAdapter(clock);
@@ -69,10 +73,12 @@ class GroundTruthLabelAdapterIntegrationTest {
         Path path = Paths.get(GroundTruthLabelAdapterIntegrationTest.class
                 .getClassLoader().getResource(resource).toURI());
         FileRahaDatasetLoader loader = new FileRahaDatasetLoader(
-                SparkTestSession.get(), new RowIdValidator(), new SchemaHasher(),
+                SparkTestSession.get(), new RowIdentityService(),
+                new RowIdValidator(), new SchemaHasher(),
                 new ColumnMetadataFactory(), new SnapshotMetadataFactory(), clock);
         LoadedDataset loaded = loader.load(new DataLoadRequest(
-                datasetId, path.toString(), datasetId, "id", DataFormat.CSV,
+                datasetId, path.toString(), datasetId,
+                RowIdentityConfig.sourceKey("id"), DataFormat.CSV,
                 csvOptions(), Collections.<String>emptySet(), Collections.<String>emptySet(),
                 Collections.<String>emptySet(), null, "source-v1"));
         return loaded.getDataset();

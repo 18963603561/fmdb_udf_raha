@@ -2,6 +2,7 @@ package com.fiberhome.ml.raha.service.train;
 
 import com.fiberhome.ml.raha.config.dto.RahaJobConfig;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
@@ -44,6 +45,18 @@ public final class RahaTrainRequest {
     private final RahaFeaturePreparationResult preparedFeatures;
     /** PROPAGATE 阶段已经生成的可复用标签传播结果。 */
     private final LabelPropagationResult preparedPropagation;
+    /** 可选 c1 采样批次引用。 */
+    private final String sampleBatchId;
+    /** c1 月分区。 */
+    private final String samplePartitionMonth;
+    /** 可选标注批次引用。 */
+    private final String annotationBatchId;
+    /** 标注月分区。 */
+    private final String annotationPartitionMonth;
+    /** c1 与 o1 必须共用的行身份配置。 */
+    private final RowIdentityConfig rowIdentityConfig;
+    /** 已在工作流画像前完成的训练合并结果。 */
+    private final TrainingMergeResult trainingMergeResult;
 
     public RahaTrainRequest(String jobId,
                             String stageId,
@@ -57,7 +70,7 @@ public final class RahaTrainRequest {
                             ArtifactVersion artifactVersion) {
         this(jobId, stageId, dataset, config, directLabels, propagationMethod,
                 propagationConfig, trainingConfig, modelNamePrefix,
-                artifactVersion, null, null);
+                artifactVersion, null, null, null, null, null, null, null, null);
     }
 
     public RahaTrainRequest(String jobId,
@@ -73,7 +86,8 @@ public final class RahaTrainRequest {
                             RahaFeaturePreparationResult preparedFeatures) {
         this(jobId, stageId, dataset, config, directLabels, propagationMethod,
                 propagationConfig, trainingConfig, modelNamePrefix,
-                artifactVersion, preparedFeatures, null);
+                artifactVersion, preparedFeatures, null, null, null, null, null, null,
+                null);
     }
 
     public RahaTrainRequest(String jobId,
@@ -88,6 +102,76 @@ public final class RahaTrainRequest {
                             ArtifactVersion artifactVersion,
                             RahaFeaturePreparationResult preparedFeatures,
                             LabelPropagationResult preparedPropagation) {
+        this(jobId, stageId, dataset, config, directLabels, propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix, artifactVersion,
+                preparedFeatures, preparedPropagation, null, null, null, null, null,
+                null);
+    }
+
+    /**
+     * 使用工作流已经完成的合并、画像、特征和传播结果执行最终训练。
+     */
+    public RahaTrainRequest(String jobId,
+                            String stageId,
+                            RahaDataset dataset,
+                            RahaJobConfig config,
+                            List<CellLabel> directLabels,
+                            LabelPropagationMethod propagationMethod,
+                            LabelPropagationConfig propagationConfig,
+                            LogisticRegressionTrainingConfig trainingConfig,
+                            String modelNamePrefix,
+                            ArtifactVersion artifactVersion,
+                            RahaFeaturePreparationResult preparedFeatures,
+                            LabelPropagationResult preparedPropagation,
+                            TrainingMergeResult trainingMergeResult) {
+        this(jobId, stageId, dataset, config, directLabels, propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix, artifactVersion,
+                preparedFeatures, preparedPropagation, null, null, null, null, null,
+                trainingMergeResult);
+    }
+
+    /**
+     * 使用持久化 c1 和标注批次训练，训练服务会在算法开始前生成合并快照。
+     */
+    public RahaTrainRequest(String jobId,
+                            String stageId,
+                            RahaDataset dataset,
+                            RahaJobConfig config,
+                            List<CellLabel> directLabels,
+                            LabelPropagationMethod propagationMethod,
+                            LabelPropagationConfig propagationConfig,
+                            LogisticRegressionTrainingConfig trainingConfig,
+                            String modelNamePrefix,
+                            ArtifactVersion artifactVersion,
+                            String sampleBatchId,
+                            String samplePartitionMonth,
+                            String annotationBatchId,
+                            String annotationPartitionMonth,
+                            RowIdentityConfig rowIdentityConfig) {
+        this(jobId, stageId, dataset, config, directLabels, propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix, artifactVersion,
+                null, null, sampleBatchId, samplePartitionMonth,
+                annotationBatchId, annotationPartitionMonth, rowIdentityConfig, null);
+    }
+
+    private RahaTrainRequest(String jobId,
+                             String stageId,
+                             RahaDataset dataset,
+                             RahaJobConfig config,
+                             List<CellLabel> directLabels,
+                             LabelPropagationMethod propagationMethod,
+                             LabelPropagationConfig propagationConfig,
+                             LogisticRegressionTrainingConfig trainingConfig,
+                             String modelNamePrefix,
+                             ArtifactVersion artifactVersion,
+                             RahaFeaturePreparationResult preparedFeatures,
+                             LabelPropagationResult preparedPropagation,
+                             String sampleBatchId,
+                             String samplePartitionMonth,
+                             String annotationBatchId,
+                             String annotationPartitionMonth,
+                             RowIdentityConfig rowIdentityConfig,
+                             TrainingMergeResult trainingMergeResult) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "训练任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "训练阶段标识");
         this.modelNamePrefix = ValueUtils.requireNotBlank(modelNamePrefix, "模型名称前缀");
@@ -125,6 +209,33 @@ public final class RahaTrainRequest {
             throw new IllegalArgumentException("复用传播结果与训练直接标签数量不一致");
         }
         this.preparedPropagation = preparedPropagation;
+        boolean hasAnyBatchReference = sampleBatchId != null
+                || samplePartitionMonth != null || annotationBatchId != null
+                || annotationPartitionMonth != null || rowIdentityConfig != null;
+        boolean hasAllBatchReferences = sampleBatchId != null
+                && samplePartitionMonth != null && annotationBatchId != null
+                && annotationPartitionMonth != null && rowIdentityConfig != null;
+        if (hasAnyBatchReference && !hasAllBatchReferences) {
+            throw new IllegalArgumentException("训练 c1、标注批次和行身份配置必须完整提供");
+        }
+        this.sampleBatchId = sampleBatchId;
+        this.samplePartitionMonth = samplePartitionMonth;
+        this.annotationBatchId = annotationBatchId;
+        this.annotationPartitionMonth = annotationPartitionMonth;
+        this.rowIdentityConfig = rowIdentityConfig;
+        if (trainingMergeResult != null
+                && (!dataset.getDatasetId().equals(
+                trainingMergeResult.getDataset().getDatasetId())
+                || !dataset.getSnapshotId().equals(
+                trainingMergeResult.getTrainingSnapshotId())
+                || trainingMergeResult.getDirectLabels().size()
+                != this.directLabels.size())) {
+            throw new IllegalArgumentException("训练合并结果与当前快照或直接标签不一致");
+        }
+        if (trainingMergeResult != null && hasAnyBatchReference) {
+            throw new IllegalArgumentException("已合并训练请求不能再次携带批次引用");
+        }
+        this.trainingMergeResult = trainingMergeResult;
     }
 
     public String getJobId() { return jobId; }
@@ -139,4 +250,43 @@ public final class RahaTrainRequest {
     public ArtifactVersion getArtifactVersion() { return artifactVersion; }
     public RahaFeaturePreparationResult getPreparedFeatures() { return preparedFeatures; }
     public LabelPropagationResult getPreparedPropagation() { return preparedPropagation; }
+    public String getSampleBatchId() { return sampleBatchId; }
+    public String getSamplePartitionMonth() { return samplePartitionMonth; }
+    public String getAnnotationBatchId() { return annotationBatchId; }
+    public String getAnnotationPartitionMonth() { return annotationPartitionMonth; }
+    public RowIdentityConfig getRowIdentityConfig() { return rowIdentityConfig; }
+    public TrainingMergeResult getTrainingMergeResult() { return trainingMergeResult; }
+
+    public boolean hasPersistedInput() {
+        return sampleBatchId != null;
+    }
+
+    /** 返回已完成 c1/o1 合并的请求，清除批次引用避免重复合并。 */
+    public RahaTrainRequest withMergedInput(RahaDataset mergedDataset,
+                                            List<CellLabel> mergedLabels) {
+        if (mergedDataset == null || mergedLabels == null) {
+            throw new IllegalArgumentException("合并训练数据和标签不能为空");
+        }
+        if (preparedFeatures != null || preparedPropagation != null) {
+            throw new IllegalStateException("合并输入不能复用旧快照的训练产物");
+        }
+        return new RahaTrainRequest(jobId, stageId, mergedDataset, config,
+                mergedLabels, propagationMethod, propagationConfig, trainingConfig,
+                modelNamePrefix, artifactVersion, null, null, null, null, null,
+                null, null, null);
+    }
+
+    /** 返回携带完整合并血缘的请求，供训练产物冻结使用。 */
+    public RahaTrainRequest withMergedInput(TrainingMergeResult merged) {
+        if (merged == null) {
+            throw new IllegalArgumentException("训练合并结果不能为空");
+        }
+        if (preparedFeatures != null || preparedPropagation != null) {
+            throw new IllegalStateException("合并输入不能复用旧快照的训练产物");
+        }
+        return new RahaTrainRequest(jobId, stageId, merged.getDataset(), config,
+                merged.getDirectLabels(), propagationMethod, propagationConfig,
+                trainingConfig, modelNamePrefix, artifactVersion, null, null,
+                null, null, null, null, null, merged);
+    }
 }

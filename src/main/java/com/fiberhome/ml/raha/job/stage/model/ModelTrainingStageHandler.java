@@ -20,6 +20,7 @@ import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationResult;
 import com.fiberhome.ml.raha.service.train.RahaTrainOutput;
 import com.fiberhome.ml.raha.service.train.RahaTrainRequest;
 import com.fiberhome.ml.raha.service.train.RahaTrainService;
+import com.fiberhome.ml.raha.service.train.TrainingMergeResult;
 import com.fiberhome.ml.raha.strategy.execution.StrategyBatchResult;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlan;
 import java.util.List;
@@ -77,6 +78,8 @@ public final class ModelTrainingStageHandler implements StageHandler {
                 StageAttributeKeys.LABEL_PROPAGATION_RESULT);
         Object planVersionValue = context.getAttributes().get(
                 StageAttributeKeys.STRATEGY_PLAN_VERSION);
+        Object mergeValue = context.getAttributes().get(
+                StageAttributeKeys.TRAINING_MERGE_RESULT);
         if (!(datasetValue instanceof RahaDataset) || !(planValue instanceof List)
                 || !(batchValue instanceof StrategyBatchResult)
                 || !(featureValue instanceof FeatureAssemblyResult)
@@ -101,7 +104,9 @@ public final class ModelTrainingStageHandler implements StageHandler {
                         context.getStage().getStageId(), dataset, context.getConfig(),
                         (List<CellLabel>) labelValue, propagationMethod,
                         propagationConfig, trainingConfig, modelNamePrefix,
-                        version, prepared, (LabelPropagationResult) propagationValue));
+                        version, prepared, (LabelPropagationResult) propagationValue,
+                        mergeValue instanceof TrainingMergeResult
+                                ? (TrainingMergeResult) mergeValue : null));
         context.getAttributes().put(StageAttributeKeys.TRAIN_SERVICE_RESULT, result);
         if (result.getPayload() != null) {
             context.getAttributes().put(StageAttributeKeys.TRAIN_OUTPUT, result.getPayload());

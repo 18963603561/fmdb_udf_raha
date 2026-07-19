@@ -6,20 +6,34 @@ import com.fiberhome.ml.raha.job.stage.core.StageHandler;
 import com.fiberhome.ml.raha.job.stage.core.StageResult;
 import com.fiberhome.ml.raha.data.type.StageType;
 import com.fiberhome.ml.raha.service.common.RahaServiceResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 确认业务服务已经持久化结果，并登记任务最终结果位置。
  */
 public final class ResultPersistenceStageHandler implements StageHandler {
 
+    /** 日志记录器。 */
+    private static final Logger LOGGER = LoggerFactory.getLogger(
+            ResultPersistenceStageHandler.class);
     /** 需要读取的服务结果属性键。 */
     private final String serviceResultAttributeKey;
+    /** 可选物理表写入和回读验证器。 */
+    private final ResultPersistenceVerifier persistenceVerifier;
 
     public ResultPersistenceStageHandler(String serviceResultAttributeKey) {
+        this(serviceResultAttributeKey, null);
+    }
+
+    public ResultPersistenceStageHandler(
+            String serviceResultAttributeKey,
+            ResultPersistenceVerifier persistenceVerifier) {
         if (serviceResultAttributeKey == null || serviceResultAttributeKey.trim().isEmpty()) {
             throw new IllegalArgumentException("服务结果属性键不能为空");
         }
         this.serviceResultAttributeKey = serviceResultAttributeKey;
+        this.persistenceVerifier = persistenceVerifier;
     }
 
     @Override
@@ -35,6 +49,19 @@ public final class ResultPersistenceStageHandler implements StageHandler {
                     "结果登记阶段缺少业务服务结果", false, 0L, 0L);
         }
         RahaServiceResult<?> result = (RahaServiceResult<?>) value;
+        if (persistenceVerifier != null) {
+            try {
+                String verifiedLocation = persistenceVerifier.verify(context, result);
+                context.getAttributes().put(StageAttributeKeys.RESULT_LOCATION,
+                        verifiedLocation);
+                return StageResult.success();
+            } catch (RuntimeException exception) {
+                LOGGER.error("业务物理结果验证失败，jobId={}，jobType={}",
+                        context.getJob().getJobId(), result.getJobType(), exception);
+                return StageResult.failure("PHYSICAL_RESULT_VERIFICATION_FAILED",
+                        exception.getMessage(), false, 1L, 1L);
+            }
+        }
         if (result.getResultLocation() == null || result.getResultLocation().trim().isEmpty()) {
             return StageResult.failure("RESULT_LOCATION_REQUIRED",
                     "业务服务没有返回持久化结果位置", false, 0L, 0L);

@@ -73,6 +73,21 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
     }
 
     @Override
+    public Dataset<Row> read(String tableName,
+                             List<String> columns,
+                             Column condition) {
+        Dataset<Row> source = read(tableName);
+        List<String> validatedColumns = validateProjection(source, columns);
+        if (condition != null) {
+            source = source.filter(condition);
+        }
+        LOGGER.debug("调用 FMDB Catalog 裁剪读取，tableName={}，columns={}，"
+                        + "filtered={}", tableName, validatedColumns,
+                condition != null);
+        return source.selectExpr(validatedColumns.toArray(new String[0]));
+    }
+
+    @Override
     public synchronized long appendIdempotent(String tableName,
                                               Dataset<Row> rows,
                                               List<String> keyColumns) {
@@ -81,8 +96,8 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
         FmdbPhysicalTable physicalTable = FmdbPhysicalTable.fromTableName(validated);
         // 标准九表在网关层再次执行开关，防止专用写入器遗漏判断。
         if (physicalTable != null && !persistenceConfig.shouldPersist(physicalTable)) {
-            //LOGGER.info("FMDB 物理表入库已关闭，跳过网关写入，tableName={}，configKey={}",
-            //        validated, physicalTable.getConfigKey());
+            LOGGER.info("FMDB 物理表入库已关闭，跳过网关写入，tableName={}，configKey={}",
+                    validated, physicalTable.getConfigKey());
             return 0L;
         }
         LOGGER.info("开始向 FMDB 表幂等写入，tableName={}，keyColumns={}",
@@ -91,7 +106,7 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
             Dataset<Row> pending = rows;
             if (tableExists(validated)) {
                 Dataset<Row> existing = read(validated);
-                if (!existing.schema().equals(rows.schema())) {
+                if (!schemasCompatible(existing.schema(), rows.schema())) {
                     throw new IllegalStateException("FMDB 目标表模式与写入模式不一致：" + validated);
                 }
                 Dataset<Row> incoming = rows.alias("incoming");
@@ -170,6 +185,38 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
                 throw new IllegalArgumentException("FMDB 业务主键缺失或重复：" + validated);
             }
         }
+    }
+
+    private static List<String> validateProjection(Dataset<Row> rows,
+                                                    List<String> columns) {
+        if (columns == null || columns.isEmpty()) {
+            throw new IllegalArgumentException("FMDB 查询投影字段不能为空");
+        }
+        Set<String> available = new LinkedHashSet<String>(Arrays.asList(rows.columns()));
+        Set<String> unique = new LinkedHashSet<String>();
+        for (String column : columns) {
+            String validated = validateColumnName(column);
+            if (!available.contains(validated) || !unique.add(validated)) {
+                throw new IllegalArgumentException("FMDB 查询字段缺失或重复：" + validated);
+            }
+        }
+        return new java.util.ArrayList<String>(unique);
+    }
+
+    private static boolean schemasCompatible(
+            org.apache.spark.sql.types.StructType first,
+            org.apache.spark.sql.types.StructType second) {
+        if (first.fields().length != second.fields().length) {
+            return false;
+        }
+        for (int index = 0; index < first.fields().length; index++) {
+            if (!first.fields()[index].name().equals(second.fields()[index].name())
+                    || !first.fields()[index].dataType().equals(
+                    second.fields()[index].dataType())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static String validateTableName(String tableName) {

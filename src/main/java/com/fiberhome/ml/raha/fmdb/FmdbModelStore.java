@@ -1,37 +1,30 @@
 package com.fiberhome.ml.raha.fmdb;
 
 import com.fiberhome.ml.raha.data.type.ClassifierType;
-import com.fiberhome.ml.raha.data.type.FeatureType;
-import com.fiberhome.ml.raha.feature.domain.FeatureDefinition;
 import com.fiberhome.ml.raha.feature.domain.FeatureDictionary;
 import com.fiberhome.ml.raha.fmdb.gateway.FmdbTableGateway;
 import com.fiberhome.ml.raha.fmdb.gateway.SparkSqlFmdbTableGateway;
 import com.fiberhome.ml.raha.model.ColumnModelStore;
 import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
-import com.fiberhome.ml.raha.util.FormDataCodec;
+import com.fiberhome.ml.raha.model.domain.ModelPersistenceContext;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.functions;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.functions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 使用 FMDB 表保存不可变列级模型和特征字典，并按版本缓存加载结果。
+ * 使用最终模型产物表保存列模型，并从训练列级产物表加载特征字典。
  */
 public final class FmdbModelStore implements ColumnModelStore {
 
@@ -39,90 +32,51 @@ public final class FmdbModelStore implements ColumnModelStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(FmdbModelStore.class);
     /** FMDB 模型路径协议。 */
     private static final String MODEL_SCHEME = "fmdb://";
-    /** 空特征字典使用的稳定占位编号。 */
-    private static final int EMPTY_DICTIONARY_INDEX = -1;
-    /** 模型参数表模式。 */
-    private static final StructType MODEL_SCHEMA = DataTypes.createStructType(
-            new StructField[]{
-                    field("model_version", DataTypes.StringType, false),
-                    field("model_name", DataTypes.StringType, false),
-                    field("column_name", DataTypes.StringType, false),
-                    field("classifier_type", DataTypes.StringType, false),
-                    field("dictionary_version", DataTypes.StringType, false),
-                    field("feature_dimension", DataTypes.IntegerType, false),
-                    field("threshold", DataTypes.DoubleType, false),
-                    field("intercept", DataTypes.DoubleType, false),
-                    field("coefficients", DataTypes.StringType, false),
-                    field("training_mode", DataTypes.StringType, false),
-                    field("stored_at", DataTypes.LongType, false)
-            });
-    /** 特征字典表模式。 */
-    private static final StructType DICTIONARY_SCHEMA = DataTypes.createStructType(
-            new StructField[]{
-                    field("dictionary_version", DataTypes.StringType, false),
-                    field("column_name", DataTypes.StringType, false),
-                    field("created_at", DataTypes.LongType, false),
-                    field("feature_index", DataTypes.IntegerType, false),
-                    field("feature_name", DataTypes.StringType, true),
-                    field("feature_type", DataTypes.StringType, true),
-                    field("feature_source", DataTypes.StringType, true),
-                    field("default_value", DataTypes.DoubleType, true),
-                    field("stored_at", DataTypes.LongType, false)
-            });
     /** Spark 会话。 */
     private final SparkSession sparkSession;
     /** FMDB 表网关。 */
     private final FmdbTableGateway tableGateway;
-    /** 模型参数表名。 */
+    /** 最终模型产物表。 */
     private final String modelTable;
-    /** 特征字典表名。 */
-    private final String dictionaryTable;
+    /** 训练列级产物表。 */
+    private final String columnArtifactTable;
     /** 提供可测试存储时间的时钟。 */
     private final Clock clock;
-    /** 控制模型和特征字典是否写入 FMDB。 */
+    /** 统一持久化配置。 */
     private final FmdbPersistenceConfig persistenceConfig;
-    /** 按完整路径缓存已加载模型。 */
+    /** 按完整路径缓存模型。 */
     private final Map<String, ColumnModelArtifact> modelCache =
             new ConcurrentHashMap<String, ColumnModelArtifact>();
-    /** 按字典版本缓存已加载字典。 */
+    /** 按字典版本缓存字典。 */
     private final Map<String, FeatureDictionary> dictionaryCache =
             new ConcurrentHashMap<String, FeatureDictionary>();
 
-    /**
-     * 创建受统一持久化配置控制的 FMDB 模型存储。
-     *
-     * @param sparkSession Spark 会话
-     * @param tableGateway FMDB 表网关
-     * @param modelTable 模型参数表
-     * @param dictionaryTable 特征字典表
-     * @param clock 存储时间来源
-     * @param persistenceConfig 模型和字典持久化配置
-     */
     public FmdbModelStore(SparkSession sparkSession,
                           FmdbTableGateway tableGateway,
                           String modelTable,
-                          String dictionaryTable,
+                          String columnArtifactTable,
                           Clock clock,
                           FmdbPersistenceConfig persistenceConfig) {
         if (sparkSession == null || tableGateway == null || clock == null
                 || persistenceConfig == null) {
             throw new IllegalArgumentException("FMDB 模型存储依赖不能为空");
         }
-        this.modelTable = SparkSqlFmdbTableGateway.validateTableName(modelTable);
-        this.dictionaryTable = SparkSqlFmdbTableGateway.validateTableName(dictionaryTable);
         this.sparkSession = sparkSession;
         this.tableGateway = tableGateway;
+        this.modelTable = SparkSqlFmdbTableGateway.validateTableName(modelTable);
+        this.columnArtifactTable = SparkSqlFmdbTableGateway.validateTableName(
+                columnArtifactTable);
         this.clock = clock;
         this.persistenceConfig = persistenceConfig;
     }
 
     @Override
-    public synchronized String save(ColumnModelArtifact artifact) {
-        if (artifact == null) {
-            throw new IllegalArgumentException("FMDB 模型参数不能为空");
+    public synchronized String save(ColumnModelArtifact artifact,
+                                    ModelPersistenceContext context) {
+        if (artifact == null || context == null) {
+            throw new IllegalArgumentException("FMDB 模型参数和上下文不能为空");
         }
         String path = modelPath(artifact.getModelVersion());
-        // 模型表关闭时仅保留当前存储实例的缓存，进程重启后不能再次加载。
         if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT)) {
             modelCache.put(path, artifact);
             LOGGER.info("FMDB 模型产物入库已关闭，仅缓存当前模型，modelVersion={}，"
@@ -131,31 +85,47 @@ public final class FmdbModelStore implements ColumnModelStore {
                     FmdbPhysicalTable.MODEL_ARTIFACT.getConfigKey());
             return path;
         }
-        LOGGER.info("开始保存 FMDB 列级模型，modelVersion={}，columnName={}",
-                artifact.getModelVersion(), artifact.getColumnName());
         ColumnModelArtifact existing = findModel(artifact.getModelVersion());
-        // 同一模型版本必须对应完全相同的不可变参数，防止版本污染。
-        if (existing != null) {
-            if (!sameModel(existing, artifact)) {
-                throw new IllegalStateException("FMDB 中同一模型版本已存在不同参数");
-            }
-            modelCache.put(path, existing);
-            return path;
+        if (existing != null && !sameModel(existing, artifact)) {
+            throw new IllegalStateException("FMDB 中同一模型版本已存在不同参数");
         }
-        Map<String, String> coefficients = new LinkedHashMap<String, String>();
-        for (Map.Entry<Integer, Double> entry : artifact.getCoefficients().entrySet()) {
-            coefficients.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
-        }
-        Row row = RowFactory.create(artifact.getModelVersion(), artifact.getModelName(),
-                artifact.getColumnName(), artifact.getClassifierType().name(),
-                artifact.getFeatureDictionaryVersion(), artifact.getFeatureDimension(),
-                artifact.getThreshold(), artifact.getIntercept(),
-                FormDataCodec.encode(coefficients), artifact.getTrainingMode(), positiveNow());
-        tableGateway.appendIdempotent(modelTable,
-                sparkSession.createDataFrame(Collections.singletonList(row), MODEL_SCHEMA),
-                Collections.singletonList("model_version"));
+        long storedAt = Math.max(context.getCreatedAt(), positiveNow());
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("coefficients", artifact.getCoefficients());
+        payload.put("intercept", artifact.getIntercept());
+        payload.put("modelName", artifact.getModelName());
+        payload.put("trainingMode", artifact.getTrainingMode());
+        Map<String, Object> values = new LinkedHashMap<String, Object>();
+        values.put("model_set_version", context.getModelSetVersion());
+        values.put("dataset_id", context.getDatasetId());
+        values.put("schema_hash", context.getSchemaHash());
+        values.put("training_batch_id", context.getTrainingBatchId());
+        values.put("model_set_status", context.getStatus().name());
+        values.put("state_version", 1);
+        values.put("strategy_plan_version", context.getStrategyPlanVersion());
+        values.put("merge_algorithm_version", context.getMergeAlgorithmVersion());
+        values.put("column_name", artifact.getColumnName());
+        values.put("model_version", artifact.getModelVersion());
+        values.put("classifier_type", artifact.getClassifierType().name());
+        values.put("feature_dictionary_version",
+                artifact.getFeatureDictionaryVersion());
+        values.put("feature_dimension", artifact.getFeatureDimension());
+        values.put("threshold", artifact.getThreshold());
+        values.put("model_path", path);
+        values.put("model_payload_json", FmdbJsonCodec.write(payload));
+        values.put("metrics_json", FmdbJsonCodec.write(context.getMetrics()));
+        values.put("created_at", storedAt);
+        values.put("published_at", context.getPublishedAt());
+        Dataset<Row> frame = sparkSession.createDataFrame(
+                Collections.singletonList(FmdbTableRecord.of(
+                        FmdbPhysicalTable.MODEL_ARTIFACT, values).toRow()),
+                FmdbTableSchemas.schema(FmdbPhysicalTable.MODEL_ARTIFACT));
+        tableGateway.appendIdempotent(modelTable, frame,
+                Arrays.asList("model_set_version", "column_name",
+                        "model_version", "state_version"));
         modelCache.put(path, artifact);
-        LOGGER.info("FMDB 列级模型保存完成，modelVersion={}，columnName={}",
+        LOGGER.info("FMDB 列级模型保存完成，modelSetVersion={}，modelVersion={}，"
+                        + "columnName={}", context.getModelSetVersion(),
                 artifact.getModelVersion(), artifact.getColumnName());
         return path;
     }
@@ -167,71 +137,20 @@ public final class FmdbModelStore implements ColumnModelStore {
         if (cached != null) {
             return cached;
         }
-        // 未入库模型只能由创建它的同一存储实例从缓存读取。
         if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT)) {
             throw new IllegalStateException("FMDB 模型产物入库已关闭且当前缓存不存在模型："
                     + version);
         }
-        LOGGER.info("开始加载 FMDB 列级模型，modelVersion={}", version);
         ColumnModelArtifact artifact = findModel(version);
         if (artifact == null) {
             throw new IllegalStateException("FMDB 中不存在模型版本：" + version);
         }
         modelCache.put(modelPath, artifact);
-        LOGGER.info("FMDB 列级模型加载完成，modelVersion={}，columnName={}",
-                artifact.getModelVersion(), artifact.getColumnName());
         return artifact;
     }
 
     /**
-     * 幂等保存特征字典，字典版本相同但内容变化时拒绝覆盖。
-     */
-    public synchronized String saveDictionary(FeatureDictionary dictionary) {
-        if (dictionary == null) {
-            throw new IllegalArgumentException("FMDB 特征字典不能为空");
-        }
-        // 字典停写时仍缓存当前任务所需定义，但不执行任何 FMDB 读写。
-        if (!persistenceConfig.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY)) {
-            dictionaryCache.put(dictionary.getVersion(), dictionary);
-            LOGGER.info("FMDB 特征字典入库已关闭，仅缓存当前字典，dictionaryVersion={}，"
-                            + "featureCount={}，configKey={}", dictionary.getVersion(),
-                    dictionary.getDefinitions().size(),
-                    FmdbColumnArtifact.FEATURE_DICTIONARY.getConfigKey());
-            return dictionaryPath(dictionary.getVersion());
-        }
-        FeatureDictionary existing = findDictionary(dictionary.getVersion());
-        if (existing != null) {
-            if (!sameDictionary(existing, dictionary)) {
-                throw new IllegalStateException("FMDB 中同一字典版本已存在不同内容");
-            }
-            dictionaryCache.put(dictionary.getVersion(), existing);
-            return dictionaryPath(dictionary.getVersion());
-        }
-        List<Row> rows = new ArrayList<Row>();
-        long storedAt = positiveNow();
-        if (dictionary.getDefinitions().isEmpty()) {
-            rows.add(RowFactory.create(dictionary.getVersion(), dictionary.getColumnName(),
-                    dictionary.getCreatedAt(), EMPTY_DICTIONARY_INDEX,
-                    null, null, null, null, storedAt));
-        } else {
-            for (FeatureDefinition definition : dictionary.getDefinitions().values()) {
-                rows.add(RowFactory.create(dictionary.getVersion(), dictionary.getColumnName(),
-                        dictionary.getCreatedAt(), definition.getIndex(), definition.getName(),
-                        definition.getFeatureType().name(), definition.getSource(),
-                        definition.getDefaultValue(), storedAt));
-            }
-        }
-        tableGateway.appendIdempotent(dictionaryTable,
-                sparkSession.createDataFrame(rows, DICTIONARY_SCHEMA),
-                Arrays.asList("dictionary_version", "feature_index"));
-        dictionaryCache.put(dictionary.getVersion(), dictionary);
-        LOGGER.info("FMDB 特征字典保存完成，dictionaryVersion={}，featureCount={}",
-                dictionary.getVersion(), dictionary.getDefinitions().size());
-        return dictionaryPath(dictionary.getVersion());
-    }
-
-    /**
-     * 按不可变版本加载特征字典。
+     * 从训练列级产物表按不可变版本加载特征字典。
      */
     public FeatureDictionary loadDictionary(String dictionaryVersion) {
         String version = ValueUtils.requireNotBlank(
@@ -240,14 +159,27 @@ public final class FmdbModelStore implements ColumnModelStore {
         if (cached != null) {
             return cached;
         }
-        // 未入库字典不能在进程重启后从 FMDB 恢复。
         if (!persistenceConfig.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY)) {
             throw new IllegalStateException("FMDB 特征字典入库已关闭且当前缓存不存在字典："
                     + version);
         }
-        FeatureDictionary dictionary = findDictionary(version);
-        if (dictionary == null) {
+        if (!tableGateway.tableExists(columnArtifactTable)) {
+            throw new IllegalStateException("FMDB 训练列级产物表不存在："
+                    + columnArtifactTable);
+        }
+        List<Row> rows = tableGateway.read(columnArtifactTable,
+                        Arrays.asList("feature_dictionary_version",
+                                "feature_dictionary_json", "created_at"),
+                        functions.col("feature_dictionary_version").equalTo(version))
+                .orderBy(functions.col("created_at").desc()).limit(2).collectAsList();
+        if (rows.isEmpty()) {
             throw new IllegalStateException("FMDB 中不存在特征字典版本：" + version);
+        }
+        FeatureDictionary dictionary = FmdbFeatureDictionaryCodec.read(
+                rows.get(0).getAs("feature_dictionary_json"));
+        if (!version.equals(dictionary.getVersion())) {
+            throw new IllegalStateException("FMDB 特征字典版本与 JSON 内容不一致："
+                    + version);
         }
         dictionaryCache.put(version, dictionary);
         return dictionary;
@@ -257,69 +189,66 @@ public final class FmdbModelStore implements ColumnModelStore {
         if (!tableGateway.tableExists(modelTable)) {
             return null;
         }
-        List<Row> rows = tableGateway.read(modelTable)
-                .filter(functions.col("model_version").equalTo(version))
-                .limit(2).collectAsList();
+        List<Row> rows = tableGateway.read(modelTable,
+                        FmdbTableSchemas.columns(FmdbPhysicalTable.MODEL_ARTIFACT),
+                        functions.col("model_version").equalTo(version))
+                .orderBy(functions.when(functions.col("model_set_status")
+                                .equalTo("PUBLISHED"), 0).otherwise(1),
+                        functions.col("state_version").desc(),
+                        functions.col("published_at").desc_nulls_last(),
+                        functions.col("created_at").desc())
+                .limit(1).collectAsList();
         if (rows.isEmpty()) {
             return null;
-        }
-        if (rows.size() > 1) {
-            throw new IllegalStateException("FMDB 模型版本存在重复记录：" + version);
         }
         Row row = rows.get(0);
-        Map<Integer, Double> coefficients = new LinkedHashMap<Integer, Double>();
-        String encoded = row.getAs("coefficients");
-        if (encoded != null && !encoded.isEmpty()) {
-            for (Map.Entry<String, String> entry : FormDataCodec.decode(encoded).entrySet()) {
-                coefficients.put(Integer.parseInt(entry.getKey()),
-                        Double.parseDouble(entry.getValue()));
-            }
-        }
-        return new ColumnModelArtifact(row.getAs("model_name"),
+        Map<String, Object> payload = FmdbJsonCodec.readObject(
+                row.getAs("model_payload_json"));
+        Map<Integer, Double> coefficients = coefficients(payload.get("coefficients"));
+        return new ColumnModelArtifact(text(payload, "modelName"),
                 row.getAs("model_version"), row.getAs("column_name"),
                 ClassifierType.valueOf(row.getAs("classifier_type")),
-                row.getAs("dictionary_version"), row.getAs("feature_dimension"),
-                row.getAs("threshold"), row.getAs("intercept"), coefficients,
-                row.getAs("training_mode"));
+                row.getAs("feature_dictionary_version"),
+                row.getAs("feature_dimension"), row.getAs("threshold"),
+                number(payload, "intercept").doubleValue(), coefficients,
+                text(payload, "trainingMode"));
     }
 
-    private FeatureDictionary findDictionary(String version) {
-        if (!tableGateway.tableExists(dictionaryTable)) {
-            return null;
+    @SuppressWarnings("unchecked")
+    private static Map<Integer, Double> coefficients(Object raw) {
+        if (!(raw instanceof Map)) {
+            throw new IllegalArgumentException("模型 JSON 缺少 coefficients");
         }
-        List<Row> rows = tableGateway.read(dictionaryTable)
-                .filter(functions.col("dictionary_version").equalTo(version))
-                .orderBy("feature_index").collectAsList();
-        if (rows.isEmpty()) {
-            return null;
-        }
-        String columnName = rows.get(0).getAs("column_name");
-        long createdAt = rows.get(0).getAs("created_at");
-        Map<Integer, FeatureDefinition> definitions =
-                new LinkedHashMap<Integer, FeatureDefinition>();
-        for (Row row : rows) {
-            int index = row.getAs("feature_index");
-            if (!columnName.equals(row.getAs("column_name"))
-                    || createdAt != ((Long) row.getAs("created_at"))) {
-                throw new IllegalStateException("FMDB 特征字典元数据不一致：" + version);
+        Map<Integer, Double> result = new LinkedHashMap<Integer, Double>();
+        for (Map.Entry<Object, Object> entry
+                : ((Map<Object, Object>) raw).entrySet()) {
+            int index = Integer.parseInt(String.valueOf(entry.getKey()));
+            if (!(entry.getValue() instanceof Number)) {
+                throw new IllegalArgumentException("模型系数必须为数值：" + index);
             }
-            if (index == EMPTY_DICTIONARY_INDEX) {
-                continue;
-            }
-            definitions.put(index, new FeatureDefinition(index,
-                    row.getAs("feature_name"),
-                    FeatureType.valueOf(row.getAs("feature_type")),
-                    row.getAs("feature_source"), row.getAs("default_value")));
+            result.put(index, ((Number) entry.getValue()).doubleValue());
         }
-        return new FeatureDictionary(version, columnName, definitions, createdAt);
+        return result;
+    }
+
+    private static String text(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        if (!(value instanceof String) || ((String) value).trim().isEmpty()) {
+            throw new IllegalArgumentException("模型 JSON 缺少字段：" + key);
+        }
+        return (String) value;
+    }
+
+    private static Number number(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        if (!(value instanceof Number)) {
+            throw new IllegalArgumentException("模型 JSON 缺少数值字段：" + key);
+        }
+        return (Number) value;
     }
 
     private String modelPath(String version) {
         return MODEL_SCHEME + modelTable + "/" + version;
-    }
-
-    private String dictionaryPath(String version) {
-        return MODEL_SCHEME + dictionaryTable + "/" + version;
     }
 
     private String versionFromPath(String path) {
@@ -348,32 +277,5 @@ public final class FmdbModelStore implements ColumnModelStore {
                 && Double.compare(first.getIntercept(), second.getIntercept()) == 0
                 && first.getCoefficients().equals(second.getCoefficients())
                 && first.getTrainingMode().equals(second.getTrainingMode());
-    }
-
-    private static boolean sameDictionary(FeatureDictionary first,
-                                          FeatureDictionary second) {
-        if (!first.getVersion().equals(second.getVersion())
-                || !first.getColumnName().equals(second.getColumnName())
-                || first.getCreatedAt() != second.getCreatedAt()
-                || first.getDefinitions().size() != second.getDefinitions().size()) {
-            return false;
-        }
-        for (Map.Entry<Integer, FeatureDefinition> entry
-                : first.getDefinitions().entrySet()) {
-            FeatureDefinition other = second.getDefinitions().get(entry.getKey());
-            FeatureDefinition value = entry.getValue();
-            if (other == null || value.getIndex() != other.getIndex()
-                    || !value.getName().equals(other.getName())
-                    || value.getFeatureType() != other.getFeatureType()
-                    || !value.getSource().equals(other.getSource())
-                    || Double.compare(value.getDefaultValue(), other.getDefaultValue()) != 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static StructField field(String name, DataType type, boolean nullable) {
-        return DataTypes.createStructField(name, type, nullable);
     }
 }

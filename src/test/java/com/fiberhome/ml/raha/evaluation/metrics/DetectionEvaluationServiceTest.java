@@ -9,6 +9,7 @@ import com.fiberhome.ml.raha.evaluation.threshold.ThresholdComparisonResult;
 import com.fiberhome.ml.raha.evaluation.threshold.ThresholdComparisonService;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
+import com.fiberhome.ml.raha.model.domain.ModelPersistenceContext;
 import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
 import com.fiberhome.ml.raha.model.FileColumnModelStore;
 import com.fiberhome.ml.raha.model.release.ColumnModelCompatibilityValidator;
@@ -74,7 +75,7 @@ class DetectionEvaluationServiceTest {
                 modelVersion, "code", ClassifierType.WEIGHTED_RULE,
                 "dictionary-v1", 1, 0.2d, 0.0d, coefficients, "test-weighted");
         FileColumnModelStore store = new FileColumnModelStore(temporaryDirectory);
-        String path = store.save(artifact);
+        String path = store.save(artifact, persistenceContext());
         RahaColumnModel candidate = new RahaColumnModel("raha-code", modelVersion,
                 "dataset", "code", "schema-v1", ClassifierType.WEIGHTED_RULE,
                 "dictionary-v1", "plan-v1", 0.2d, path,
@@ -155,5 +156,12 @@ class DetectionEvaluationServiceTest {
 
     private static Clock fixedClock(long millis) {
         return Clock.fixed(Instant.ofEpochMilli(millis), ZoneOffset.UTC);
+    }
+
+    private static ModelPersistenceContext persistenceContext() {
+        return new ModelPersistenceContext(HashUtils.sha256Hex("model-set-v1"),
+                "dataset", "training-batch-v1", ModelStatus.CANDIDATE,
+                "plan-v1", "merge-v1",
+                Collections.<String, Double>emptyMap(), 1000L, null);
     }
 }

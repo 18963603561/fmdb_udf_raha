@@ -2,6 +2,7 @@ package com.fiberhome.ml.raha.service.task;
 
 import com.fiberhome.ml.raha.config.dto.RahaJobConfig;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.job.stage.core.StageEvaluator;
@@ -37,6 +38,16 @@ public final class RahaTaskExecutionRequest {
     private final int samplingRound;
     /** 可选模型或检测评估器。 */
     private final StageEvaluator evaluator;
+    /** 可选 c1 采样批次标识。 */
+    private final String sampleBatchId;
+    /** c1 采样月分区。 */
+    private final String samplePartitionMonth;
+    /** 可选标注批次标识。 */
+    private final String annotationBatchId;
+    /** 标注月分区。 */
+    private final String annotationPartitionMonth;
+    /** c1 与 o1 共用的行身份配置。 */
+    private final RowIdentityConfig rowIdentityConfig;
 
     private RahaTaskExecutionRequest(RahaJobConfig config,
                                      DataLoadRequest dataLoadRequest,
@@ -46,7 +57,12 @@ public final class RahaTaskExecutionRequest {
                                      LogisticRegressionTrainingConfig trainingConfig,
                                      String modelNamePrefix,
                                      int samplingRound,
-                                     StageEvaluator evaluator) {
+                                     StageEvaluator evaluator,
+                                     String sampleBatchId,
+                                     String samplePartitionMonth,
+                                     String annotationBatchId,
+                                     String annotationPartitionMonth,
+                                     RowIdentityConfig rowIdentityConfig) {
         if (config == null || dataLoadRequest == null) {
             throw new IllegalArgumentException("任务配置和数据加载请求不能为空");
         }
@@ -63,6 +79,11 @@ public final class RahaTaskExecutionRequest {
         this.modelNamePrefix = modelNamePrefix;
         this.samplingRound = samplingRound;
         this.evaluator = evaluator;
+        this.sampleBatchId = sampleBatchId;
+        this.samplePartitionMonth = samplePartitionMonth;
+        this.annotationBatchId = annotationBatchId;
+        this.annotationPartitionMonth = annotationPartitionMonth;
+        this.rowIdentityConfig = rowIdentityConfig;
         validateByType();
     }
 
@@ -89,7 +110,29 @@ public final class RahaTaskExecutionRequest {
             StageEvaluator evaluator) {
         return new RahaTaskExecutionRequest(config, dataLoadRequest, directLabels,
                 propagationMethod, propagationConfig, trainingConfig,
-                modelNamePrefix, 0, evaluator);
+                modelNamePrefix, 0, evaluator, null, null, null, null, null);
+    }
+
+    /**
+     * 创建使用持久化 c1 和标注批次的训练任务，标签由合并阶段从标注仓储读取。
+     */
+    public static RahaTaskExecutionRequest training(
+            RahaJobConfig config,
+            DataLoadRequest dataLoadRequest,
+            LabelPropagationMethod propagationMethod,
+            LabelPropagationConfig propagationConfig,
+            LogisticRegressionTrainingConfig trainingConfig,
+            String modelNamePrefix,
+            String sampleBatchId,
+            String samplePartitionMonth,
+            String annotationBatchId,
+            String annotationPartitionMonth,
+            RowIdentityConfig rowIdentityConfig) {
+        return new RahaTaskExecutionRequest(config, dataLoadRequest,
+                Collections.<CellLabel>emptyList(), propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix, 0, null,
+                sampleBatchId, samplePartitionMonth, annotationBatchId,
+                annotationPartitionMonth, rowIdentityConfig);
     }
 
     public static RahaTaskExecutionRequest detection(
@@ -104,7 +147,7 @@ public final class RahaTaskExecutionRequest {
             StageEvaluator evaluator) {
         return new RahaTaskExecutionRequest(config, dataLoadRequest,
                 Collections.<CellLabel>emptyList(), null, null,
-                null, null, 0, evaluator);
+                null, null, 0, evaluator, null, null, null, null, null);
     }
 
     public static RahaTaskExecutionRequest sampling(
@@ -113,11 +156,21 @@ public final class RahaTaskExecutionRequest {
             List<CellLabel> existingLabels,
             int samplingRound) {
         return new RahaTaskExecutionRequest(config, dataLoadRequest, existingLabels,
-                null, null, null, null, samplingRound, null);
+                null, null, null, null, samplingRound, null,
+                null, null, null, null, null);
     }
 
     private void validateByType() {
         JobType jobType = config.getJobType();
+        boolean hasAnyBatchReference = sampleBatchId != null
+                || samplePartitionMonth != null || annotationBatchId != null
+                || annotationPartitionMonth != null || rowIdentityConfig != null;
+        boolean hasAllBatchReferences = sampleBatchId != null
+                && samplePartitionMonth != null && annotationBatchId != null
+                && annotationPartitionMonth != null && rowIdentityConfig != null;
+        if (hasAnyBatchReference && !hasAllBatchReferences) {
+            throw new IllegalArgumentException("训练批次引用和行身份配置必须完整提供");
+        }
         if (jobType == JobType.TRAINING) {
             if (propagationMethod == null || propagationConfig == null
                     || trainingConfig == null) {
@@ -129,7 +182,13 @@ public final class RahaTaskExecutionRequest {
                     throw new IllegalArgumentException("训练任务只接受直接标签");
                 }
             }
+            if (hasAllBatchReferences && !labels.isEmpty()) {
+                throw new IllegalArgumentException("持久化标注训练不能同时传入调用方标签");
+            }
             return;
+        }
+        if (hasAnyBatchReference) {
+            throw new IllegalArgumentException("仅训练任务可以引用 c1 和标注批次");
         }
         if (jobType == JobType.SAMPLING) {
             if (samplingRound <= 0) {
@@ -151,4 +210,13 @@ public final class RahaTaskExecutionRequest {
     public String getModelNamePrefix() { return modelNamePrefix; }
     public int getSamplingRound() { return samplingRound; }
     public StageEvaluator getEvaluator() { return evaluator; }
+    public String getSampleBatchId() { return sampleBatchId; }
+    public String getSamplePartitionMonth() { return samplePartitionMonth; }
+    public String getAnnotationBatchId() { return annotationBatchId; }
+    public String getAnnotationPartitionMonth() { return annotationPartitionMonth; }
+    public RowIdentityConfig getRowIdentityConfig() { return rowIdentityConfig; }
+
+    public boolean hasPersistedTrainingInput() {
+        return sampleBatchId != null;
+    }
 }

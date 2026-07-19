@@ -8,16 +8,21 @@ import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.DataValidationException;
 import com.fiberhome.ml.raha.data.loader.LoadedDataset;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
+import com.fiberhome.ml.raha.data.loader.RowIdentityColumns;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.RowIdentityService;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.data.type.FeatureType;
 import com.fiberhome.ml.raha.data.type.JobType;
+import com.fiberhome.ml.raha.data.type.ModelStatus;
 import com.fiberhome.ml.raha.feature.domain.FeatureDefinition;
 import com.fiberhome.ml.raha.feature.domain.FeatureDictionary;
 import com.fiberhome.ml.raha.fmdb.gateway.InMemoryFmdbTableGateway;
 import com.fiberhome.ml.raha.job.domain.RahaJob;
 import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
+import com.fiberhome.ml.raha.model.domain.ModelPersistenceContext;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import com.fiberhome.ml.raha.util.HashUtils;
 import java.time.Clock;
@@ -91,7 +96,8 @@ class FmdbAdapterIntegrationTest {
         assertEquals(3L, table.getSnapshot().getRowCount());
         assertEquals(2, table.getSnapshot().getColumnCount());
         assertEquals("snapshot-v1", table.getDataset().getSnapshotId());
-        assertEquals("id", table.getDataset().getRowIdColumn());
+        assertEquals(RowIdentityColumns.ROW_ID,
+                table.getDataset().getRowIdColumn());
         assertFalse(table.getDataset().getColumns().get(0).isDetectable());
         assertTrue(table.getDataset().getColumns().get(1).isDetectable());
         assertEquals(table.getDataset().getSchemaHash(),
@@ -107,23 +113,25 @@ class FmdbAdapterIntegrationTest {
     void shouldWriteJobsAndDetectionResultsIdempotently() {
         SparkSession spark = SparkTestSession.get();
         SparkSqlFmdbResultWriter writer = new SparkSqlFmdbResultWriter(
-                spark, gateway, fixedClock(2000L));
+                spark, gateway, fixedClock(2000L),
+                FmdbPersistenceConfig.fromDefaults());
         RahaJob job = new RahaJob("job-1", "request-1", JobType.DETECTION,
                 "dataset", "snapshot-v1", "config-v1", 1000L);
 
-        assertEquals(1L, writer.writeJob(JOB_TABLE, job));
-        assertEquals(0L, writer.writeJob(JOB_TABLE, job));
+        assertEquals(1L, writer.writeJob(JOB_TABLE, job,
+                Collections.<String, Object>singletonMap("errorCount", 1L)));
+        assertEquals(0L, writer.writeJob(JOB_TABLE, job,
+                Collections.<String, Object>singletonMap("errorCount", 1L)));
         assertEquals(1L, gateway.read(JOB_TABLE).count());
 
         List<DetectionResult> results = Arrays.asList(
                 detection("1", true, 0.9d), detection("2", false, 0.1d));
-        assertEquals(2L, writer.writeDetectionResults(RESULT_TABLE, "job-1", results));
-        assertEquals(0L, writer.writeDetectionResults(RESULT_TABLE, "job-1", results));
-        assertEquals(2L, gateway.read(RESULT_TABLE).count());
-        assertFalse(Arrays.asList(gateway.read(RESULT_TABLE).columns())
-                .contains("correct_value"));
-        assertEquals(1L, gateway.read(RESULT_TABLE)
-                .filter("is_error = true").count());
+        FmdbDetectionWriteContext context = detectionContext("1", "2");
+        assertEquals(1L, writer.writeDetectionResults(RESULT_TABLE, context, results));
+        assertEquals(0L, writer.writeDetectionResults(RESULT_TABLE, context, results));
+        assertEquals(1L, gateway.read(RESULT_TABLE).count());
+        assertEquals("VALUE-1", gateway.read(RESULT_TABLE).first()
+                .getAs("original_value"));
     }
 
     @Test
@@ -135,8 +143,10 @@ class FmdbAdapterIntegrationTest {
         RahaJob job = new RahaJob("job-disabled", "request-disabled", JobType.DETECTION,
                 "dataset", "snapshot-v1", "config-v1", 1000L);
 
-        assertEquals(0L, writer.writeJob(JOB_TABLE, job));
-        assertEquals(0L, writer.writeDetectionResults(RESULT_TABLE, "job-disabled",
+        assertEquals(0L, writer.writeJob(JOB_TABLE, job,
+                Collections.<String, Object>emptyMap()));
+        assertEquals(0L, writer.writeDetectionResults(RESULT_TABLE,
+                detectionContext(),
                 Collections.<DetectionResult>emptyList()));
         assertFalse(gateway.tableExists(JOB_TABLE));
         assertFalse(gateway.tableExists(RESULT_TABLE));
@@ -153,9 +163,11 @@ class FmdbAdapterIntegrationTest {
         RahaJob job = new RahaJob("job-1", "request-table-switch",
                 JobType.DETECTION, "dataset", "snapshot-v1", "config-v1", 1000L);
 
-        assertEquals(1L, writer.writeJob(JOB_TABLE, job));
+        assertEquals(1L, writer.writeJob(JOB_TABLE, job,
+                Collections.<String, Object>emptyMap()));
         assertEquals(0L, writer.writeDetectionResults(RESULT_TABLE,
-                "job-1", Collections.singletonList(detection("1", true, 0.9d))));
+                detectionContext("1"),
+                Collections.singletonList(detection("1", true, 0.9d))));
         assertTrue(gateway.tableExists(JOB_TABLE));
         assertFalse(gateway.tableExists(RESULT_TABLE));
     }
@@ -169,8 +181,8 @@ class FmdbAdapterIntegrationTest {
         ColumnModelArtifact artifact = artifact(0.25d);
         FeatureDictionary dictionary = dictionary();
 
-        String modelPath = first.save(artifact);
-        String dictionaryPath = first.saveDictionary(dictionary);
+        appendDictionary(spark, dictionary);
+        String modelPath = first.save(artifact, modelContext());
         FmdbModelStore restarted = new FmdbModelStore(spark, gateway,
                 MODEL_TABLE, DICTIONARY_TABLE, fixedClock(3000L),
                 FmdbPersistenceConfig.fromDefaults());
@@ -181,14 +193,12 @@ class FmdbAdapterIntegrationTest {
         assertEquals(artifact.getCoefficients(), loadedModel.getCoefficients());
         assertEquals(dictionary.getVersion(), loadedDictionary.getVersion());
         assertEquals(2, loadedDictionary.getDefinitions().size());
-        assertTrue(dictionaryPath.startsWith("fmdb://" + DICTIONARY_TABLE + "/"));
 
-        assertEquals(modelPath, restarted.save(artifact));
-        assertEquals(dictionaryPath, restarted.saveDictionary(dictionary));
+        assertEquals(modelPath, restarted.save(artifact, modelContext()));
         assertEquals(1L, gateway.read(MODEL_TABLE).count());
-        assertEquals(2L, gateway.read(DICTIONARY_TABLE).count());
+        assertEquals(1L, gateway.read(DICTIONARY_TABLE).count());
         assertThrows(IllegalStateException.class,
-                () -> restarted.save(artifact(0.75d)));
+                () -> restarted.save(artifact(0.75d), modelContext()));
     }
 
     @Test
@@ -201,7 +211,7 @@ class FmdbAdapterIntegrationTest {
                 MODEL_TABLE, DICTIONARY_TABLE, fixedClock(2000L), config);
         ColumnModelArtifact artifact = artifact(0.25d);
 
-        String modelPath = current.save(artifact);
+        String modelPath = current.save(artifact, modelContext());
 
         assertEquals(artifact.getModelVersion(),
                 current.load(modelPath).getModelVersion());
@@ -235,14 +245,16 @@ class FmdbAdapterIntegrationTest {
     }
 
     private static FmdbDatasetLoader loader() {
-        return new FmdbDatasetLoader(SparkTestSession.get(), new RowIdValidator(),
+        return new FmdbDatasetLoader(SparkTestSession.get(),
+                new RowIdentityService(), new RowIdValidator(),
                 new SchemaHasher(), new DefaultFmdbSchemaResolver(
                 new ColumnMetadataFactory()), new SnapshotMetadataFactory(),
                 fixedClock(1000L));
     }
 
     private static DataLoadRequest request(DataFormat format, String inputReference) {
-        return new DataLoadRequest("dataset", inputReference, INPUT_VIEW, "id", format,
+        return new DataLoadRequest("dataset", inputReference, INPUT_VIEW,
+                RowIdentityConfig.sourceKey("id"), format,
                 Collections.<String, String>emptyMap(),
                 Collections.<String>emptySet(), Collections.<String>emptySet(),
                 Collections.singleton("code"), "snapshot-v1", "source-v1");
@@ -288,6 +300,57 @@ class FmdbAdapterIntegrationTest {
                 1, "value-frequency", FeatureType.NUMERIC, "context", 0.0d));
         return new FeatureDictionary(HashUtils.sha256Hex("dictionary-v1"),
                 "code", definitions, 1000L);
+    }
+
+    private static ModelPersistenceContext modelContext() {
+        return new ModelPersistenceContext(HashUtils.sha256Hex("model-set-v1"),
+                "dataset", "training-batch-v1", ModelStatus.CANDIDATE,
+                HashUtils.sha256Hex("strategy-plan-v1"), "merge-v1",
+                Collections.singletonMap("f1", 1.0d), 2000L, null);
+    }
+
+    private static FmdbDetectionWriteContext detectionContext(String... rowIds) {
+        Map<String, Map<String, Object>> rows =
+                new LinkedHashMap<String, Map<String, Object>>();
+        for (String rowId : rowIds) {
+            Map<String, Object> row = new LinkedHashMap<String, Object>();
+            row.put("id", rowId);
+            row.put("code", "VALUE-" + rowId);
+            rows.put(rowId, row);
+        }
+        return new FmdbDetectionWriteContext("detect-batch-v1", INPUT_VIEW,
+                HashUtils.sha256Hex("model-set-v1"), rows);
+    }
+
+    private void appendDictionary(SparkSession spark,
+                                  FeatureDictionary dictionary) {
+        Map<String, Object> values = new LinkedHashMap<String, Object>();
+        values.put("training_batch_id", "training-batch-v1");
+        values.put("dataset_id", "dataset");
+        values.put("source_version", "source-v1");
+        values.put("schema_hash", HashUtils.sha256Hex("schema-v1"));
+        values.put("merge_algorithm_version", "merge-v1");
+        values.put("training_context_json", "{}");
+        values.put("column_name", dictionary.getColumnName());
+        values.put("profile_version", null);
+        values.put("profile_json", null);
+        values.put("strategy_plan_version", HashUtils.sha256Hex("strategy-plan-v1"));
+        values.put("strategy_plan_json", "{}");
+        values.put("feature_dictionary_version", dictionary.getVersion());
+        values.put("feature_dictionary_json",
+                FmdbFeatureDictionaryCodec.write(dictionary));
+        values.put("cluster_version", null);
+        values.put("cluster_summary_json", null);
+        values.put("propagation_summary_json", null);
+        values.put("created_at", 2000L);
+        gateway.appendIdempotent(DICTIONARY_TABLE,
+                spark.createDataFrame(Collections.singletonList(
+                                FmdbTableRecord.of(
+                                        FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT,
+                                        values).toRow()),
+                        FmdbTableSchemas.schema(
+                                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT)),
+                Arrays.asList("training_batch_id", "column_name"));
     }
 
     private static Clock fixedClock(long millis) {

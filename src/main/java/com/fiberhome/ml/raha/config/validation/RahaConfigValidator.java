@@ -32,7 +32,10 @@ public final class RahaConfigValidator {
         }
         requireNotBlank(config.getDatasetId(), ConfigErrorCode.DATASET_ID_REQUIRED, "数据集标识不能为空");
         requireNotBlank(config.getInputReference(), ConfigErrorCode.INPUT_REFERENCE_REQUIRED, "输入数据引用不能为空");
-        requireNotBlank(config.getRowIdColumn(), ConfigErrorCode.ROW_ID_COLUMN_REQUIRED, "行标识字段不能为空");
+        if (config.getRowIdentityConfig() == null) {
+            fail(ConfigErrorCode.ROW_IDENTITY_CONFIG_REQUIRED,
+                    "行身份配置不能为空");
+        }
         requireNotBlank(config.getExecutionConfigFingerprint(),
                 ConfigErrorCode.CONFIG_REQUIRED, "执行配置指纹不能为空");
         validateStrategy(config.getStrategyConfig());

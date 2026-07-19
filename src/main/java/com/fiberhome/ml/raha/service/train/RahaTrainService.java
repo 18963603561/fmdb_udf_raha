@@ -5,12 +5,17 @@ import com.fiberhome.ml.raha.cluster.domain.ClusterAssignment;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
 import com.fiberhome.ml.raha.cluster.domain.ColumnClusteringResult;
 import com.fiberhome.ml.raha.feature.assembly.FeatureAssemblyResult;
+import com.fiberhome.ml.raha.feature.assembly.FeatureAssemblyMetrics;
 import com.fiberhome.ml.raha.feature.domain.FeatureDictionary;
+import com.fiberhome.ml.raha.feature.domain.SparseFeatureRow;
+import com.fiberhome.ml.raha.data.domain.CellCoordinate;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
 import com.fiberhome.ml.raha.feature.FeatureService;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationResult;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationService;
 import com.fiberhome.ml.raha.model.ColumnModelStore;
 import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
+import com.fiberhome.ml.raha.model.domain.ModelPersistenceContext;
 import com.fiberhome.ml.raha.model.release.ColumnModelMetadataFactory;
 import com.fiberhome.ml.raha.model.release.ModelReleaseManager;
 import com.fiberhome.ml.raha.model.training.ColumnModelTrainer;
@@ -20,6 +25,9 @@ import com.fiberhome.ml.raha.model.training.ColumnModelTrainingStatus;
 import com.fiberhome.ml.raha.model.training.ColumnTrainingDataBuilder;
 import com.fiberhome.ml.raha.model.training.ColumnTrainingDataset;
 import com.fiberhome.ml.raha.model.training.ColumnTrainingStatus;
+import com.fiberhome.ml.raha.model.training.ColumnTrainingExample;
+import com.fiberhome.ml.raha.fmdb.FmdbJsonCodec;
+import com.fiberhome.ml.raha.data.domain.ColumnProfile;
 import com.fiberhome.ml.raha.model.training.ModelQualityGate;
 import com.fiberhome.ml.raha.parallel.BoundedParallelExecutor;
 import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
@@ -29,6 +37,7 @@ import com.fiberhome.ml.raha.service.common.RahaServiceResult;
 import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.common.RahaServiceSummary;
 import com.fiberhome.ml.raha.data.type.JobType;
+import com.fiberhome.ml.raha.data.type.ModelStatus;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationRequest;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationResult;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationService;
@@ -36,6 +45,7 @@ import com.fiberhome.ml.raha.strategy.execution.StrategyBatchResult;
 import com.fiberhome.ml.raha.strategy.execution.StrategyExecutionService;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlan;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlanService;
+import com.fiberhome.ml.raha.util.HashUtils;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -81,6 +91,10 @@ public final class RahaTrainService {
     private final BoundedParallelExecutor parallelExecutor;
     /** 可由 SAMPLE 和 TRAIN 共同复用的策略及特征准备服务。 */
     private final RahaFeaturePreparationService preparationService;
+    /** 可选持久化 c1/o1 合并服务。 */
+    private final TrainingInputMergeService inputMergeService;
+    /** 可选训练派生产物物化和冻结样本恢复服务。 */
+    private final TrainingArtifactMaterializationService artifactMaterializationService;
 
     public RahaTrainService(StrategyPlanService planService,
                             StrategyExecutionService executionService,
@@ -95,7 +109,8 @@ public final class RahaTrainService {
                             Clock clock) {
         this(planService, executionService, featureService, clusteringService,
                 propagationService, dataBuilder, trainer, modelStore,
-                metadataFactory, releaseManager, clock, new BoundedParallelExecutor());
+                metadataFactory, releaseManager, clock, new BoundedParallelExecutor(),
+                null, null);
     }
 
     public RahaTrainService(StrategyPlanService planService,
@@ -110,6 +125,71 @@ public final class RahaTrainService {
                             ModelReleaseManager releaseManager,
                             Clock clock,
                             BoundedParallelExecutor parallelExecutor) {
+        this(planService, executionService, featureService, clusteringService,
+                propagationService, dataBuilder, trainer, modelStore,
+                metadataFactory, releaseManager, clock, parallelExecutor, null);
+    }
+
+    /**
+     * 创建支持持久化输入合并、训练产物物化和冻结样本恢复的训练服务。
+     */
+    public RahaTrainService(StrategyPlanService planService,
+                            StrategyExecutionService executionService,
+                            FeatureService featureService,
+                            ColumnClusteringService clusteringService,
+                            LabelPropagationService propagationService,
+                            ColumnTrainingDataBuilder dataBuilder,
+                            ColumnModelTrainer trainer,
+                            ColumnModelStore modelStore,
+                            ColumnModelMetadataFactory metadataFactory,
+                            ModelReleaseManager releaseManager,
+                            Clock clock,
+                            BoundedParallelExecutor parallelExecutor,
+                            TrainingInputMergeService inputMergeService,
+                            TrainingArtifactMaterializationService artifactMaterializationService) {
+        this(planService, executionService, featureService, clusteringService,
+                propagationService, dataBuilder, trainer, modelStore,
+                metadataFactory, releaseManager, clock, parallelExecutor,
+                inputMergeService, artifactMaterializationService, true);
+    }
+
+    /**
+     * 创建支持持久化 c1/o1 合并的训练编排服务。
+     */
+    public RahaTrainService(StrategyPlanService planService,
+                            StrategyExecutionService executionService,
+                            FeatureService featureService,
+                            ColumnClusteringService clusteringService,
+                            LabelPropagationService propagationService,
+                            ColumnTrainingDataBuilder dataBuilder,
+                            ColumnModelTrainer trainer,
+                            ColumnModelStore modelStore,
+                            ColumnModelMetadataFactory metadataFactory,
+                            ModelReleaseManager releaseManager,
+                            Clock clock,
+                            BoundedParallelExecutor parallelExecutor,
+                            TrainingInputMergeService inputMergeService) {
+        this(planService, executionService, featureService, clusteringService,
+                propagationService, dataBuilder, trainer, modelStore,
+                metadataFactory, releaseManager, clock, parallelExecutor,
+                inputMergeService, null, true);
+    }
+
+    private RahaTrainService(StrategyPlanService planService,
+                             StrategyExecutionService executionService,
+                             FeatureService featureService,
+                             ColumnClusteringService clusteringService,
+                             LabelPropagationService propagationService,
+                             ColumnTrainingDataBuilder dataBuilder,
+                             ColumnModelTrainer trainer,
+                             ColumnModelStore modelStore,
+                             ColumnModelMetadataFactory metadataFactory,
+                             ModelReleaseManager releaseManager,
+                             Clock clock,
+                             BoundedParallelExecutor parallelExecutor,
+                             TrainingInputMergeService inputMergeService,
+                             TrainingArtifactMaterializationService artifactMaterializationService,
+                             boolean ignored) {
         if (planService == null || executionService == null || featureService == null
                 || clusteringService == null || propagationService == null
                 || dataBuilder == null || trainer == null || modelStore == null
@@ -129,6 +209,8 @@ public final class RahaTrainService {
         this.releaseManager = releaseManager;
         this.clock = clock;
         this.parallelExecutor = parallelExecutor;
+        this.inputMergeService = inputMergeService;
+        this.artifactMaterializationService = artifactMaterializationService;
         this.preparationService = new RahaFeaturePreparationService(
                 planService, executionService, featureService, clock);
     }
@@ -144,6 +226,26 @@ public final class RahaTrainService {
             throw new IllegalArgumentException("训练服务请求不能为空");
         }
         long startedAt = clock.millis();
+        TrainingMergeResult mergeResult = request.getTrainingMergeResult();
+        if (request.hasPersistedInput()) {
+            if (inputMergeService == null) {
+                throw new IllegalStateException("训练请求引用了持久化批次，但未配置合并服务");
+            }
+            TrainingMergeResult merged = inputMergeService.merge(
+                    new TrainingMergeRequest(request.getJobId(),
+                            request.getDataset(), request.getRowIdentityConfig(),
+                            request.getSampleBatchId(), request.getSamplePartitionMonth(),
+                            request.getAnnotationBatchId(),
+                            request.getAnnotationPartitionMonth(),
+                            request.getConfig().getResourceConfig()
+                                    .getBroadcastThresholdBytes()));
+            request = request.withMergedInput(merged);
+            mergeResult = merged;
+            LOGGER.info("训练服务已切换到 c1/o1 合并快照，jobId={}，"
+                            + "trainingBatchId={}，trainingSnapshotId={}，mergedCount={}",
+                    request.getJobId(), merged.getTrainingBatchId(),
+                    merged.getTrainingSnapshotId(), merged.getMetrics().getMergedCount());
+        }
         Dataset<Row> inputFrame = request.getDataset().getDataFrame();
         boolean ownsInputCache = request.getPreparedFeatures() == null
                 && inputFrame.storageLevel().equals(StorageLevel.NONE());
@@ -173,6 +275,13 @@ public final class RahaTrainService {
             List<StrategyPlan> plans = preparation.getStrategyPlans();
             StrategyBatchResult strategyBatch = preparation.getStrategyBatch();
             FeatureAssemblyResult features = preparation.getFeatures();
+            String planVersion = preparation.getStrategyPlanVersion();
+            if (mergeResult != null) {
+                // 训练字典版本必须绑定合并批次，避免新训练快照误复用采样或旧训练字典。
+                features = versionTrainingFeatures(features,
+                        mergeResult.getTrainingBatchId(), planVersion,
+                        request.getConfig().getExecutionConfigFingerprint());
+            }
             ClusteringBatchResult clustering = preparation.getClustering();
             if (clustering == null) {
                 clustering = clusteringService.clusterAndSaveParallel(
@@ -198,26 +307,52 @@ public final class RahaTrainService {
                         propagation.getMetrics().getPropagatedLabelCount());
             }
             final LabelPropagationResult trainingPropagation = propagation;
-            String planVersion = preparation.getStrategyPlanVersion();
+            String modelSetVersion = HashUtils.sha256Hex(request.getDataset().getDatasetId() + "|"
+                    + request.getDataset().getSnapshotId() + "|" + planVersion + "|"
+                    + request.getConfig().getExecutionConfigFingerprint() + "|"
+                    + (mergeResult == null ? "legacy" : mergeResult.getTrainingBatchId()));
+            Map<String, ColumnTrainingDataset> frozenDatasets = null;
+            TrainingArtifactMaterializationResult materialization = null;
+            if (mergeResult != null) {
+                if (artifactMaterializationService == null) {
+                    throw new IllegalStateException("持久化训练未配置派生产物物化服务");
+                }
+                Map<String, ColumnTrainingDataset> builtDatasets = buildTrainingDatasets(request, features,
+                        trainingPropagation, planVersion);
+                if (!artifactMaterializationService.isTrainingExamplePersistenceEnabled()) {
+                    throw new IllegalStateException("首个可用训练闭环必须开启最终训练样本持久化");
+                }
+                materialization =
+                        artifactMaterializationService.materialize(mergeResult, features,
+                        clustering, trainingPropagation, modelSetVersion, planVersion,
+                        builtDatasets, profileJsonByColumn(request.getDataset()),
+                        strategyPlanJsonByColumn(plans));
+                frozenDatasets = loadFrozenDatasets(request, features, modelSetVersion,
+                        materialization);
+            }
+            final Map<String, ColumnTrainingDataset> trainingDatasets = frozenDatasets;
+            final FeatureAssemblyResult trainingFeatures = features;
             Map<String, ColumnModelTrainingResult> trainingResults =
                     new LinkedHashMap<String, ColumnModelTrainingResult>();
             Map<String, RahaColumnModel> candidates =
                     new LinkedHashMap<String, RahaColumnModel>();
             long skippedCount = 0L;
             long failedCount = 0L;
+            final RahaTrainRequest trainingRequest = request;
             List<ParallelWorkItem<String, ColumnTrainingOutcome>> trainingItems =
                     new ArrayList<ParallelWorkItem<String, ColumnTrainingOutcome>>();
             for (Map.Entry<String, FeatureDictionary> entry
-                    : features.getDictionaries().entrySet()) {
+                    : trainingFeatures.getDictionaries().entrySet()) {
                 trainingItems.add(new ParallelWorkItem<String, ColumnTrainingOutcome>(
-                        entry.getKey(), () -> trainColumn(request, features,
-                        trainingPropagation, planVersion, entry.getKey(), entry.getValue())));
+                        entry.getKey(), () -> trainColumn(trainingRequest, trainingFeatures,
+                        trainingPropagation, planVersion, modelSetVersion,
+                        entry.getKey(), entry.getValue(), trainingDatasets)));
             }
             ParallelBatchResult<String, ColumnTrainingOutcome> parallelTraining =
                     parallelExecutor.execute(trainingItems,
                             request.getConfig().getResourceConfig().getMaxParallelColumns(),
                             request.getConfig().getResourceConfig().getStageTimeoutMillis());
-            for (String columnName : features.getDictionaries().keySet()) {
+            for (String columnName : trainingFeatures.getDictionaries().keySet()) {
                 ColumnTrainingOutcome outcome = parallelTraining.getSuccesses().get(columnName);
                 if (outcome == null) {
                     ParallelFailure failure = parallelTraining.getFailures().get(columnName);
@@ -237,14 +372,15 @@ public final class RahaTrainService {
                     skippedCount++;
                 }
             }
-            RahaTrainOutput output = new RahaTrainOutput(plans, strategyBatch, features,
-                    clustering, propagation, trainingResults, candidates, planVersion);
+            RahaTrainOutput output = new RahaTrainOutput(plans, strategyBatch, trainingFeatures,
+                    clustering, propagation, trainingResults, candidates, planVersion,
+                    modelSetVersion, materialization);
             long completedAt = clock.millis();
-            Map<String, String> details = details(plans, strategyBatch, features,
+            Map<String, String> details = details(plans, strategyBatch, trainingFeatures,
                     propagation, candidates, planVersion,
                     parallelTraining.getMaxObservedConcurrency());
             RahaServiceSummary summary = new RahaServiceSummary(startedAt, completedAt,
-                    features.getDictionaries().size(), candidates.size(), skippedCount,
+                    trainingFeatures.getDictionaries().size(), candidates.size(), skippedCount,
                     failedCount, details);
             JobStatus status;
             String errorCode = null;
@@ -296,8 +432,52 @@ public final class RahaTrainService {
                                               FeatureAssemblyResult features,
                                               LabelPropagationResult propagation,
                                               String planVersion,
+                                              String modelSetVersion,
                                               String columnName,
-                                              FeatureDictionary dictionary) {
+                                              FeatureDictionary dictionary,
+                                              Map<String, ColumnTrainingDataset> frozenDatasets) {
+        ColumnTrainingDataset trainingDataset = frozenDatasets == null
+                ? buildTrainingDataset(request, features, propagation, columnName, dictionary)
+                : frozenDatasets.get(columnName);
+        if (trainingDataset == null) {
+            throw new IllegalStateException("冻结训练数据缺少字段：" + columnName);
+        }
+        if (frozenDatasets != null) {
+            LOGGER.info("训练字段读取冻结样本，jobId={}，columnName={}，sampleCount={}，"
+                            + "positiveCount={}，negativeCount={}", request.getJobId(),
+                    columnName, trainingDataset.getExamples().size(),
+                    trainingDataset.getPositiveCount(), trainingDataset.getNegativeCount());
+        }
+        ColumnModelTrainingRequest trainingRequest = new ColumnModelTrainingRequest(
+                request.getModelNamePrefix() + "-" + columnName,
+                request.getDataset().getDatasetId(),
+                request.getDataset().getSchemaHash(), planVersion, trainingDataset,
+                request.getConfig().getModelConfig(), request.getTrainingConfig());
+        ColumnModelTrainingResult trainingResult = trainer.train(trainingRequest);
+        trainingResult = ModelQualityGate.evaluate(trainingResult,
+                trainingDataset, request.getConfig().getModelConfig());
+        if (trainingResult.getStatus() != ColumnModelTrainingStatus.TRAINED) {
+            return new ColumnTrainingOutcome(trainingResult, null);
+        }
+        ModelPersistenceContext persistenceContext = new ModelPersistenceContext(
+                modelSetVersion, request.getDataset().getDatasetId(),
+                request.getDataset().getSchemaHash(),
+                request.getJobId(), ModelStatus.CANDIDATE, planVersion,
+                "direct-input-v1", trainingResult.getMetrics(), clock.millis(), null);
+        String modelPath = modelStore.save(
+                trainingResult.getArtifact(), persistenceContext);
+        RahaColumnModel draft = metadataFactory.create(
+                trainingRequest, trainingResult, modelPath);
+        RahaColumnModel candidate = releaseManager.markCandidate(
+                draft, request.getArtifactVersion());
+        return new ColumnTrainingOutcome(trainingResult, candidate);
+    }
+
+    private ColumnTrainingDataset buildTrainingDataset(RahaTrainRequest request,
+                                                       FeatureAssemblyResult features,
+                                                       LabelPropagationResult propagation,
+                                                       String columnName,
+                                                       FeatureDictionary dictionary) {
         ColumnTrainingDataset trainingDataset = dataBuilder.build(
                 columnName, dictionary, features.getRowsByColumn(columnName),
                 propagation.getLabels(),
@@ -322,23 +502,7 @@ public final class RahaTrainService {
                 trainingDataset = directDataset;
             }
         }
-        ColumnModelTrainingRequest trainingRequest = new ColumnModelTrainingRequest(
-                request.getModelNamePrefix() + "-" + columnName,
-                request.getDataset().getDatasetId(),
-                request.getDataset().getSchemaHash(), planVersion, trainingDataset,
-                request.getConfig().getModelConfig(), request.getTrainingConfig());
-        ColumnModelTrainingResult trainingResult = trainer.train(trainingRequest);
-        trainingResult = ModelQualityGate.evaluate(trainingResult,
-                trainingDataset, request.getConfig().getModelConfig());
-        if (trainingResult.getStatus() != ColumnModelTrainingStatus.TRAINED) {
-            return new ColumnTrainingOutcome(trainingResult, null);
-        }
-        String modelPath = modelStore.save(trainingResult.getArtifact());
-        RahaColumnModel draft = metadataFactory.create(
-                trainingRequest, trainingResult, modelPath);
-        RahaColumnModel candidate = releaseManager.markCandidate(
-                draft, request.getArtifactVersion());
-        return new ColumnTrainingOutcome(trainingResult, candidate);
+        return trainingDataset;
     }
 
     private static boolean shouldUseDirectLabels(
@@ -354,6 +518,117 @@ public final class RahaTrainService {
         }
         double positiveRatio = (double) trainingDataset.getPositiveCount() / total;
         return positiveRatio < 0.05d || positiveRatio > 0.95d;
+    }
+
+    private Map<String, ColumnTrainingDataset> buildTrainingDatasets(
+            RahaTrainRequest request,
+            FeatureAssemblyResult features,
+            LabelPropagationResult propagation,
+            String planVersion) {
+        Map<String, ColumnTrainingDataset> result =
+                new LinkedHashMap<String, ColumnTrainingDataset>();
+        for (Map.Entry<String, FeatureDictionary> entry
+                : features.getDictionaries().entrySet()) {
+            result.put(entry.getKey(), buildTrainingDataset(request, features,
+                    propagation, entry.getKey(), entry.getValue()));
+        }
+        LOGGER.info("最终训练样本构建完成，jobId={}，columnCount={}，sampleCount={}",
+                request.getJobId(), result.size(), sampleCount(result));
+        return result;
+    }
+
+    private Map<String, ColumnTrainingDataset> loadFrozenDatasets(
+            RahaTrainRequest request,
+            FeatureAssemblyResult features,
+            String modelSetVersion,
+            TrainingArtifactMaterializationResult materialization) {
+        Map<String, ColumnTrainingDataset> result =
+                new LinkedHashMap<String, ColumnTrainingDataset>();
+        for (Map.Entry<String, FeatureDictionary> entry
+                : features.getDictionaries().entrySet()) {
+            result.put(entry.getKey(), artifactMaterializationService
+                    .loadFrozenTrainingDataset(request.getDataset().getDatasetId(),
+                            materialization.getPartitionMonth(), modelSetVersion,
+                            entry.getKey(), entry.getValue().getVersion(),
+                            entry.getValue().getDefinitions().size()));
+        }
+        long sampleCount = sampleCount(result);
+        if (sampleCount != materialization.getMaterializedExampleCount()) {
+            throw new IllegalStateException("冻结训练样本读取数量与写入数量不一致");
+        }
+        LOGGER.info("冻结训练样本读取完成，jobId={}，modelSetVersion={}，sampleCount={}",
+                request.getJobId(), modelSetVersion, sampleCount);
+        return result;
+    }
+
+    private static long sampleCount(Map<String, ColumnTrainingDataset> datasets) {
+        long count = 0L;
+        for (ColumnTrainingDataset dataset : datasets.values()) {
+            count += dataset.getExamples().size();
+        }
+        return count;
+    }
+
+    private static FeatureAssemblyResult versionTrainingFeatures(
+            FeatureAssemblyResult source,
+            String trainingBatchId,
+            String planVersion,
+            String executionConfigFingerprint) {
+        Map<String, FeatureDictionary> dictionaries =
+                new LinkedHashMap<String, FeatureDictionary>();
+        Map<String, String> versions = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, FeatureDictionary> entry
+                : source.getDictionaries().entrySet()) {
+            String version = HashUtils.sha256Hex("training-feature-v1|"
+                    + trainingBatchId + "|" + planVersion + "|"
+                    + executionConfigFingerprint + "|" + entry.getKey() + "|"
+                    + entry.getValue().getVersion());
+            versions.put(entry.getKey(), version);
+            FeatureDictionary dictionary = entry.getValue();
+            dictionaries.put(entry.getKey(), new FeatureDictionary(version,
+                    dictionary.getColumnName(), dictionary.getDefinitions(),
+                    dictionary.getCreatedAt()));
+        }
+        List<SparseFeatureRow> rows = new ArrayList<SparseFeatureRow>();
+        for (SparseFeatureRow row : source.getRows()) {
+            String version = versions.get(row.getColumnName());
+            CellCoordinate coordinate = row.getCoordinate();
+            rows.add(new SparseFeatureRow(row.getCellId(), row.getColumnName(),
+                    coordinate, row.getValueHash(), row.getMaskedValue(), version,
+                    row.getValues(), row.getSummary()));
+        }
+        return new FeatureAssemblyResult(dictionaries, rows,
+                new FeatureAssemblyMetrics(source.getMetrics().getCellCount(),
+                        source.getMetrics().getCandidateFeatureCount(),
+                        source.getMetrics().getRetainedFeatureCount(),
+                        source.getMetrics().getRemovedConstantFeatureCount()));
+    }
+
+    private static Map<String, String> profileJsonByColumn(RahaDataset dataset) {
+        Map<String, String> result = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, ColumnProfile> entry : dataset.getProfiles().entrySet()) {
+            result.put(entry.getKey(), FmdbJsonCodec.write(entry.getValue()));
+        }
+        return result;
+    }
+
+    private static Map<String, String> strategyPlanJsonByColumn(
+            List<StrategyPlan> plans) {
+        Map<String, List<StrategyPlan>> grouped =
+                new LinkedHashMap<String, List<StrategyPlan>>();
+        for (StrategyPlan plan : plans) {
+            for (String column : plan.getTargetColumns()) {
+                if (!grouped.containsKey(column)) {
+                    grouped.put(column, new ArrayList<StrategyPlan>());
+                }
+                grouped.get(column).add(plan);
+            }
+        }
+        Map<String, String> result = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, List<StrategyPlan>> entry : grouped.entrySet()) {
+            result.put(entry.getKey(), FmdbJsonCodec.write(entry.getValue()));
+        }
+        return result;
     }
 
     private static Map<String, String> details(

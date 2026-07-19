@@ -34,6 +34,10 @@ public final class RahaTrainOutput {
     private final Map<String, RahaColumnModel> candidateModels;
     /** 训练依赖的策略计划版本。 */
     private final String strategyPlanVersion;
+    /** 训练前确定的模型集合版本。 */
+    private final String modelSetVersion;
+    /** 可选三类训练物理产物校验结果。 */
+    private final TrainingArtifactMaterializationResult materializationResult;
 
     public RahaTrainOutput(List<StrategyPlan> strategyPlans,
                            StrategyBatchResult strategyBatch,
@@ -43,6 +47,20 @@ public final class RahaTrainOutput {
                            Map<String, ColumnModelTrainingResult> trainingResults,
                            Map<String, RahaColumnModel> candidateModels,
                            String strategyPlanVersion) {
+        this(strategyPlans, strategyBatch, features, clustering, propagation,
+                trainingResults, candidateModels, strategyPlanVersion, null, null);
+    }
+
+    public RahaTrainOutput(List<StrategyPlan> strategyPlans,
+                           StrategyBatchResult strategyBatch,
+                           FeatureAssemblyResult features,
+                           ClusteringBatchResult clustering,
+                           LabelPropagationResult propagation,
+                           Map<String, ColumnModelTrainingResult> trainingResults,
+                           Map<String, RahaColumnModel> candidateModels,
+                           String strategyPlanVersion,
+                           String modelSetVersion,
+                           TrainingArtifactMaterializationResult materializationResult) {
         if (strategyPlans == null || strategyBatch == null || features == null
                 || clustering == null || propagation == null || trainingResults == null
                 || candidateModels == null || strategyPlanVersion == null) {
@@ -59,6 +77,8 @@ public final class RahaTrainOutput {
         this.candidateModels = Collections.unmodifiableMap(
                 new LinkedHashMap<String, RahaColumnModel>(candidateModels));
         this.strategyPlanVersion = strategyPlanVersion;
+        this.modelSetVersion = modelSetVersion;
+        this.materializationResult = materializationResult;
     }
 
     public List<StrategyPlan> getStrategyPlans() { return strategyPlans; }
@@ -71,4 +91,8 @@ public final class RahaTrainOutput {
     }
     public Map<String, RahaColumnModel> getCandidateModels() { return candidateModels; }
     public String getStrategyPlanVersion() { return strategyPlanVersion; }
+    public String getModelSetVersion() { return modelSetVersion; }
+    public TrainingArtifactMaterializationResult getMaterializationResult() {
+        return materializationResult;
+    }
 }

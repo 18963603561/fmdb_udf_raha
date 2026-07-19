@@ -19,8 +19,8 @@ public final class DataLoadRequest {
     private final String inputReference;
     /** 来源表或逻辑表名称。 */
     private final String tableName;
-    /** 稳定行标识字段。 */
-    private final String rowIdColumn;
+    /** 输入业务键或全字段内容哈希行身份配置。 */
+    private final RowIdentityConfig rowIdentityConfig;
     /** 输入数据格式。 */
     private final DataFormat format;
     /** 传递给 Spark 数据源的读取选项。 */
@@ -39,7 +39,7 @@ public final class DataLoadRequest {
     public DataLoadRequest(String datasetId,
                            String inputReference,
                            String tableName,
-                           String rowIdColumn,
+                           RowIdentityConfig rowIdentityConfig,
                            DataFormat format,
                            Map<String, String> options,
                            Set<String> includedColumns,
@@ -50,7 +50,10 @@ public final class DataLoadRequest {
         this.datasetId = ValueUtils.requireNotBlank(datasetId, "数据集标识");
         this.inputReference = ValueUtils.requireNotBlank(inputReference, "输入数据引用");
         this.tableName = ValueUtils.requireNotBlank(tableName, "表名");
-        this.rowIdColumn = ValueUtils.requireNotBlank(rowIdColumn, "行标识字段");
+        if (rowIdentityConfig == null) {
+            throw new IllegalArgumentException("行身份配置不能为空");
+        }
+        this.rowIdentityConfig = rowIdentityConfig;
         if (format == null) {
             throw new IllegalArgumentException("数据格式不能为空");
         }
@@ -80,8 +83,8 @@ public final class DataLoadRequest {
         return tableName;
     }
 
-    public String getRowIdColumn() {
-        return rowIdColumn;
+    public RowIdentityConfig getRowIdentityConfig() {
+        return rowIdentityConfig;
     }
 
     public DataFormat getFormat() {

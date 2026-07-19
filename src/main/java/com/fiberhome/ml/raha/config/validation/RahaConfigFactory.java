@@ -13,6 +13,7 @@ import com.fiberhome.ml.raha.config.dto.ResourceConfig;
 import com.fiberhome.ml.raha.config.dto.SamplingConfig;
 import com.fiberhome.ml.raha.config.dto.StrategyConfig;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
@@ -47,9 +48,9 @@ public final class RahaConfigFactory {
     public RahaJobConfig jobConfig(JobType jobType,
                                    String datasetId,
                                    String inputReference,
-                                   String rowIdColumn) {
+                                   RowIdentityConfig rowIdentityConfig) {
         return new RahaJobConfig(jobType, datasetId, null, inputReference,
-                rowIdColumn, properties.getLong("raha.job.random-seed"),
+                rowIdentityConfig, properties.getLong("raha.job.random-seed"),
                 strategyConfig(), featureConfig(), modelConfig(),
                 clusteringConfig(), samplingConfig(), resourceConfig(),
                 failureToleranceConfig(), executionFingerprint());

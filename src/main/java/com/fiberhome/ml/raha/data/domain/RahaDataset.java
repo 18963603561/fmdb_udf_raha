@@ -69,6 +69,15 @@ public final class RahaDataset {
     }
 
     /**
+     * 绑定新的训练快照和数据，不改变原数据集对象。
+     */
+    public RahaDataset withSnapshot(String newSnapshotId,
+                                    Dataset<Row> newDataFrame) {
+        return new RahaDataset(datasetId, newSnapshotId, tableName, rowIdColumn,
+                columns, newDataFrame, schemaHash, profiles);
+    }
+
+    /**
      * 返回绑定列画像的新对象，不修改当前数据集和输入数据。
      *
      * @param newProfiles 按字段名称索引的列画像

@@ -4,6 +4,7 @@ import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.data.type.ModelStatus;
 import com.fiberhome.ml.raha.feature.domain.SparseFeatureRow;
 import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
+import com.fiberhome.ml.raha.model.domain.ModelPersistenceContext;
 import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
 import com.fiberhome.ml.raha.model.FileColumnModelStore;
 import com.fiberhome.ml.raha.model.prediction.ColumnModelPredictor;
@@ -41,7 +42,7 @@ class ModelLifecycleIntegrationTest {
     void shouldReloadModelAfterStoreRestartAndKeepPredictionStable() {
         ColumnModelArtifact artifact = artifact("first", 0.25d, 1.5d);
         FileColumnModelStore firstStore = new FileColumnModelStore(temporaryDirectory);
-        String modelPath = firstStore.save(artifact);
+        String modelPath = firstStore.save(artifact, persistenceContext());
         SparseFeatureRow row = row(2.0d);
         double expected = new ColumnModelPredictor().predict(
                 artifact, Collections.singletonList(row)).get(0).getScore();
@@ -62,10 +63,12 @@ class ModelLifecycleIntegrationTest {
         ColumnModelArtifact firstArtifact = artifact("first", -0.5d, 1.0d);
         ColumnModelArtifact secondArtifact = artifact("second", 0.5d, 2.0d);
         ColumnModelArtifact neverPublishedArtifact = artifact("never", 0.0d, 0.5d);
-        RahaColumnModel first = metadata(firstArtifact, store.save(firstArtifact), 1000L);
+        RahaColumnModel first = metadata(firstArtifact,
+                store.save(firstArtifact, persistenceContext()), 1000L);
         RahaColumnModel neverPublished = metadata(neverPublishedArtifact,
-                store.save(neverPublishedArtifact), 1500L);
-        RahaColumnModel second = metadata(secondArtifact, store.save(secondArtifact), 2000L);
+                store.save(neverPublishedArtifact, persistenceContext()), 1500L);
+        RahaColumnModel second = metadata(secondArtifact,
+                store.save(secondArtifact, persistenceContext()), 2000L);
         ModelMetadataRepository repository = new DefaultModelMetadataRepository(
                 new InMemoryRahaRepository());
         PublishedColumnModelLoader loader = new PublishedColumnModelLoader(repository,
@@ -131,7 +134,8 @@ class ModelLifecycleIntegrationTest {
                 artifact.getModelVersion(), "dataset", artifact.getColumnName(),
                 "schema-v1", artifact.getClassifierType(),
                 artifact.getFeatureDictionaryVersion(), "plan-v1",
-                artifact.getThreshold(), store.save(artifact), ModelStatus.DRAFT,
+                artifact.getThreshold(), store.save(artifact, persistenceContext()),
+                ModelStatus.DRAFT,
                 metrics, 1000L);
         ModelMetadataRepository repository = new DefaultModelMetadataRepository(
                 new InMemoryRahaRepository());
@@ -178,5 +182,12 @@ class ModelLifecycleIntegrationTest {
 
     private static ArtifactVersion version(String stageId) {
         return new ArtifactVersion("config-v1", "snapshot-v1", stageId, 1);
+    }
+
+    private static ModelPersistenceContext persistenceContext() {
+        return new ModelPersistenceContext(HashUtils.sha256Hex("model-set-v1"),
+                "dataset", "training-batch-v1", ModelStatus.CANDIDATE,
+                "plan-v1", "merge-v1",
+                Collections.<String, Double>emptyMap(), 1000L, null);
     }
 }

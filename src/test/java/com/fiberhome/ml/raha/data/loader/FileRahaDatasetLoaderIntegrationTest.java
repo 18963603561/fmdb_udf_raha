@@ -44,7 +44,8 @@ class FileRahaDatasetLoaderIntegrationTest {
                 "1,a@example.com,10.5",
                 "2,b@example.com,20");
         DataLoadRequest request = new DataLoadRequest(
-                "dataset", csv.toString(), "test_table", "id", DataFormat.CSV,
+                "dataset", csv.toString(), "test_table",
+                RowIdentityConfig.sourceKey("id"), DataFormat.CSV,
                 csvOptions(), new LinkedHashSet<String>(Arrays.asList("email", "amount")),
                 Collections.<String>emptySet(), Collections.singleton("email"),
                 null, "source-v1");
@@ -66,13 +67,14 @@ class FileRahaDatasetLoaderIntegrationTest {
     }
 
     @Test
-    void shouldRejectDuplicatedRowId() throws IOException {
+    void shouldDeduplicateConflictingSourceKey() throws IOException {
         Path csv = writeCsv("duplicate.csv", "id,name", "1,A", "1,B");
 
-        DataValidationException exception = assertThrows(DataValidationException.class,
-                () -> loader().load(request(csv, "id")));
+        LoadedDataset loaded = loader().load(request(csv, "id"));
 
-        assertEquals(DataValidationErrorCode.ROW_ID_DUPLICATED, exception.getErrorCode());
+        assertEquals(1L, loaded.getSnapshot().getRowCount());
+        assertEquals(2L, ((Number) loaded.getDataset().getDataFrame().first()
+                .getAs(RowIdentityColumns.DUPLICATE_COUNT)).longValue());
     }
 
     @Test
@@ -92,7 +94,8 @@ class FileRahaDatasetLoaderIntegrationTest {
         DataValidationException exception = assertThrows(DataValidationException.class,
                 () -> loader().load(request(csv, "id")));
 
-        assertEquals(DataValidationErrorCode.ROW_ID_COLUMN_MISSING, exception.getErrorCode());
+        assertEquals(DataValidationErrorCode.ROW_KEY_COLUMN_MISSING,
+                exception.getErrorCode());
     }
 
     @Test
@@ -107,13 +110,15 @@ class FileRahaDatasetLoaderIntegrationTest {
 
     private FileRahaDatasetLoader loader() {
         SparkSession sparkSession = SparkTestSession.get();
-        return new FileRahaDatasetLoader(sparkSession, new RowIdValidator(),
+        return new FileRahaDatasetLoader(sparkSession, new RowIdentityService(),
+                new RowIdValidator(),
                 new SchemaHasher(), new ColumnMetadataFactory(), new SnapshotMetadataFactory(),
                 Clock.fixed(Instant.ofEpochMilli(1000L), ZoneOffset.UTC));
     }
 
     private DataLoadRequest request(Path path, String rowIdColumn) {
-        return new DataLoadRequest("dataset", path.toString(), "test_table", rowIdColumn,
+        return new DataLoadRequest("dataset", path.toString(), "test_table",
+                RowIdentityConfig.sourceKey(rowIdColumn),
                 DataFormat.CSV, csvOptions(), Collections.<String>emptySet(),
                 Collections.<String>emptySet(), Collections.<String>emptySet(),
                 "snapshot-v1", "source-v1");
@@ -133,4 +138,3 @@ class FileRahaDatasetLoaderIntegrationTest {
         return path;
     }
 }
-

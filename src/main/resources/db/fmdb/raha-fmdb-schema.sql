@@ -5,24 +5,24 @@ CREATE DATABASE IF NOT EXISTS dw;
 
 -- 保存不可变采样行和待标注任务上下文。
 CREATE TABLE IF NOT EXISTS dw.raha_sample_record (
-    sample_batch_id STRING,
-    dataset_id STRING,
-    input_reference STRING,
+    sample_batch_id STRING NOT NULL,
+    dataset_id STRING NOT NULL,
+    input_reference STRING NOT NULL,
     source_version STRING,
-    row_identity_mode STRING,
+    row_identity_mode STRING NOT NULL,
     row_key_columns_json STRING,
-    row_fingerprint_algorithm STRING,
-    row_fingerprint_version STRING,
-    row_id STRING,
-    row_content_hash STRING,
-    schema_hash STRING,
-    column_schema_json STRING,
-    row_data_json STRING,
-    duplicate_count BIGINT,
-    sampling_version STRING,
-    sampling_context_json STRING,
-    created_at BIGINT,
-    partition_month STRING
+    row_fingerprint_algorithm STRING NOT NULL,
+    row_fingerprint_version STRING NOT NULL,
+    row_id STRING NOT NULL,
+    row_content_hash STRING NOT NULL,
+    schema_hash STRING NOT NULL,
+    column_schema_json STRING NOT NULL,
+    row_data_json STRING NOT NULL,
+    duplicate_count BIGINT NOT NULL,
+    sampling_version STRING NOT NULL,
+    sampling_context_json STRING NOT NULL,
+    created_at BIGINT NOT NULL,
+    partition_month STRING NOT NULL
 )
 USING ORC
 PARTITIONED BY (dataset_id, partition_month)
@@ -30,25 +30,25 @@ TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 追加保存标注批次元数据、原始行快照和用户标签。
 CREATE TABLE IF NOT EXISTS dw.raha_annotation_record (
-    annotation_batch_id STRING,
-    sample_batch_id STRING,
-    dataset_id STRING,
+    annotation_batch_id STRING NOT NULL,
+    sample_batch_id STRING NOT NULL,
+    dataset_id STRING NOT NULL,
     annotation_task_id STRING,
-    row_id STRING,
-    row_content_hash STRING,
-    row_data_json STRING,
-    template_version STRING,
+    row_id STRING NOT NULL,
+    row_content_hash STRING NOT NULL,
+    row_data_json STRING NOT NULL,
+    template_version STRING NOT NULL,
     file_name STRING,
-    schema_hash STRING,
-    annotation_json STRING,
+    schema_hash STRING NOT NULL,
+    annotation_json STRING NOT NULL,
     annotator STRING,
-    batch_status STRING,
-    batch_record_count BIGINT,
-    valid_record_count BIGINT,
-    invalid_record_count BIGINT,
+    batch_status STRING NOT NULL,
+    batch_record_count BIGINT NOT NULL,
+    valid_record_count BIGINT NOT NULL,
+    invalid_record_count BIGINT NOT NULL,
     supersedes_batch_id STRING,
-    annotated_at BIGINT,
-    partition_month STRING
+    annotated_at BIGINT NOT NULL,
+    partition_month STRING NOT NULL
 )
 USING ORC
 PARTITIONED BY (dataset_id, partition_month)
@@ -56,13 +56,13 @@ TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 保存列画像、策略、特征字典、聚类和传播摘要。
 CREATE TABLE IF NOT EXISTS dw.raha_training_column_artifact (
-    training_batch_id STRING,
-    dataset_id STRING,
+    training_batch_id STRING NOT NULL,
+    dataset_id STRING NOT NULL,
     source_version STRING,
-    schema_hash STRING,
-    merge_algorithm_version STRING,
-    training_context_json STRING,
-    column_name STRING,
+    schema_hash STRING NOT NULL,
+    merge_algorithm_version STRING NOT NULL,
+    training_context_json STRING NOT NULL,
+    column_name STRING NOT NULL,
     profile_version STRING,
     profile_json STRING,
     strategy_plan_version STRING,
@@ -72,23 +72,23 @@ CREATE TABLE IF NOT EXISTS dw.raha_training_column_artifact (
     cluster_version STRING,
     cluster_summary_json STRING,
     propagation_summary_json STRING,
-    created_at BIGINT
+    created_at BIGINT NOT NULL
 )
 USING ORC
 TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 保存全量训练单元格特征、聚类和标签传播结果。
 CREATE TABLE IF NOT EXISTS dw.raha_training_cell (
-    training_batch_id STRING,
-    dataset_id STRING,
-    training_snapshot_id STRING,
-    row_id STRING,
-    column_name STRING,
-    cell_id STRING,
+    training_batch_id STRING NOT NULL,
+    dataset_id STRING NOT NULL,
+    training_snapshot_id STRING NOT NULL,
+    row_id STRING NOT NULL,
+    column_name STRING NOT NULL,
+    cell_id STRING NOT NULL,
     cell_value STRING,
-    feature_dictionary_version STRING,
-    feature_vector_json STRING,
-    feature_summary_json STRING,
+    feature_dictionary_version STRING NOT NULL,
+    feature_vector_json STRING NOT NULL,
+    feature_summary_json STRING NOT NULL,
     cluster_id STRING,
     cluster_distance DOUBLE,
     direct_label INT,
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS dw.raha_training_cell (
     label_source STRING,
     source_annotation_batch_id STRING,
     sample_weight DOUBLE,
-    created_at BIGINT
+    created_at BIGINT NOT NULL
 )
 USING ORC
 PARTITIONED BY (dataset_id, training_batch_id)
@@ -104,22 +104,22 @@ TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 保存模型实际使用的单元格值、特征和最终标签。
 CREATE TABLE IF NOT EXISTS dw.raha_training_example (
-    model_set_version STRING,
-    training_batch_id STRING,
-    dataset_id STRING,
-    row_id STRING,
-    column_name STRING,
-    cell_id STRING,
+    model_set_version STRING NOT NULL,
+    training_batch_id STRING NOT NULL,
+    dataset_id STRING NOT NULL,
+    row_id STRING NOT NULL,
+    column_name STRING NOT NULL,
+    cell_id STRING NOT NULL,
     cell_value STRING,
-    feature_dictionary_version STRING,
-    feature_vector_json STRING,
-    label INT,
-    label_source STRING,
+    feature_dictionary_version STRING NOT NULL,
+    feature_vector_json STRING NOT NULL,
+    label INT NOT NULL,
+    label_source STRING NOT NULL,
     source_annotation_batch_id STRING,
-    sample_weight DOUBLE,
+    sample_weight DOUBLE NOT NULL,
     cluster_id STRING,
-    created_at BIGINT,
-    partition_month STRING
+    created_at BIGINT NOT NULL,
+    partition_month STRING NOT NULL
 )
 USING ORC
 PARTITIONED BY (dataset_id, partition_month)
@@ -127,22 +127,24 @@ TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 保存模型集合和列模型载荷。
 CREATE TABLE IF NOT EXISTS dw.raha_model_artifact (
-    model_set_version STRING,
-    dataset_id STRING,
-    training_batch_id STRING,
-    model_set_status STRING,
-    strategy_plan_version STRING,
-    merge_algorithm_version STRING,
-    column_name STRING,
-    model_version STRING,
-    classifier_type STRING,
-    feature_dictionary_version STRING,
-    feature_dimension INT,
-    threshold DOUBLE,
+    model_set_version STRING NOT NULL,
+    dataset_id STRING NOT NULL,
+    schema_hash STRING NOT NULL,
+    training_batch_id STRING NOT NULL,
+    model_set_status STRING NOT NULL,
+    state_version INT NOT NULL,
+    strategy_plan_version STRING NOT NULL,
+    merge_algorithm_version STRING NOT NULL,
+    column_name STRING NOT NULL,
+    model_version STRING NOT NULL,
+    classifier_type STRING NOT NULL,
+    feature_dictionary_version STRING NOT NULL,
+    feature_dimension INT NOT NULL,
+    threshold DOUBLE NOT NULL,
     model_path STRING,
-    model_payload_json STRING,
-    metrics_json STRING,
-    created_at BIGINT,
+    model_payload_json STRING NOT NULL,
+    metrics_json STRING NOT NULL,
+    created_at BIGINT NOT NULL,
     published_at BIGINT
 )
 USING ORC
@@ -150,21 +152,21 @@ TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 只保存错误单元格、具体原值和完整错误行。
 CREATE TABLE IF NOT EXISTS dw.raha_detection_result (
-    detection_batch_id STRING,
-    dataset_id STRING,
-    input_reference STRING,
-    model_set_version STRING,
-    model_version STRING,
-    row_id STRING,
-    column_name STRING,
-    cell_id STRING,
+    detection_batch_id STRING NOT NULL,
+    dataset_id STRING NOT NULL,
+    input_reference STRING NOT NULL,
+    model_set_version STRING NOT NULL,
+    model_version STRING NOT NULL,
+    row_id STRING NOT NULL,
+    column_name STRING NOT NULL,
+    cell_id STRING NOT NULL,
     original_value STRING,
-    row_data_json STRING,
-    score DOUBLE,
-    threshold DOUBLE,
-    error_reason_json STRING,
-    detected_at BIGINT,
-    partition_date STRING
+    row_data_json STRING NOT NULL,
+    score DOUBLE NOT NULL,
+    threshold DOUBLE NOT NULL,
+    error_reason_json STRING NOT NULL,
+    detected_at BIGINT NOT NULL,
+    partition_date STRING NOT NULL
 )
 USING ORC
 PARTITIONED BY (dataset_id, partition_date)
@@ -172,23 +174,23 @@ TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 追加保存任务状态快照。
 CREATE TABLE IF NOT EXISTS dw.raha_job_run (
-    job_id STRING,
-    state_version INT,
-    dataset_id STRING,
-    idempotent_key STRING,
-    job_type STRING,
+    job_id STRING NOT NULL,
+    state_version INT NOT NULL,
+    dataset_id STRING NOT NULL,
+    idempotent_key STRING NOT NULL,
+    job_type STRING NOT NULL,
     snapshot_id STRING,
-    config_version STRING,
-    status STRING,
+    config_version STRING NOT NULL,
+    status STRING NOT NULL,
     current_stage_id STRING,
     result_summary_json STRING,
     error_code STRING,
     error_message STRING,
-    created_at BIGINT,
-    started_at BIGINT,
-    finished_at BIGINT,
-    updated_at BIGINT,
-    partition_month STRING
+    created_at BIGINT NOT NULL,
+    started_at BIGINT NOT NULL,
+    finished_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    partition_month STRING NOT NULL
 )
 USING ORC
 PARTITIONED BY (dataset_id, partition_month)
@@ -196,24 +198,24 @@ TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 合并保存阶段状态、重试尝试和检查点信息。
 CREATE TABLE IF NOT EXISTS dw.raha_job_stage_attempt (
-    job_id STRING,
-    dataset_id STRING,
-    stage_id STRING,
-    stage_type STRING,
-    attempt_id INT,
-    state_version INT,
+    job_id STRING NOT NULL,
+    dataset_id STRING NOT NULL,
+    stage_id STRING NOT NULL,
+    stage_type STRING NOT NULL,
+    attempt_id INT NOT NULL,
+    state_version INT NOT NULL,
     checkpoint_id STRING,
-    status STRING,
+    status STRING NOT NULL,
     input_version_json STRING,
     input_fingerprint STRING,
     output_location STRING,
     summary_json STRING,
     error_code STRING,
     error_message STRING,
-    started_at BIGINT,
-    completed_at BIGINT,
-    updated_at BIGINT,
-    partition_month STRING
+    started_at BIGINT NOT NULL,
+    completed_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    partition_month STRING NOT NULL
 )
 USING ORC
 PARTITIONED BY (dataset_id, partition_month)

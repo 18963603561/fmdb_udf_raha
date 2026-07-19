@@ -38,9 +38,17 @@ public final class DirectLabelStageHandler implements StageHandler {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public StageResult execute(StageExecutionContext context) {
-        context.getAttributes().put(StageAttributeKeys.CELL_LABELS, directLabels);
-        return directLabels.isEmpty()
+        List<CellLabel> effectiveLabels = directLabels;
+        Object existing = context.getAttributes().get(StageAttributeKeys.CELL_LABELS);
+        // 持久化训练批次的标签已在合并阶段完成坐标转换，空调用方标签不能覆盖它们。
+        if (effectiveLabels.isEmpty() && existing instanceof List
+                && !((List<?>) existing).isEmpty()) {
+            effectiveLabels = (List<CellLabel>) existing;
+        }
+        context.getAttributes().put(StageAttributeKeys.CELL_LABELS, effectiveLabels);
+        return effectiveLabels.isEmpty()
                 ? StageResult.skipped("当前训练任务没有直接标签")
                 : StageResult.success();
     }

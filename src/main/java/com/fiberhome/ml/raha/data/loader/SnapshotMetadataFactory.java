@@ -25,8 +25,8 @@ public final class SnapshotMetadataFactory {
             snapshotId = "snapshot-" + HashUtils.sha256Hex(source).substring(0, 24);
         }
         return new DatasetSnapshot(request.getDatasetId(), snapshotId,
-                request.getInputReference(), request.getTableName(), request.getRowIdColumn(),
+                request.getInputReference(), request.getTableName(),
+                RowIdentityColumns.ROW_ID,
                 schemaHash, rowCount, columnCount, request.getSourceVersion(), createdAt);
     }
 }
-

@@ -11,6 +11,8 @@ public final class StageAttributeKeys {
     public static final String RAHA_DATASET = "rahaDataset";
     /** 步骤 1：数据加载阶段写入，表示输入数据快照元数据，供任务绑定快照和结果追溯使用。 */
     public static final String DATASET_SNAPSHOT = "datasetSnapshot";
+    /** 步骤 1：训练合并阶段写入，供后续画像、冻结样本和模型血缘复用。 */
+    public static final String TRAINING_MERGE_RESULT = "trainingMergeResult";
 
     /** 步骤 2：策略计划阶段写入，表示当前快照生成的策略计划列表，供策略执行、特征和训练阶段使用。 */
     public static final String STRATEGY_PLANS = "strategyPlans";
@@ -47,6 +49,11 @@ public final class StageAttributeKeys {
     public static final String SAMPLE_SERVICE_RESULT = "sampleServiceResult";
     /** 步骤 5：服务化采样阶段写入，表示采样业务输出，供任务结果返回和标注任务查看使用。 */
     public static final String SAMPLE_OUTPUT = "sampleOutput";
+    /** 步骤 5：采样持久化完成后写入，表示可供 Excel 标注和训练读取的 c1 批次。 */
+    public static final String SAMPLE_BATCH = "sampleBatch";
+    /** 步骤 5：采样持久化完成后写入，表示新增数量和真实物理位置。 */
+    public static final String SAMPLE_MATERIALIZATION_RESULT =
+            "sampleMaterializationResult";
 
     /** 步骤 6：评估阶段写入，表示模型训练或检测后的评估结果，供任务结果返回和质量分析使用。 */
     public static final String EVALUATION_RESULT = "evaluationResult";

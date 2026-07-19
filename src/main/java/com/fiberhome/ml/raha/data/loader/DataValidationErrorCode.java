@@ -12,7 +12,10 @@ public enum DataValidationErrorCode {
     ROW_ID_NULL_OR_BLANK,
     /** 行标识存在重复值。 */
     ROW_ID_DUPLICATED,
+    /** 用户声明的单字段或联合键字段不存在。 */
+    ROW_KEY_COLUMN_MISSING,
+    /** 输入字段与 Raha 保留技术字段冲突。 */
+    RESERVED_COLUMN_CONFLICT,
     /** 外部数据读取失败。 */
     DATA_LOAD_FAILED
 }
-

@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.fmdb.gateway;
 
 import java.util.List;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 
@@ -12,6 +13,18 @@ public interface FmdbTableGateway {
     boolean tableExists(String tableName);
 
     Dataset<Row> read(String tableName);
+
+    /**
+     * 按显式字段和过滤条件读取 FMDB，避免业务热路径扫描无关列。
+     *
+     * @param tableName FMDB 目标表
+     * @param columns 需要读取的字段
+     * @param condition 可选 Spark 过滤条件
+     * @return 完成列裁剪和条件过滤的数据集
+     */
+    Dataset<Row> read(String tableName,
+                      List<String> columns,
+                      Column condition);
 
     /**
      * 只追加业务主键尚不存在的记录。

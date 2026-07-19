@@ -12,8 +12,8 @@ public enum ConfigErrorCode {
     DATASET_ID_REQUIRED,
     /** 输入数据引用为空。 */
     INPUT_REFERENCE_REQUIRED,
-    /** 行标识字段为空。 */
-    ROW_ID_COLUMN_REQUIRED,
+    /** 行身份配置为空。 */
+    ROW_IDENTITY_CONFIG_REQUIRED,
     /** 策略配置为空。 */
     STRATEGY_CONFIG_REQUIRED,
     /** 策略族为空。 */

@@ -7,6 +7,7 @@ import com.fiberhome.ml.raha.feature.FeatureService;
 import com.fiberhome.ml.raha.job.stage.model.EvaluationStageHandler;
 import com.fiberhome.ml.raha.job.stage.detection.PublishedModelDetectionStageHandler;
 import com.fiberhome.ml.raha.job.stage.model.ResultPersistenceStageHandler;
+import com.fiberhome.ml.raha.job.stage.model.ResultPersistenceVerifier;
 import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
 import com.fiberhome.ml.raha.job.stage.core.StageHandler;
 import com.fiberhome.ml.raha.service.detect.RahaDetectService;
@@ -22,6 +23,8 @@ public final class DetectionWorkflow extends AbstractRahaWorkflow {
 
     /** 已发布模型检测服务。 */
     private final RahaDetectService detectService;
+    /** 可选检测错误表写入和回读验证器。 */
+    private final ResultPersistenceVerifier resultPersistenceVerifier;
 
     public DetectionWorkflow(RahaDatasetLoader datasetLoader,
                              ColumnProfileService profileService,
@@ -29,11 +32,23 @@ public final class DetectionWorkflow extends AbstractRahaWorkflow {
                              StrategyExecutionService executionService,
                              FeatureService featureService,
                              RahaDetectService detectService) {
+        this(datasetLoader, profileService, planService, executionService,
+                featureService, detectService, null);
+    }
+
+    public DetectionWorkflow(RahaDatasetLoader datasetLoader,
+                             ColumnProfileService profileService,
+                             StrategyPlanService planService,
+                             StrategyExecutionService executionService,
+                             FeatureService featureService,
+                             RahaDetectService detectService,
+                             ResultPersistenceVerifier resultPersistenceVerifier) {
         super(datasetLoader, profileService, planService, executionService, featureService);
         if (detectService == null) {
             throw new IllegalArgumentException("检测工作流服务不能为空");
         }
         this.detectService = detectService;
+        this.resultPersistenceVerifier = resultPersistenceVerifier;
     }
 
     @Override
@@ -52,7 +67,8 @@ public final class DetectionWorkflow extends AbstractRahaWorkflow {
             handlers.add(new EvaluationStageHandler(request.getEvaluator()));
         }
         handlers.add(new ResultPersistenceStageHandler(
-                StageAttributeKeys.DETECT_SERVICE_RESULT));
+                StageAttributeKeys.DETECT_SERVICE_RESULT,
+                resultPersistenceVerifier));
         return Collections.unmodifiableList(handlers);
     }
 }

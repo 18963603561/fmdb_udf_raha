@@ -8,6 +8,8 @@ import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.FileRahaDatasetLoader;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.RowIdentityService;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
 import com.fiberhome.ml.raha.data.profile.ColumnProfiler;
@@ -79,14 +81,16 @@ class Iteration3PipelineIntegrationTest {
         InMemoryRahaRepository storage = new InMemoryRahaRepository();
         StrategyRepository strategyRepository = new DefaultStrategyRepository(storage);
         RahaJobConfig config = RahaJobConfig.defaults(
-                JobType.DETECTION, "dataset", csv.toString(), "id");
+                JobType.DETECTION, "dataset", csv.toString(),
+                RowIdentityConfig.sourceKey("id"));
         RahaJobOrchestrator orchestrator = new RahaJobOrchestrator(
                 new RahaConfigValidator(), new ConfigVersioner(),
                 new IdempotencyKeyGenerator(), new DefaultRahaIdGenerator(),
                 new StageFailureDecider(), new DefaultJobRepository(storage),
                 new DefaultStageRepository(storage), clock);
         FileRahaDatasetLoader loader = new FileRahaDatasetLoader(
-                SparkTestSession.get(), new RowIdValidator(), new SchemaHasher(),
+                SparkTestSession.get(), new RowIdentityService(),
+                new RowIdValidator(), new SchemaHasher(),
                 new ColumnMetadataFactory(), new SnapshotMetadataFactory(), clock);
         ColumnProfileService profileService = new ColumnProfileService(
                 new ColumnProfiler(), new DefaultColumnProfileRepository(storage), clock);
@@ -96,7 +100,8 @@ class Iteration3PipelineIntegrationTest {
                 new StrategyExecutor(StrategyRegistry.defaults(), clock),
                 strategyRepository, clock);
         DataLoadRequest loadRequest = new DataLoadRequest(
-                "dataset", csv.toString(), "test_table", "id", DataFormat.CSV,
+                "dataset", csv.toString(), "test_table",
+                RowIdentityConfig.sourceKey("id"), DataFormat.CSV,
                 csvOptions(), Collections.<String>emptySet(), Collections.<String>emptySet(),
                 Collections.<String>emptySet(), null, "source-v1");
 

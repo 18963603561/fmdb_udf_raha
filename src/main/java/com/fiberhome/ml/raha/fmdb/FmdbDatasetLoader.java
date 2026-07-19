@@ -11,6 +11,9 @@ import com.fiberhome.ml.raha.data.loader.LoadedDataset;
 import com.fiberhome.ml.raha.data.loader.RahaDatasetLoader;
 import com.fiberhome.ml.raha.data.loader.RowIdValidationResult;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
+import com.fiberhome.ml.raha.data.loader.RowIdentityColumns;
+import com.fiberhome.ml.raha.data.loader.RowIdentityResult;
+import com.fiberhome.ml.raha.data.loader.RowIdentityService;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
 import java.time.Clock;
@@ -34,6 +37,8 @@ public final class FmdbDatasetLoader implements RahaDatasetLoader {
     private final SparkSession sparkSession;
     /** 稳定行标识校验器。 */
     private final RowIdValidator rowIdValidator;
+    /** 行身份生成和逻辑去重服务。 */
+    private final RowIdentityService rowIdentityService;
     /** 模式哈希生成器。 */
     private final SchemaHasher schemaHasher;
     /** FMDB 模式解析器。 */
@@ -44,16 +49,19 @@ public final class FmdbDatasetLoader implements RahaDatasetLoader {
     private final Clock clock;
 
     public FmdbDatasetLoader(SparkSession sparkSession,
+                             RowIdentityService rowIdentityService,
                              RowIdValidator rowIdValidator,
                              SchemaHasher schemaHasher,
                              FmdbSchemaResolver schemaResolver,
                              SnapshotMetadataFactory snapshotFactory,
                              Clock clock) {
-        if (sparkSession == null || rowIdValidator == null || schemaHasher == null
+        if (sparkSession == null || rowIdentityService == null
+                || rowIdValidator == null || schemaHasher == null
                 || schemaResolver == null || snapshotFactory == null || clock == null) {
             throw new IllegalArgumentException("FMDB 数据加载器依赖不能为空");
         }
         this.sparkSession = sparkSession;
+        this.rowIdentityService = rowIdentityService;
         this.rowIdValidator = rowIdValidator;
         this.schemaHasher = schemaHasher;
         this.schemaResolver = schemaResolver;
@@ -71,23 +79,31 @@ public final class FmdbDatasetLoader implements RahaDatasetLoader {
         LOGGER.info("开始读取 FMDB 数据，datasetId={}，sourceType={}，tableName={}",
                 request.getDatasetId(), request.getFormat(), request.getTableName());
         try {
-            Dataset<Row> frame = request.getFormat() == DataFormat.FMDB_TABLE
+            Dataset<Row> source = request.getFormat() == DataFormat.FMDB_TABLE
                     ? readTable(request.getInputReference())
                     : readSql(request.getInputReference());
+            org.apache.spark.sql.types.StructType businessSchema =
+                    rowIdentityService.businessSchema(source.schema());
+            String schemaHash = schemaHasher.hash(businessSchema);
+            List<ColumnMetadata> columns = schemaResolver.resolve(
+                    businessSchema, request);
+            RowIdentityResult identity = rowIdentityService.identify(
+                    source, request.getRowIdentityConfig());
+            Dataset<Row> frame = identity.getDataFrame();
             RowIdValidationResult rowId = rowIdValidator.validate(
-                    frame, request.getRowIdColumn());
-            String schemaHash = schemaHasher.hash(frame.schema());
-            List<ColumnMetadata> columns = schemaResolver.resolve(frame.schema(), request);
+                    frame, RowIdentityColumns.ROW_ID);
             DatasetSnapshot snapshot = snapshotFactory.create(request, schemaHash,
                     rowId.getRowCount(), columns.size(), clock.millis());
             RahaDataset dataset = new RahaDataset(request.getDatasetId(),
                     snapshot.getSnapshotId(), request.getTableName(),
-                    request.getRowIdColumn(), columns, frame, schemaHash,
+                    RowIdentityColumns.ROW_ID, columns, frame, schemaHash,
                     Collections.emptyMap());
-            LOGGER.info("FMDB 数据读取完成，datasetId={}，snapshotId={}，rowCount={}，"
-                            + "columnCount={}，elapsedMillis={}",
+            LOGGER.info("FMDB 数据读取完成，datasetId={}，snapshotId={}，"
+                            + "sourceRowCount={}，logicalRowCount={}，columnCount={}，"
+                            + "elapsedMillis={}",
                     request.getDatasetId(), snapshot.getSnapshotId(),
-                    snapshot.getRowCount(), snapshot.getColumnCount(),
+                    identity.getMetrics().getSourceRowCount(), snapshot.getRowCount(),
+                    snapshot.getColumnCount(),
                     clock.millis() - startedAt);
             return new LoadedDataset(dataset, snapshot);
         } catch (DataValidationException exception) {

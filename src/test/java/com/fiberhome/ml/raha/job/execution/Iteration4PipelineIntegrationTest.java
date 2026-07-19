@@ -9,11 +9,14 @@ import com.fiberhome.ml.raha.config.dto.StrategyConfig;
 import com.fiberhome.ml.raha.config.validation.ConfigVersioner;
 import com.fiberhome.ml.raha.config.validation.RahaConfigValidator;
 import com.fiberhome.ml.raha.data.domain.DetectionResult;
+import com.fiberhome.ml.raha.data.domain.RahaDataset;
 import com.fiberhome.ml.raha.data.loader.ColumnMetadataFactory;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.FileRahaDatasetLoader;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.RowIdentityService;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
 import com.fiberhome.ml.raha.data.profile.ColumnProfiler;
@@ -123,7 +126,8 @@ class Iteration4PipelineIntegrationTest {
                 new StageFailureDecider(), new DefaultJobRepository(storage),
                 new DefaultStageRepository(storage), clock);
         FileRahaDatasetLoader loader = new FileRahaDatasetLoader(
-                SparkTestSession.get(), new RowIdValidator(), new SchemaHasher(),
+                SparkTestSession.get(), new RowIdentityService(),
+                new RowIdValidator(), new SchemaHasher(),
                 new ColumnMetadataFactory(), new SnapshotMetadataFactory(), clock);
         ColumnProfileService profileService = new ColumnProfileService(
                 new ColumnProfiler(), new DefaultColumnProfileRepository(storage), clock);
@@ -138,7 +142,8 @@ class Iteration4PipelineIntegrationTest {
         BasicDetectionService detectionService = new BasicDetectionService(
                 new WeightedRuleScoringRule(), detectionRepository, clock);
         DataLoadRequest loadRequest = new DataLoadRequest(
-                "dataset", csv.toString(), "test_table", "id", DataFormat.CSV,
+                "dataset", csv.toString(), "test_table",
+                RowIdentityConfig.sourceKey("id"), DataFormat.CSV,
                 csvOptions(), Collections.<String>emptySet(), Collections.<String>emptySet(),
                 Collections.singleton("city"), null, "source-v1");
 
@@ -168,8 +173,12 @@ class Iteration4PipelineIntegrationTest {
         assertEquals(12, detectionRepository.findByJob(job.getJobId()).size());
         assertFalse(featureRepository.findRows(job.getJobId(), "code").isEmpty());
 
-        DetectionResult cityResult = findResult(detections, "1", "city");
-        SparseFeatureRow cityFeature = findFeature(features, "1", "city");
+        RahaDataset loadedDataset = (RahaDataset) run.getAttributes()
+                .get(StageAttributeKeys.RAHA_DATASET);
+        String firstRowId = loadedDataset.getDataFrame().filter("id = 1")
+                .select(loadedDataset.getRowIdColumn()).first().getString(0);
+        DetectionResult cityResult = findResult(detections, firstRowId, "city");
+        SparseFeatureRow cityFeature = findFeature(features, firstRowId, "city");
         DetectionExplanation explanation = new DetectionExplanationService().explain(
                 cityResult, plans, strategyBatch.getHits(), cityFeature);
         assertTrue(cityResult.isError());
@@ -189,7 +198,7 @@ class Iteration4PipelineIntegrationTest {
                 Collections.singleton(StrategyTypes.RVD_ONE_TO_MANY),
                 Collections.<String>emptySet(), Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(JobType.DETECTION, "dataset", null,
-                csv.toString(), "id", 1L,
+                csv.toString(), RowIdentityConfig.sourceKey("id"), 1L,
                 strategyConfig, FeatureConfig.defaults(),
                 new ModelConfig(com.fiberhome.ml.raha.data.type.ClassifierType.WEIGHTED_RULE,
                         0.5d, false),

@@ -8,6 +8,8 @@ public enum StageType {
     INITIALIZE,
     /** 读取输入数据和快照。 */
     LOAD_DATA,
+    /** 合并持久化 c1、标注批次和当前 o1，生成训练快照。 */
+    MERGE_TRAINING_INPUT,
     /** 生成数据画像。 */
     PROFILE,
     /** 生成策略计划。 */

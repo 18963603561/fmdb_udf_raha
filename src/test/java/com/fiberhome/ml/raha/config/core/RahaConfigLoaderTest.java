@@ -8,6 +8,7 @@ import com.fiberhome.ml.raha.config.validation.RahaConfigFactory;
 import com.fiberhome.ml.raha.config.validation.RahaConfigValidator;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.data.type.JobType;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
 import com.fiberhome.ml.raha.model.training.LogisticRegressionTrainingConfig;
@@ -38,7 +39,7 @@ class RahaConfigLoaderTest {
         RahaConfigFactory factory = new RahaConfigFactory(
                 new RahaConfigLoader().load());
         RahaJobConfig job = factory.jobConfig(JobType.DETECTION,
-                "dataset", "source_table", "id");
+                "dataset", "source_table", RowIdentityConfig.sourceKey("id"));
         new RahaConfigValidator().validate(job);
         assertEquals(20260714L, job.getRandomSeed());
         assertEquals(1000, job.getStrategyConfig().getMaxStrategyCount());
@@ -79,9 +80,9 @@ class RahaConfigLoaderTest {
                 new RahaConfigLoader().load(override));
 
         RahaJobConfig defaultJob = defaults.jobConfig(JobType.DETECTION,
-                "dataset", "source_table", "id");
+                "dataset", "source_table", RowIdentityConfig.sourceKey("id"));
         RahaJobConfig overriddenJob = overridden.jobConfig(JobType.DETECTION,
-                "dataset", "source_table", "id");
+                "dataset", "source_table", RowIdentityConfig.sourceKey("id"));
         assertEquals(77, overriddenJob.getStrategyConfig().getMaxStrategyCount());
         assertEquals(9, overriddenJob.getResourceConfig().getMaxParallelColumns());
         assertEquals(0.05d, overriddenJob.getFeatureConfig()

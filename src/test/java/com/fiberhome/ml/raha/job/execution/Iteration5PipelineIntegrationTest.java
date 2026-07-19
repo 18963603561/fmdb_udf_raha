@@ -23,6 +23,8 @@ import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.FileRahaDatasetLoader;
 import com.fiberhome.ml.raha.data.loader.LoadedDataset;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.RowIdentityService;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
 import com.fiberhome.ml.raha.data.profile.ColumnProfiler;
@@ -201,21 +203,24 @@ class Iteration5PipelineIntegrationTest {
         assertTrue(tasks.stream().allMatch(
                 task -> task.getStatus() == AnnotationTaskStatus.COMPLETED));
         assertEquals(3, taskRepository.findByJob(job.getJobId()).size());
+        RahaDataset loadedDataset = (RahaDataset) run.getAttributes()
+                .get(StageAttributeKeys.RAHA_DATASET);
+        Map<String, String> businessIds = businessIds(loadedDataset);
 
         assertEquals(cellSet(baseline.getProperty("rvd.code.city.cells")),
-                rvdCodeCityCells(strategies.getHits()));
+                rvdCodeCityCells(strategies.getHits(), businessIds));
         assertTrue(plans.size() < Integer.parseInt(
                 baseline.getProperty("strategy.profile.count")));
         assertTrue(javaErrorCells(detections).containsAll(
-                cellSet(baseline.getProperty("detected.cells"))));
+                cellSet(baseline.getProperty("detected.cells"), businessIds)));
         // Python 按字符策略命中斜杠，Java 日期格式允许斜杠，因此不产生格式错误原因。
-        assertFalse(hasReason(strategies.getHits(), "7", "event_date",
+        assertFalse(hasReason(strategies.getHits(), businessIds.get("7"), "event_date",
                 "PVD_FORMAT_MISMATCH"));
     }
 
     private static RahaJobConfig config(Path dirtyPath) {
         return new RahaJobConfig(JobType.EVALUATION, "dataset", null,
-                dirtyPath.toString(), "id", 20260714L,
+                dirtyPath.toString(), RowIdentityConfig.sourceKey("id"), 20260714L,
                 StrategyConfig.defaults(), FeatureConfig.defaults(),
                 new ModelConfig(com.fiberhome.ml.raha.data.type.ClassifierType.WEIGHTED_RULE,
                         0.5d, false),
@@ -225,7 +230,8 @@ class Iteration5PipelineIntegrationTest {
     }
 
     private static FileRahaDatasetLoader loader(Clock clock) {
-        return new FileRahaDatasetLoader(SparkTestSession.get(), new RowIdValidator(),
+        return new FileRahaDatasetLoader(SparkTestSession.get(),
+                new RowIdentityService(), new RowIdValidator(),
                 new SchemaHasher(), new ColumnMetadataFactory(),
                 new SnapshotMetadataFactory(), clock);
     }
@@ -233,7 +239,8 @@ class Iteration5PipelineIntegrationTest {
     private static DataLoadRequest loadRequest(String datasetId,
                                                Path path,
                                                String sourceVersion) {
-        return new DataLoadRequest(datasetId, path.toString(), datasetId, "id",
+        return new DataLoadRequest(datasetId, path.toString(), datasetId,
+                RowIdentityConfig.sourceKey("id"),
                 DataFormat.CSV, csvOptions(), Collections.<String>emptySet(),
                 Collections.<String>emptySet(), Collections.singleton("email"),
                 null, sourceVersion);
@@ -246,12 +253,15 @@ class Iteration5PipelineIntegrationTest {
         return options;
     }
 
-    private static Set<String> rvdCodeCityCells(List<StrategyHit> hits) {
+    private static Set<String> rvdCodeCityCells(
+            List<StrategyHit> hits,
+            Map<String, String> businessIds) {
+        Map<String, String> rowIds = invert(businessIds);
         Set<String> cells = new LinkedHashSet<String>();
         for (StrategyHit hit : hits) {
             if ("RVD_ONE_TO_MANY_CONFLICT".equals(hit.getReasonCode())
                     && "code->city".equals(hit.getReasonDetails().get("dependency"))) {
-                cells.add(hit.getCoordinate().getRowId() + ":"
+                cells.add(rowIds.get(hit.getCoordinate().getRowId()) + ":"
                         + hit.getCoordinate().getColumnName());
             }
         }
@@ -285,6 +295,33 @@ class Iteration5PipelineIntegrationTest {
 
     private static Set<String> cellSet(String value) {
         return new LinkedHashSet<String>(Arrays.asList(value.split(",")));
+    }
+
+    private static Set<String> cellSet(String value,
+                                       Map<String, String> businessIds) {
+        Set<String> cells = new LinkedHashSet<String>();
+        for (String cell : value.split(",")) {
+            String[] parts = cell.split(":", 2);
+            cells.add(businessIds.get(parts[0]) + ":" + parts[1]);
+        }
+        return cells;
+    }
+
+    private static Map<String, String> businessIds(RahaDataset dataset) {
+        Map<String, String> ids = new LinkedHashMap<String, String>();
+        for (org.apache.spark.sql.Row row : dataset.getDataFrame()
+                .select("id", dataset.getRowIdColumn()).collectAsList()) {
+            ids.put(row.getString(0), row.getString(1));
+        }
+        return ids;
+    }
+
+    private static Map<String, String> invert(Map<String, String> values) {
+        Map<String, String> result = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            result.put(entry.getValue(), entry.getKey());
+        }
+        return result;
     }
 
     private static Properties baseline() throws Exception {

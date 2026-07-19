@@ -194,6 +194,53 @@ public final class RahaJob {
         return copy;
     }
 
+    /**
+     * 从追加式任务状态表恢复领域对象，并复用领域状态迁移校验。
+     */
+    public static RahaJob restore(String jobId,
+                                  String idempotentKey,
+                                  JobType jobType,
+                                  String datasetId,
+                                  String snapshotId,
+                                  String configVersion,
+                                  long createdAt,
+                                  JobStatus status,
+                                  String currentStageId,
+                                  long startedAt,
+                                  long finishedAt,
+                                  String errorCode,
+                                  String errorMessage) {
+        RahaJob job = new RahaJob(jobId, idempotentKey, jobType, datasetId,
+                snapshotId, configVersion, createdAt);
+        if (status == null || status == JobStatus.CREATED) {
+            return job;
+        }
+        if (startedAt > 0L) {
+            job.start(ValueUtils.requireNotBlank(currentStageId, "恢复任务阶段"),
+                    startedAt);
+        }
+        if (status == JobStatus.RUNNING) {
+            return job;
+        }
+        switch (status) {
+            case SUCCEEDED:
+                job.succeed(finishedAt);
+                break;
+            case PARTIAL_SUCCESS:
+                job.partialSucceed(finishedAt);
+                break;
+            case FAILED:
+                job.fail(errorCode, errorMessage, finishedAt);
+                break;
+            case CANCELLED:
+                job.cancel(finishedAt);
+                break;
+            default:
+                throw new IllegalArgumentException("不支持恢复任务状态：" + status);
+        }
+        return job;
+    }
+
     public String getJobId() {
         return jobId;
     }

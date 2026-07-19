@@ -9,6 +9,7 @@ import com.fiberhome.ml.raha.config.dto.StrategyConfig;
 import com.fiberhome.ml.raha.config.validation.ConfigVersioner;
 import com.fiberhome.ml.raha.config.validation.RahaConfigValidator;
 import com.fiberhome.ml.raha.data.type.JobStatus;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.StageStatus;
 import com.fiberhome.ml.raha.data.type.StageType;
@@ -113,7 +114,7 @@ class RahaJobOrchestratorTest {
     @Test
     void shouldTerminateWhenLoadedSnapshotConflictsWithSubmittedSnapshot() {
         RahaJobConfig config = new RahaJobConfig(JobType.DETECTION, "dataset", "expected-snapshot",
-                "input", "id", 1L,
+                "input", RowIdentityConfig.sourceKey("id"), 1L,
                 StrategyConfig.defaults(), FeatureConfig.defaults(), ModelConfig.defaults(),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
         Fixture fixture = new Fixture(config);
@@ -159,7 +160,7 @@ class RahaJobOrchestratorTest {
 
     private static RahaJobConfig configWithFailureTolerance(FailureToleranceConfig toleranceConfig) {
         return new RahaJobConfig(JobType.DETECTION, "dataset", null,
-                "input", "id", 1L,
+                "input", RowIdentityConfig.sourceKey("id"), 1L,
                 StrategyConfig.defaults(), FeatureConfig.defaults(), ModelConfig.defaults(),
                 ResourceConfig.defaults(), toleranceConfig);
     }

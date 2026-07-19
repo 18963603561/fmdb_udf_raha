@@ -15,6 +15,7 @@ import com.fiberhome.ml.raha.config.dto.StrategyConfig;
 import com.fiberhome.ml.raha.data.domain.CellCoordinate;
 import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.profile.ColumnProfiler;
 import com.fiberhome.ml.raha.data.profile.ColumnProfileService;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
@@ -266,7 +267,8 @@ class Iteration7RahaLearningPipelineIntegrationTest {
                 1, 60000L, false, strategyTypes,
                 Collections.<String>emptySet(), Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(JobType.TRAINING, "dataset", "snapshot-v1",
-                "memory", "id", 20260715L, strategyConfig,
+                "memory", RowIdentityConfig.sourceKey("id"), 20260715L,
+                strategyConfig,
                 FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, true),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 2, 100),

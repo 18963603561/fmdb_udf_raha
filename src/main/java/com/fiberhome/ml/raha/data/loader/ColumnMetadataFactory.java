@@ -24,7 +24,8 @@ public final class ColumnMetadataFactory {
                     || request.getIncludedColumns().contains(field.name());
             boolean detectable = included
                     && !request.getExcludedColumns().contains(field.name())
-                    && !request.getRowIdColumn().equals(field.name());
+                    && !request.getRowIdentityConfig().getKeyColumns()
+                    .contains(field.name());
             boolean sensitive = request.getSensitiveColumns().contains(field.name());
             columns.add(new ColumnMetadata(field.name(), index,
                     field.dataType().catalogString(), field.nullable(), detectable, sensitive));
@@ -32,4 +33,3 @@ public final class ColumnMetadataFactory {
         return Collections.unmodifiableList(columns);
     }
 }
-

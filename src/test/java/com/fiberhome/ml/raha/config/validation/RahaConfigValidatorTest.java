@@ -10,6 +10,7 @@ import com.fiberhome.ml.raha.config.dto.ResourceConfig;
 import com.fiberhome.ml.raha.config.dto.SamplingConfig;
 import com.fiberhome.ml.raha.config.dto.StrategyConfig;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
 import com.fiberhome.ml.raha.strategy.api.StrategyTypes;
@@ -37,7 +38,8 @@ class RahaConfigValidatorTest {
     @Test
     void shouldAcceptDefaultConfiguration() {
         RahaJobConfig config = RahaJobConfig.defaults(
-                JobType.DETECTION, "dataset-1", "table-1", "id");
+                JobType.DETECTION, "dataset-1", "table-1",
+                RowIdentityConfig.sourceKey("id"));
 
         assertDoesNotThrow(() -> validator.validate(config));
     }
@@ -45,7 +47,8 @@ class RahaConfigValidatorTest {
     @Test
     void shouldReturnStableErrorCodeForMissingDataset() {
         RahaJobConfig config = RahaJobConfig.defaults(
-                JobType.DETECTION, " ", "table-1", "id");
+                JobType.DETECTION, " ", "table-1",
+                RowIdentityConfig.sourceKey("id"));
 
         ConfigValidationException exception = assertThrows(
                 ConfigValidationException.class, () -> validator.validate(config));
@@ -61,7 +64,8 @@ class RahaConfigValidatorTest {
                 Collections.singleton(StrategyFamily.PVD), 10, includedColumns, excludedColumns,
                 10, 1000L, false);
         RahaJobConfig config = new RahaJobConfig(
-                JobType.DETECTION, "dataset-1", null, "table-1", "id",
+                JobType.DETECTION, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, strategyConfig, FeatureConfig.defaults(),
                 ModelConfig.defaults(), ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
@@ -74,7 +78,8 @@ class RahaConfigValidatorTest {
     @Test
     void shouldRejectInvalidModelThreshold() {
         RahaJobConfig config = new RahaJobConfig(
-                JobType.TRAINING, "dataset-1", null, "table-1", "id",
+                JobType.TRAINING, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 1.1d, true),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
@@ -93,7 +98,8 @@ class RahaConfigValidatorTest {
         ModelConfig modelConfig = new ModelConfig(
                 ClassifierType.WEIGHTED_RULE, 0.5d, true, weights, 0.2d);
         RahaJobConfig config = new RahaJobConfig(
-                JobType.DETECTION, "dataset-1", null, "table-1", "id",
+                JobType.DETECTION, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 modelConfig, ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
@@ -109,7 +115,8 @@ class RahaConfigValidatorTest {
                 ClassifierType.WEIGHTED_RULE, 0.5d, true,
                 Collections.<StrategyFamily, Double>emptyMap(), -0.1d);
         RahaJobConfig config = new RahaJobConfig(
-                JobType.DETECTION, "dataset-1", null, "table-1", "id",
+                JobType.DETECTION, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 modelConfig, ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
@@ -122,14 +129,16 @@ class RahaConfigValidatorTest {
     @Test
     void shouldRejectInvalidClusteringAndSamplingConfiguration() {
         RahaJobConfig invalidClustering = new RahaJobConfig(
-                JobType.SAMPLING, "dataset-1", null, "table-1", "id",
+                JobType.SAMPLING, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 ModelConfig.defaults(),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 0, 100),
                 SamplingConfig.defaults(), ResourceConfig.defaults(),
                 FailureToleranceConfig.defaults());
         RahaJobConfig invalidSampling = new RahaJobConfig(
-                JobType.SAMPLING, "dataset-1", null, "table-1", "id",
+                JobType.SAMPLING, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 ModelConfig.defaults(), ClusteringConfig.defaults(),
                 new SamplingConfig(0, true, false, 1000L),
@@ -167,7 +176,8 @@ class RahaConfigValidatorTest {
                 10, 1000L, false, strategyTypes, strategyTypes,
                 Collections.<String, Integer>emptyMap());
         RahaJobConfig config = new RahaJobConfig(
-                JobType.DETECTION, "dataset-1", null, "table-1", "id",
+                JobType.DETECTION, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, strategyConfig, FeatureConfig.defaults(),
                 ModelConfig.defaults(), ResourceConfig.defaults(), FailureToleranceConfig.defaults());
 
@@ -200,7 +210,8 @@ class RahaConfigValidatorTest {
         StrategyConfig strategyConfig = new StrategyConfig(
                 families, 100, columns, Collections.<String>emptySet(), 50, 1000L, false);
         return new RahaJobConfig(
-                JobType.DETECTION, "dataset-1", null, "table-1", "id",
+                JobType.DETECTION, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, strategyConfig, FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, threshold, true),
                 ResourceConfig.defaults(), FailureToleranceConfig.defaults());
@@ -208,7 +219,8 @@ class RahaConfigValidatorTest {
 
     private static RahaJobConfig configWithResource(ResourceConfig resourceConfig) {
         return new RahaJobConfig(
-                JobType.DETECTION, "dataset-1", null, "table-1", "id",
+                JobType.DETECTION, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
                 1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
                 ModelConfig.defaults(), resourceConfig, FailureToleranceConfig.defaults());
     }

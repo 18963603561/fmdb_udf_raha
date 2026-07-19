@@ -18,6 +18,8 @@ import com.fiberhome.ml.raha.data.loader.ColumnMetadataFactory;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.RowIdValidator;
+import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.RowIdentityService;
 import com.fiberhome.ml.raha.data.loader.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
 import com.fiberhome.ml.raha.data.profile.ColumnProfiler;
@@ -32,8 +34,13 @@ import com.fiberhome.ml.raha.feature.FeatureDictionaryVersioner;
 import com.fiberhome.ml.raha.feature.FeatureService;
 import com.fiberhome.ml.raha.fmdb.DefaultFmdbSchemaResolver;
 import com.fiberhome.ml.raha.fmdb.FmdbDatasetLoader;
+import com.fiberhome.ml.raha.fmdb.FmdbDetectionWriteContext;
+import com.fiberhome.ml.raha.fmdb.FmdbFeatureDictionaryCodec;
 import com.fiberhome.ml.raha.fmdb.FmdbModelStore;
 import com.fiberhome.ml.raha.fmdb.FmdbPersistenceConfig;
+import com.fiberhome.ml.raha.fmdb.FmdbPhysicalTable;
+import com.fiberhome.ml.raha.fmdb.FmdbTableRecord;
+import com.fiberhome.ml.raha.fmdb.FmdbTableSchemas;
 import com.fiberhome.ml.raha.fmdb.gateway.InMemoryFmdbTableGateway;
 import com.fiberhome.ml.raha.fmdb.SparkSqlFmdbResultWriter;
 import com.fiberhome.ml.raha.label.CellLabel;
@@ -85,6 +92,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -155,7 +164,7 @@ class Iteration9FmdbPipelineIntegrationTest {
 
         RahaServiceResult<RahaTrainOutput> trained = trainService.train(
                 new RahaTrainRequest("fmdb-train", "train-stage", dataset,
-                        trainingConfig(), directLabels(),
+                        trainingConfig(), directLabels(dataset),
                         LabelPropagationMethod.HOMOGENEITY,
                         LabelPropagationConfig.defaults(),
                         LogisticRegressionTrainingConfig.defaults(), "raha",
@@ -165,7 +174,7 @@ class Iteration9FmdbPipelineIntegrationTest {
         assertEquals(1, trained.getPayload().getCandidateModels().size());
         for (FeatureDictionary dictionary
                 : trained.getPayload().getFeatures().getDictionaries().values()) {
-            modelStore.saveDictionary(dictionary);
+            appendDictionary(spark, fmdbGateway, dictionary);
         }
         RahaColumnModel candidate = trained.getPayload()
                 .getCandidateModels().get("code");
@@ -194,23 +203,29 @@ class Iteration9FmdbPipelineIntegrationTest {
         assertEquals(JobStatus.SUCCEEDED, detected.getStatus());
         assertEquals(8, detected.getPayload().getResults().size());
         SparkSqlFmdbResultWriter resultWriter = new SparkSqlFmdbResultWriter(
-                spark, fmdbGateway, clock);
-        assertEquals(8L, resultWriter.writeDetectionResults(
-                RESULT_TABLE, "fmdb-detect", detected.getPayload().getResults()));
+                spark, fmdbGateway, clock, FmdbPersistenceConfig.fromDefaults());
+        long errorCount = detected.getPayload().getResults().stream()
+                .filter(com.fiberhome.ml.raha.data.domain.DetectionResult::isError)
+                .count();
+        FmdbDetectionWriteContext writeContext = new FmdbDetectionWriteContext(
+                "detect-batch-v1", INPUT_TABLE, "model-set-v1", sourceRows(dataset));
+        assertEquals(errorCount, resultWriter.writeDetectionResults(
+                RESULT_TABLE, writeContext, detected.getPayload().getResults()));
         assertEquals(0L, resultWriter.writeDetectionResults(
-                RESULT_TABLE, "fmdb-detect", detected.getPayload().getResults()));
-        assertEquals(8L, fmdbGateway.read(RESULT_TABLE).count());
+                RESULT_TABLE, writeContext, detected.getPayload().getResults()));
+        assertEquals(errorCount, fmdbGateway.read(RESULT_TABLE).count());
         assertTrue(fmdbGateway.read(RESULT_TABLE)
                 .filter("model_version IS NOT NULL").count() > 0L);
     }
 
     private static RahaDataset loadDataset(SparkSession spark, Clock clock) {
         FmdbDatasetLoader loader = new FmdbDatasetLoader(spark,
-                new RowIdValidator(), new SchemaHasher(),
+                new RowIdentityService(), new RowIdValidator(), new SchemaHasher(),
                 new DefaultFmdbSchemaResolver(new ColumnMetadataFactory()),
                 new SnapshotMetadataFactory(), clock);
         DataLoadRequest request = new DataLoadRequest("fmdb-dataset", INPUT_TABLE,
-                INPUT_TABLE, "id", DataFormat.FMDB_TABLE,
+                INPUT_TABLE, RowIdentityConfig.sourceKey("id"),
+                DataFormat.FMDB_TABLE,
                 Collections.<String, String>emptyMap(),
                 Collections.<String>emptySet(), Collections.<String>emptySet(),
                 Collections.<String>emptySet(), "snapshot-v1", "source-v1");
@@ -225,7 +240,8 @@ class Iteration9FmdbPipelineIntegrationTest {
                 1, 60000L, false, strategyTypes,
                 Collections.<String>emptySet(), Collections.<String, Integer>emptyMap());
         return new RahaJobConfig(JobType.TRAINING, "fmdb-dataset", "snapshot-v1",
-                INPUT_TABLE, "id", 20260715L, strategyConfig,
+                INPUT_TABLE, RowIdentityConfig.sourceKey("id"), 20260715L,
+                strategyConfig,
                 FeatureConfig.defaults(),
                 new ModelConfig(ClassifierType.WEIGHTED_RULE, 0.5d, true),
                 new ClusteringConfig(ClusteringDistanceMetric.COSINE, 2, 100),
@@ -244,11 +260,16 @@ class Iteration9FmdbPipelineIntegrationTest {
                 RowFactory.create("7", "BAD#"), RowFactory.create("8", "BAD#")), schema);
     }
 
-    private static List<CellLabel> directLabels() {
+    private static List<CellLabel> directLabels(RahaDataset dataset) {
         List<CellLabel> labels = new ArrayList<CellLabel>();
-        labels.add(label("1", 0));
-        labels.add(label("7", 1));
+        labels.add(label(rowId(dataset, "1"), 0));
+        labels.add(label(rowId(dataset, "7"), 1));
         return labels;
+    }
+
+    private static String rowId(RahaDataset dataset, String businessId) {
+        return dataset.getDataFrame().filter("id = '" + businessId + "'")
+                .select(dataset.getRowIdColumn()).first().getString(0);
     }
 
     private static CellLabel label(String rowId, int value) {
@@ -264,5 +285,50 @@ class Iteration9FmdbPipelineIntegrationTest {
 
     private static Clock fixedClock() {
         return Clock.fixed(Instant.ofEpochMilli(1000L), ZoneOffset.UTC);
+    }
+
+    private static Map<String, Map<String, Object>> sourceRows(RahaDataset dataset) {
+        Map<String, Map<String, Object>> rows =
+                new LinkedHashMap<String, Map<String, Object>>();
+        for (Row row : dataset.getDataFrame().collectAsList()) {
+            Map<String, Object> values = new LinkedHashMap<String, Object>();
+            values.put("id", row.getAs("id"));
+            values.put("code", row.getAs("code"));
+            String rowId = row.getAs(dataset.getRowIdColumn());
+            rows.put(rowId, values);
+        }
+        return rows;
+    }
+
+    private static void appendDictionary(SparkSession spark,
+                                         InMemoryFmdbTableGateway gateway,
+                                         FeatureDictionary dictionary) {
+        Map<String, Object> values = new LinkedHashMap<String, Object>();
+        values.put("training_batch_id", "fmdb-train");
+        values.put("dataset_id", "fmdb-dataset");
+        values.put("source_version", "source-v1");
+        values.put("schema_hash", "schema-v1");
+        values.put("merge_algorithm_version", "direct-input-v1");
+        values.put("training_context_json", "{}");
+        values.put("column_name", dictionary.getColumnName());
+        values.put("profile_version", null);
+        values.put("profile_json", null);
+        values.put("strategy_plan_version", "strategy-v1");
+        values.put("strategy_plan_json", "{}");
+        values.put("feature_dictionary_version", dictionary.getVersion());
+        values.put("feature_dictionary_json",
+                FmdbFeatureDictionaryCodec.write(dictionary));
+        values.put("cluster_version", null);
+        values.put("cluster_summary_json", null);
+        values.put("propagation_summary_json", null);
+        values.put("created_at", 1000L);
+        gateway.appendIdempotent(DICTIONARY_TABLE,
+                spark.createDataFrame(Collections.singletonList(
+                                FmdbTableRecord.of(
+                                        FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT,
+                                        values).toRow()),
+                        FmdbTableSchemas.schema(
+                                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT)),
+                Arrays.asList("training_batch_id", "column_name"));
     }
 }
