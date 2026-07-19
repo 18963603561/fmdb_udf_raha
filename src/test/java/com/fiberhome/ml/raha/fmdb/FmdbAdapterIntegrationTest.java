@@ -127,6 +127,22 @@ class FmdbAdapterIntegrationTest {
     }
 
     @Test
+    void shouldSkipResultWritesWhenPersistenceIsDisabled() {
+        SparkSession spark = SparkTestSession.get();
+        SparkSqlFmdbResultWriter writer = new SparkSqlFmdbResultWriter(
+                spark, gateway, fixedClock(2000L),
+                new FmdbPersistenceConfig(false, false, "unused.sql"));
+        RahaJob job = new RahaJob("job-disabled", "request-disabled", JobType.DETECTION,
+                "dataset", "snapshot-v1", "config-v1", 1000L);
+
+        assertEquals(0L, writer.writeJob(JOB_TABLE, job));
+        assertEquals(0L, writer.writeDetectionResults(RESULT_TABLE, "job-disabled",
+                Collections.<DetectionResult>emptyList()));
+        assertFalse(gateway.tableExists(JOB_TABLE));
+        assertFalse(gateway.tableExists(RESULT_TABLE));
+    }
+
+    @Test
     void shouldReloadImmutableModelAndFeatureDictionaryFromFmdb() {
         SparkSession spark = SparkTestSession.get();
         FmdbModelStore first = new FmdbModelStore(spark, gateway,

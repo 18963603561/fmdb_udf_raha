@@ -1,5 +1,7 @@
 package com.fiberhome.ml.raha.fmdb.gateway;
 
+import com.fiberhome.ml.raha.fmdb.FmdbPersistenceConfig;
+import com.fiberhome.ml.raha.fmdb.FmdbSchemaInitializer;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -32,10 +34,26 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
     private final SparkSession sparkSession;
 
     public SparkSqlFmdbTableGateway(SparkSession sparkSession) {
+        this(sparkSession, FmdbPersistenceConfig.fromDefaults());
+    }
+
+    /**
+     * 创建 FMDB 表网关并按配置初始化默认表。
+     *
+     * @param sparkSession FMDB 平台 Spark 会话
+     * @param persistenceConfig 持久化和建表配置
+     */
+    public SparkSqlFmdbTableGateway(SparkSession sparkSession,
+                                    FmdbPersistenceConfig persistenceConfig) {
         if (sparkSession == null) {
             throw new IllegalArgumentException("FMDB Spark 会话不能为空");
         }
+        if (persistenceConfig == null) {
+            throw new IllegalArgumentException("FMDB 持久化配置不能为空");
+        }
         this.sparkSession = sparkSession;
+        // 网关首次创建时初始化默认表，自定义表仍保留首次写入自动创建能力。
+        new FmdbSchemaInitializer(sparkSession, persistenceConfig).initialize();
     }
 
     @Override

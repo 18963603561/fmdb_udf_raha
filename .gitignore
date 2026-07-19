@@ -6,3 +6,4 @@ target/
 .project
 .settings/
 /datasets/
+/metastore_db/

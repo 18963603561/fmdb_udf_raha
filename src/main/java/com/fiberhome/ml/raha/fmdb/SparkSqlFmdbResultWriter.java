@@ -76,21 +76,46 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
     private final FmdbTableGateway tableGateway;
     /** 提供可测试写入时间的时钟。 */
     private final Clock clock;
+    /** 控制当前执行结果是否写入 FMDB。 */
+    private final FmdbPersistenceConfig persistenceConfig;
+
     public SparkSqlFmdbResultWriter(SparkSession sparkSession,
                                     FmdbTableGateway tableGateway,
                                     Clock clock) {
-        if (sparkSession == null || tableGateway == null || clock == null) {
+        this(sparkSession, tableGateway, clock, FmdbPersistenceConfig.fromDefaults());
+    }
+
+    /**
+     * 创建支持显式持久化开关的 FMDB 结果写入器。
+     *
+     * @param sparkSession Spark 会话
+     * @param tableGateway FMDB 表网关
+     * @param clock 写入时间来源
+     * @param persistenceConfig 持久化配置
+     */
+    public SparkSqlFmdbResultWriter(SparkSession sparkSession,
+                                    FmdbTableGateway tableGateway,
+                                    Clock clock,
+                                    FmdbPersistenceConfig persistenceConfig) {
+        if (sparkSession == null || tableGateway == null || clock == null
+                || persistenceConfig == null) {
             throw new IllegalArgumentException("FMDB 结果写入器依赖不能为空");
         }
         this.sparkSession = sparkSession;
         this.tableGateway = tableGateway;
         this.clock = clock;
+        this.persistenceConfig = persistenceConfig;
     }
 
     @Override
     public long writeJob(String tableName, RahaJob job) {
         if (job == null) {
             throw new IllegalArgumentException("FMDB 任务记录不能为空");
+        }
+        // 关闭总开关时任务仍可执行，但禁止产生 FMDB 任务状态记录。
+        if (!persistenceConfig.isEnabled()) {
+            LOGGER.info("FMDB 持久化已关闭，跳过任务状态写入，jobId={}", job.getJobId());
+            return 0L;
         }
         LOGGER.info("开始写入 FMDB 任务状态，jobId={}，status={}，tableName={}",
                 job.getJobId(), job.getStatus(), tableName);
@@ -113,6 +138,12 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
         String validatedJobId = ValueUtils.requireNotBlank(jobId, "FMDB 检测任务标识");
         if (results == null) {
             throw new IllegalArgumentException("FMDB 检测结果集合不能为空");
+        }
+        // 关闭总开关时保留内存检测结果，跳过物理表写入。
+        if (!persistenceConfig.isEnabled()) {
+            LOGGER.info("FMDB 持久化已关闭，跳过检测结果写入，jobId={}，resultCount={}",
+                    validatedJobId, results.size());
+            return 0L;
         }
         List<Row> rows = new ArrayList<Row>(results.size());
         long writtenAt = positiveNow();
