@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.service.task;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.cluster.ColumnClusteringService;
 import com.fiberhome.ml.raha.data.loader.RahaDatasetLoader;
 import com.fiberhome.ml.raha.data.profile.ColumnProfileService;

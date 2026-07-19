@@ -8,7 +8,7 @@ import com.fiberhome.ml.raha.config.validation.RahaConfigFactory;
 import com.fiberhome.ml.raha.config.validation.RahaConfigValidator;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.data.type.JobType;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
 import com.fiberhome.ml.raha.model.training.LogisticRegressionTrainingConfig;

@@ -1,7 +1,7 @@
 package com.fiberhome.ml.raha.sampling.domain;
 
-import com.fiberhome.ml.raha.data.loader.RowFingerprintAlgorithm;
-import com.fiberhome.ml.raha.data.loader.RowIdentityMode;
+import com.fiberhome.ml.raha.data.loader.identity.RowFingerprintAlgorithm;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityMode;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.ArrayList;
 import java.util.Collections;

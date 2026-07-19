@@ -3,7 +3,7 @@ package com.fiberhome.ml.raha.config.dto;
 import com.fiberhome.ml.raha.config.core.ConfigTextUtils;
 import com.fiberhome.ml.raha.config.core.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.data.type.JobType;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 
 /**
  * Raha 任务完整配置，是任务提交、幂等计算和后续阶段执行的统一输入。

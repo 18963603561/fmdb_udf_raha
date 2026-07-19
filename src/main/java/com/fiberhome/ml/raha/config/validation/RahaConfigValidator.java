@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.config.validation;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.config.dto.ClusteringConfig;
 import com.fiberhome.ml.raha.config.dto.FailureToleranceConfig;
 import com.fiberhome.ml.raha.config.dto.FeatureConfig;

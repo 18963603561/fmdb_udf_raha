@@ -1,10 +1,9 @@
 package com.fiberhome.ml.raha.fmdb;
 
-import com.fiberhome.ml.raha.fmdb.gateway.InMemoryFmdbTableGateway;
 import com.fiberhome.ml.raha.data.domain.CellCoordinate;
 import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
-import com.fiberhome.ml.raha.data.loader.RowIdentityColumns;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
 import com.fiberhome.ml.raha.feature.assembly.FeatureAssemblyMetrics;
 import com.fiberhome.ml.raha.feature.assembly.FeatureAssemblyResult;
 import com.fiberhome.ml.raha.feature.domain.FeatureDefinition;
@@ -15,6 +14,13 @@ import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationMetrics;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationResult;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.gateway.InMemoryFmdbTableGateway;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbTrainingArtifactRepository;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbTrainingCellRecord;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbTrainingColumnArtifactRecord;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbTrainingExampleRecord;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.service.train.TrainingArtifactMaterializationResult;
 import com.fiberhome.ml.raha.service.train.TrainingArtifactMaterializationService;
 import com.fiberhome.ml.raha.service.train.TrainingMergeMetrics;

@@ -17,6 +17,10 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Test;
 
+import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbSchemaInitializer;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableSchemas;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**

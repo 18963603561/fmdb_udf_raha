@@ -15,7 +15,7 @@ import com.fiberhome.ml.raha.config.dto.StrategyConfig;
 import com.fiberhome.ml.raha.data.domain.CellCoordinate;
 import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.profile.ColumnProfiler;
 import com.fiberhome.ml.raha.data.profile.ColumnProfileService;
 import com.fiberhome.ml.raha.data.type.ClassifierType;

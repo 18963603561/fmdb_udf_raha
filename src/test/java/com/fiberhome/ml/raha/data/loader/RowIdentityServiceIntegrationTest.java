@@ -1,5 +1,9 @@
 package com.fiberhome.ml.raha.data.loader;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityResult;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityService;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import java.util.ArrayList;
 import java.util.Arrays;

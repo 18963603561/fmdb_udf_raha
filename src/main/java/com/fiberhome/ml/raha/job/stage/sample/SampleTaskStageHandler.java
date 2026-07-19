@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.job.stage.sample;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.job.stage.core.ServiceStageResultMapper;
 import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
 import com.fiberhome.ml.raha.job.stage.core.StageExecutionContext;

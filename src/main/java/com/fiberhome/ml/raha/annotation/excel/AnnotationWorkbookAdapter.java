@@ -2,7 +2,7 @@ package com.fiberhome.ml.raha.annotation.excel;
 
 import com.fiberhome.ml.raha.annotation.domain.AnnotationImportErrorCode;
 import com.fiberhome.ml.raha.annotation.domain.AnnotationRowError;
-import com.fiberhome.ml.raha.fmdb.FmdbJsonCodec;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
 import com.fiberhome.ml.raha.sampling.domain.SampleAnnotationRow;
 import java.io.IOException;
 import java.io.InputStream;

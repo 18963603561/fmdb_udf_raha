@@ -2,7 +2,7 @@ package com.fiberhome.ml.raha.service.task;
 
 import com.fiberhome.ml.raha.config.dto.RahaJobConfig;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.job.stage.core.StageEvaluator;

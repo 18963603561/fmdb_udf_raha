@@ -2,7 +2,7 @@ package com.fiberhome.ml.raha.service.train;
 
 import com.fiberhome.ml.raha.config.dto.RahaJobConfig;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;

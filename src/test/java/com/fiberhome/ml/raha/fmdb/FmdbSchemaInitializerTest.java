@@ -1,5 +1,7 @@
 package com.fiberhome.ml.raha.fmdb;
 
+import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbSchemaInitializer;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import java.io.BufferedReader;
 import java.io.InputStream;

@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.service.train;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowFingerprintAlgorithm;
 import com.fiberhome.ml.raha.annotation.domain.AnnotationBatch;
 import com.fiberhome.ml.raha.annotation.domain.AnnotationBatchStatus;
 import com.fiberhome.ml.raha.annotation.domain.AnnotationRecord;
@@ -9,11 +10,11 @@ import com.fiberhome.ml.raha.data.domain.CellCoordinate;
 import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
-import com.fiberhome.ml.raha.data.loader.RowIdentityColumns;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
-import com.fiberhome.ml.raha.data.loader.RowIdentityResult;
-import com.fiberhome.ml.raha.data.loader.RowIdentityService;
-import com.fiberhome.ml.raha.data.loader.SchemaHasher;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityResult;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityService;
+import com.fiberhome.ml.raha.data.loader.metadata.SchemaHasher;
 import com.fiberhome.ml.raha.repository.port.AnnotationRecordRepository;
 import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
 import com.fiberhome.ml.raha.sampling.domain.SampleBatch;
@@ -143,7 +144,7 @@ class TrainingInputMergeServiceIntegrationTest {
         return new SampleRecord(sampleBatchId, "dataset-1", "orders",
                 "source-v1", RowIdentityConfig.sourceKey("id").getMode(),
                 Collections.singletonList("id"),
-                com.fiberhome.ml.raha.data.loader.RowFingerprintAlgorithm.SHA_256,
+                com.fiberhome.ml.raha.data.loader.identity.RowFingerprintAlgorithm.SHA_256,
                 RowIdentityConfig.NORMALIZATION_VERSION,
                 identified.getAs(RowIdentityColumns.ROW_ID),
                 identified.getAs(RowIdentityColumns.ROW_CONTENT_HASH), schemaHash,

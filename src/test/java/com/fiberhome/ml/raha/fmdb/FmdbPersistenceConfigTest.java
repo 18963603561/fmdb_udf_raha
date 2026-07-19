@@ -1,6 +1,10 @@
 package com.fiberhome.ml.raha.fmdb;
 
 import com.fiberhome.ml.raha.config.core.RahaConfigurationException;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbColumnArtifact;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

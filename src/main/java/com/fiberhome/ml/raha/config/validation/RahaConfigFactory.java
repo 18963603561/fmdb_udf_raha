@@ -13,7 +13,7 @@ import com.fiberhome.ml.raha.config.dto.ResourceConfig;
 import com.fiberhome.ml.raha.config.dto.SamplingConfig;
 import com.fiberhome.ml.raha.config.dto.StrategyConfig;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;

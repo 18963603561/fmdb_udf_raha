@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.data.loader;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.Collections;
 import java.util.HashSet;

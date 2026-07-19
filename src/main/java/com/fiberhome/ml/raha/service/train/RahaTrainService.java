@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.service.train;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.cluster.ColumnClusteringService;
 import com.fiberhome.ml.raha.cluster.domain.ClusterAssignment;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
@@ -26,13 +27,13 @@ import com.fiberhome.ml.raha.model.training.ColumnTrainingDataBuilder;
 import com.fiberhome.ml.raha.model.training.ColumnTrainingDataset;
 import com.fiberhome.ml.raha.model.training.ColumnTrainingStatus;
 import com.fiberhome.ml.raha.model.training.ColumnTrainingExample;
-import com.fiberhome.ml.raha.fmdb.FmdbJsonCodec;
 import com.fiberhome.ml.raha.data.domain.ColumnProfile;
 import com.fiberhome.ml.raha.model.training.ModelQualityGate;
 import com.fiberhome.ml.raha.parallel.BoundedParallelExecutor;
 import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
 import com.fiberhome.ml.raha.parallel.ParallelFailure;
 import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
 import com.fiberhome.ml.raha.service.common.RahaServiceResult;
 import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.common.RahaServiceSummary;

@@ -1,5 +1,7 @@
 package com.fiberhome.ml.raha.data.loader;
 
+import com.fiberhome.ml.raha.data.loader.identity.CanonicalRowSerializer;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;

@@ -1,16 +1,16 @@
 package com.fiberhome.ml.raha.label;
 
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
-import com.fiberhome.ml.raha.data.loader.ColumnMetadataFactory;
+import com.fiberhome.ml.raha.data.loader.metadata.ColumnMetadataFactory;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.FileRahaDatasetLoader;
 import com.fiberhome.ml.raha.data.loader.LoadedDataset;
-import com.fiberhome.ml.raha.data.loader.RowIdValidator;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
-import com.fiberhome.ml.raha.data.loader.RowIdentityService;
-import com.fiberhome.ml.raha.data.loader.SchemaHasher;
-import com.fiberhome.ml.raha.data.loader.SnapshotMetadataFactory;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdValidator;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityService;
+import com.fiberhome.ml.raha.data.loader.metadata.SchemaHasher;
+import com.fiberhome.ml.raha.data.loader.metadata.SnapshotMetadataFactory;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;

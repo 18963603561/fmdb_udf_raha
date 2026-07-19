@@ -1,5 +1,7 @@
 package com.fiberhome.ml.raha.data.loader;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.metadata.SchemaHasher;
 import java.util.Collections;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;

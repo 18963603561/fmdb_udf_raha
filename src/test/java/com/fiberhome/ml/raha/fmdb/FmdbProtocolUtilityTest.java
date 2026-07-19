@@ -5,6 +5,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPartitionUtils;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;

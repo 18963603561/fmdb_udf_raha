@@ -3,9 +3,9 @@ package com.fiberhome.ml.raha.sampling.service;
 import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
-import com.fiberhome.ml.raha.data.loader.RowIdentityColumns;
-import com.fiberhome.ml.raha.data.loader.RowIdentityConfig;
-import com.fiberhome.ml.raha.fmdb.FmdbPartitionUtils;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPartitionUtils;
 import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
 import com.fiberhome.ml.raha.sampling.domain.SampleBatch;
@@ -36,6 +36,7 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.collection.JavaConverters;
 import scala.Tuple2;
 import scala.collection.Iterator;
 import scala.collection.Seq;
@@ -277,9 +278,8 @@ public final class SampleRecordService {
     private static List<Object> jsonArray(Object value, ArrayType type) {
         List<Object> result = new ArrayList<Object>();
         if (value instanceof Seq) {
-            Iterator<?> iterator = ((Seq<?>) value).iterator();
-            while (iterator.hasNext()) {
-                result.add(jsonValue(iterator.next(), type.elementType()));
+            for (Object element : JavaConverters.seqAsJavaList((Seq<?>) value)) {
+                result.add(jsonValue(element, type.elementType()));
             }
             return result;
         }
