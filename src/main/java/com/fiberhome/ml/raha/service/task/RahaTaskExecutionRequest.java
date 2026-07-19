@@ -20,6 +20,9 @@ import java.util.List;
  */
 public final class RahaTaskExecutionRequest {
 
+    /** 简单训练入口使用的默认模型名称前缀。 */
+    private static final String DEFAULT_MODEL_NAME_PREFIX = "raha";
+
     /** 完整任务配置。 */
     private final RahaJobConfig config;
     /** 数据加载请求。 */
@@ -99,6 +102,50 @@ public final class RahaTaskExecutionRequest {
                 propagationConfig, trainingConfig, modelNamePrefix, null);
     }
 
+    /**
+     * 使用默认传播方式、传播配置、训练配置和模型名称前缀创建训练请求。
+     *
+     * @param config 完整任务配置
+     * @param dataLoadRequest 数据加载请求
+     * @param directLabels 调用方提供的直接标签
+     * @return 使用默认训练参数的训练请求
+     */
+    public static RahaTaskExecutionRequest training(
+            RahaJobConfig config,
+            DataLoadRequest dataLoadRequest,
+            List<CellLabel> directLabels) {
+        return training(config, dataLoadRequest, directLabels,
+                LabelPropagationMethod.HOMOGENEITY,
+                LabelPropagationConfig.defaults(),
+                LogisticRegressionTrainingConfig.defaults(),
+                DEFAULT_MODEL_NAME_PREFIX);
+    }
+
+    /**
+     * 使用调用方训练配置创建简化训练请求。
+     *
+     * 该重载保留配置对象的显式控制，同时默认使用保守的同质性传播方式和
+     * 固定模型名称前缀，适合不需要评估器和高级批次参数的常规训练任务。
+     *
+     * @param config 完整任务配置
+     * @param dataLoadRequest 数据加载请求
+     * @param trainingConfig 列模型训练配置
+     * @param propagationConfig 标签传播配置
+     * @param directLabels 调用方提供的直接标签
+     * @return 简化训练请求
+     */
+    public static RahaTaskExecutionRequest training(
+            RahaJobConfig config,
+            DataLoadRequest dataLoadRequest,
+            LogisticRegressionTrainingConfig trainingConfig,
+            LabelPropagationConfig propagationConfig,
+            List<CellLabel> directLabels) {
+        return training(config, dataLoadRequest, directLabels,
+                LabelPropagationMethod.HOMOGENEITY,
+                propagationConfig, trainingConfig,
+                DEFAULT_MODEL_NAME_PREFIX);
+    }
+
     public static RahaTaskExecutionRequest training(
             RahaJobConfig config,
             DataLoadRequest dataLoadRequest,
@@ -158,6 +205,20 @@ public final class RahaTaskExecutionRequest {
         return new RahaTaskExecutionRequest(config, dataLoadRequest, existingLabels,
                 null, null, null, null, samplingRound, null,
                 null, null, null, null, null);
+    }
+
+    /**
+     * 使用空标签集合和第 1 轮创建简化采样请求。
+     *
+     * @param config 完整任务配置
+     * @param dataLoadRequest 数据加载请求
+     * @return 第 1 轮采样请求
+     */
+    public static RahaTaskExecutionRequest sampling(
+            RahaJobConfig config,
+            DataLoadRequest dataLoadRequest) {
+        return sampling(config, dataLoadRequest,
+                Collections.<CellLabel>emptyList(), 1);
     }
 
     private void validateByType() {
