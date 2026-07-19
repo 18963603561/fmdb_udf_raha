@@ -1,4 +1,4 @@
-package com.fiberhome.ml.raha.strategy.impl;
+package com.fiberhome.ml.raha.strategy.impl.rvd;
 
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
 import com.fiberhome.ml.raha.strategy.api.DetectionStrategy;
