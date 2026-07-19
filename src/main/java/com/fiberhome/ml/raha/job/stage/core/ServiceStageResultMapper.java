@@ -1,4 +1,4 @@
-package com.fiberhome.ml.raha.job.stage;
+package com.fiberhome.ml.raha.job.stage.core;
 
 import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.common.RahaServiceResult;
@@ -6,12 +6,12 @@ import com.fiberhome.ml.raha.service.common.RahaServiceResult;
 /**
  * 将阶段内部服务结果转换为统一阶段结果。
  */
-final class ServiceStageResultMapper {
+public final class ServiceStageResultMapper {
 
     private ServiceStageResultMapper() {
     }
 
-    static StageResult map(RahaServiceResult<?> result) {
+    public static StageResult map(RahaServiceResult<?> result) {
         if (result == null) {
             return StageResult.failure("SERVICE_RESULT_REQUIRED",
                     "业务服务返回空结果", false, 0L, 0L);

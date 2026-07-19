@@ -1,4 +1,4 @@
-package com.fiberhome.ml.raha.job.stage;
+package com.fiberhome.ml.raha.job.stage.core;
 
 /**
  * 阶段处理器执行结果类型。

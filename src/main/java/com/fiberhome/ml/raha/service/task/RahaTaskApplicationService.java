@@ -4,7 +4,7 @@ import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.job.domain.JobRunResult;
 import com.fiberhome.ml.raha.job.domain.RahaJob;
 import com.fiberhome.ml.raha.job.execution.RahaJobOrchestrator;
-import com.fiberhome.ml.raha.job.stage.StageHandler;
+import com.fiberhome.ml.raha.job.stage.core.StageHandler;
 import com.fiberhome.ml.raha.repository.port.StageRepository;
 import java.util.List;
 import org.slf4j.Logger;

@@ -1,8 +1,8 @@
 package com.fiberhome.ml.raha.job.execution;
 
 import com.fiberhome.ml.raha.config.dto.FailureToleranceConfig;
-import com.fiberhome.ml.raha.job.stage.StageOutcome;
-import com.fiberhome.ml.raha.job.stage.StageResult;
+import com.fiberhome.ml.raha.job.stage.core.StageOutcome;
+import com.fiberhome.ml.raha.job.stage.core.StageResult;
 
 /**
  * 根据失败可恢复性、失败比例和重试次数决定任务是否继续。

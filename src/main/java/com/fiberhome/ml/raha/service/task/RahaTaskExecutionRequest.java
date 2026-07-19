@@ -4,7 +4,7 @@ import com.fiberhome.ml.raha.config.dto.RahaJobConfig;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.LabelSource;
-import com.fiberhome.ml.raha.job.stage.StageEvaluator;
+import com.fiberhome.ml.raha.job.stage.core.StageEvaluator;
 import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;

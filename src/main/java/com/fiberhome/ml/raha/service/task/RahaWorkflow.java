@@ -1,7 +1,7 @@
 package com.fiberhome.ml.raha.service.task;
 
 import com.fiberhome.ml.raha.data.type.JobType;
-import com.fiberhome.ml.raha.job.stage.StageHandler;
+import com.fiberhome.ml.raha.job.stage.core.StageHandler;
 import java.util.List;
 
 /**

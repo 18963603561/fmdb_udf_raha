@@ -1,4 +1,4 @@
-package com.fiberhome.ml.raha.job.stage;
+package com.fiberhome.ml.raha.job.stage.core;
 
 /**
  * 定义任务评估阶段需要执行的可替换评估逻辑。

@@ -1,5 +1,9 @@
-package com.fiberhome.ml.raha.job.stage;
+package com.fiberhome.ml.raha.job.stage.feature;
 
+import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
+import com.fiberhome.ml.raha.job.stage.core.StageExecutionContext;
+import com.fiberhome.ml.raha.job.stage.core.StageHandler;
+import com.fiberhome.ml.raha.job.stage.core.StageResult;
 import com.fiberhome.ml.raha.cluster.ColumnClusteringService;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
 import com.fiberhome.ml.raha.data.type.StageType;

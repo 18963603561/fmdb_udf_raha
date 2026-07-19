@@ -3,7 +3,7 @@ package com.fiberhome.ml.raha.service.task;
 import com.fiberhome.ml.raha.job.domain.JobRunResult;
 import com.fiberhome.ml.raha.job.domain.RahaJob;
 import com.fiberhome.ml.raha.job.domain.RahaStage;
-import com.fiberhome.ml.raha.job.stage.StageAttributeKeys;
+import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
 import java.util.List;
 import java.util.Map;
 
