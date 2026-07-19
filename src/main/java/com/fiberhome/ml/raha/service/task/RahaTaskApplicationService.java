@@ -25,6 +25,16 @@ public final class RahaTaskApplicationService {
     /** 用于复用任务时查询已有阶段轨迹的仓储。 */
     private final StageRepository stageRepository;
 
+    /**
+     * 使用默认运行时装配创建任务应用服务。
+     *
+     * 该入口要求当前线程或应用上下文已经存在活动的 Spark 会话；没有活动会话时，
+     * 构造阶段直接失败，避免在业务服务内部隐式创建 Spark 生命周期。
+     */
+    public RahaTaskApplicationService() {
+        this(RahaTaskApplicationServiceFactory.createDefaultComponents());
+    }
+
     public RahaTaskApplicationService(RahaJobOrchestrator jobOrchestrator,
                                       RahaWorkflowRegistry workflowRegistry,
                                       StageRepository stageRepository) {
@@ -34,6 +44,17 @@ public final class RahaTaskApplicationService {
         this.jobOrchestrator = jobOrchestrator;
         this.workflowRegistry = workflowRegistry;
         this.stageRepository = stageRepository;
+    }
+
+    /**
+     * 接收默认工厂已经完成的组件装配结果。
+     *
+     * @param components 默认运行时组件
+     */
+    RahaTaskApplicationService(
+            RahaTaskApplicationServiceFactory.DefaultComponents components) {
+        this(components.getJobOrchestrator(), components.getWorkflowRegistry(),
+                components.getStageRepository());
     }
 
     /**
