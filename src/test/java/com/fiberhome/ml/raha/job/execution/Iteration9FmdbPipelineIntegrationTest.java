@@ -217,9 +217,9 @@ class Iteration9FmdbPipelineIntegrationTest {
                 "detect-batch-v1", INPUT_TABLE, "model-set-v1", sourceRows(dataset));
         assertEquals(errorCount, resultWriter.writeDetectionResults(
                 RESULT_TABLE, writeContext, detected.getPayload().getResults()));
-        assertEquals(0L, resultWriter.writeDetectionResults(
+        assertEquals(errorCount, resultWriter.writeDetectionResults(
                 RESULT_TABLE, writeContext, detected.getPayload().getResults()));
-        assertEquals(errorCount, fmdbGateway.read(RESULT_TABLE).count());
+        assertEquals(errorCount * 2L, fmdbGateway.read(RESULT_TABLE).count());
         assertTrue(fmdbGateway.read(RESULT_TABLE)
                 .filter("model_version IS NOT NULL").count() > 0L);
     }

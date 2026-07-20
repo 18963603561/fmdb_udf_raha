@@ -10,7 +10,6 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableSchemas;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbRawValueAccessPolicy;
-import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbWriteMode;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -191,12 +190,10 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
             return 0L;
         }
         Dataset<Row> frame = frame(FmdbPhysicalTable.DETECTION_RESULT, records);
-        FmdbWriteMode writeMode = persistenceConfig.getWriteMode();
-        long count = tableGateway.append(tableName, frame,
-                Arrays.asList("detection_batch_id", "cell_id", "model_version"),
-                records.size());
-        LOGGER.info("FMDB 错误结果写入完成，detectionBatchId={}，writeMode={}，writtenCount={}",
-                context.getDetectionBatchId(), writeMode, count);
+        // 检测结果明细固定直接追加，避免受全局写入模式影响而扫描历史结果主键。
+        long count = tableGateway.appendDirect(tableName, frame, records.size());
+        LOGGER.info("FMDB 错误结果直接追加完成，detectionBatchId={}，writtenCount={}",
+                context.getDetectionBatchId(), count);
         return count;
     }
 

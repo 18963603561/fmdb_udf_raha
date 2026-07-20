@@ -81,8 +81,7 @@ public final class FmdbTrainingArtifactRepository {
                     artifactValues(record)).toRow());
         }
         return append(FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT,
-                columnArtifactTable, rows,
-                Arrays.asList("training_batch_id", "column_name"));
+                columnArtifactTable, rows);
     }
 
     public boolean isColumnArtifactPersistenceEnabled() {
@@ -120,8 +119,7 @@ public final class FmdbTrainingArtifactRepository {
             rows.add(FmdbTableRecord.of(FmdbPhysicalTable.TRAINING_CELL,
                     record.values()).toRow());
         }
-        return append(FmdbPhysicalTable.TRAINING_CELL, trainingCellTable, rows,
-                Arrays.asList("training_batch_id", "dataset_id", "cell_id"));
+        return append(FmdbPhysicalTable.TRAINING_CELL, trainingCellTable, rows);
     }
 
     public long saveTrainingExamples(List<FmdbTrainingExampleRecord> records) {
@@ -141,7 +139,7 @@ public final class FmdbTrainingArtifactRepository {
                     record.values()).toRow());
         }
         return append(FmdbPhysicalTable.TRAINING_EXAMPLE, trainingExampleTable,
-                rows, Arrays.asList("model_set_version", "row_id", "column_name"));
+                rows);
     }
 
     public Dataset<Row> findTrainingCells(String datasetId,
@@ -275,8 +273,7 @@ public final class FmdbTrainingArtifactRepository {
 
     private long append(FmdbPhysicalTable table,
                         String tableName,
-                        List<Row> rows,
-                        List<String> keys) {
+                        List<Row> rows) {
         if (rows.isEmpty()) {
             return 0L;
         }
@@ -285,10 +282,10 @@ public final class FmdbTrainingArtifactRepository {
         LOGGER.info("开始追加训练物理产物，tableName={}，recordCount={}",
                 tableName, rows.size());
         try {
-            long written = tableGateway.append(tableName, frame, keys, rows.size());
-            LOGGER.info("训练物理产物追加完成，tableName={}，writtenCount={}，"
-                            + "skippedCount={}", tableName, written,
-                    rows.size() - written);
+            // 训练列产物、训练单元格和训练样本固定直接追加，不受全局写入模式影响。
+            long written = tableGateway.appendDirect(tableName, frame, rows.size());
+            LOGGER.info("训练物理产物直接追加完成，tableName={}，writtenCount={}",
+                    tableName, written);
             return written;
         } catch (RuntimeException exception) {
             LOGGER.error("训练物理产物追加失败，tableName={}，recordCount={}",

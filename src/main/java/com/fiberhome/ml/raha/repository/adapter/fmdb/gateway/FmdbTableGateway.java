@@ -52,15 +52,4 @@ public interface FmdbTableGateway {
                       Dataset<Row> rows,
                       long expectedCount);
 
-    /**
-     * 删除时间字段早于截止时间的记录。
-     *
-     * @param tableName FMDB 目标表
-     * @param timestampColumn 毫秒时间戳字段
-     * @param cutoffExclusive 不包含的清理截止时间
-     * @return 实际删除行数
-     */
-    long deleteOlderThan(String tableName,
-                         String timestampColumn,
-                         long cutoffExclusive);
 }

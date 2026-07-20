@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.functions;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -137,35 +136,6 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
         LOGGER.info("内存 FMDB 表直接追加完成，tableName={}，writtenCount={}",
                 validated, expectedCount);
         return expectedCount;
-    }
-
-    @Override
-    public synchronized long deleteOlderThan(String tableName,
-                                             String timestampColumn,
-                                             long cutoffExclusive) {
-        String validatedTable = SparkSqlFmdbTableGateway.validateTableName(tableName);
-        String validatedColumn = SparkSqlFmdbTableGateway.validateColumnName(
-                timestampColumn);
-        if (cutoffExclusive <= 0L) {
-            throw new IllegalArgumentException("FMDB 清理截止时间必须大于 0");
-        }
-        Dataset<Row> existing = tables.get(validatedTable);
-        if (existing == null) {
-            throw new IllegalStateException("内存 FMDB 表不存在：" + validatedTable);
-        }
-        if (!Arrays.asList(existing.columns()).contains(validatedColumn)) {
-            throw new IllegalArgumentException("FMDB 清理时间字段不存在：" + validatedColumn);
-        }
-        long before = existing.count();
-        Dataset<Row> retained = existing.filter(
-                functions.col(validatedColumn).isNull().or(
-                        functions.col(validatedColumn).geq(cutoffExclusive)));
-        long after = retained.count();
-        tables.put(validatedTable, retained);
-        LOGGER.info("内存 FMDB 过期数据清理完成，tableName={}，timestampColumn={}，"
-                        + "cutoffExclusive={}，deletedCount={}",
-                validatedTable, validatedColumn, cutoffExclusive, before - after);
-        return before - after;
     }
 
     private static void validateRowsAndKeys(Dataset<Row> rows,

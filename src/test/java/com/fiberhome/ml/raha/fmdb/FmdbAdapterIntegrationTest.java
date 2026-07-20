@@ -123,7 +123,7 @@ class FmdbAdapterIntegrationTest {
     }
 
     @Test
-    void shouldWriteJobsAndDetectionResultsIdempotently() {
+    void shouldWriteJobsIdempotentlyAndDetectionResultsDirectly() {
         SparkSession spark = SparkTestSession.get();
         FmdbPersistenceConfig config = FmdbPersistenceConfig.builder()
                 .writeMode(FmdbWriteMode.IDEMPOTENT_BY_KEY)
@@ -144,8 +144,8 @@ class FmdbAdapterIntegrationTest {
                 detection("1", true, 0.9d), detection("2", false, 0.1d));
         FmdbDetectionWriteContext context = detectionContext("1", "2");
         assertEquals(1L, writer.writeDetectionResults(RESULT_TABLE, context, results));
-        assertEquals(0L, writer.writeDetectionResults(RESULT_TABLE, context, results));
-        assertEquals(1L, gateway.read(RESULT_TABLE).count());
+        assertEquals(1L, writer.writeDetectionResults(RESULT_TABLE, context, results));
+        assertEquals(2L, gateway.read(RESULT_TABLE).count());
         assertEquals("VALUE-1", gateway.read(RESULT_TABLE).first()
                 .getAs("original_value"));
     }

@@ -219,40 +219,6 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
         }
     }
 
-    @Override
-    public synchronized long deleteOlderThan(String tableName,
-                                             String timestampColumn,
-                                             long cutoffExclusive) {
-        String validatedTable = validateTableName(tableName);
-        String validatedColumn = validateColumnName(timestampColumn);
-        if (cutoffExclusive <= 0L) {
-            throw new IllegalArgumentException("FMDB 清理截止时间必须大于 0");
-        }
-        LOGGER.info("开始清理 FMDB 过期数据，tableName={}，timestampColumn={}，"
-                        + "cutoffExclusive={}",
-                validatedTable, validatedColumn, cutoffExclusive);
-        try {
-            long count = read(validatedTable).filter(
-                    org.apache.spark.sql.functions.col(validatedColumn)
-                            .lt(cutoffExclusive)).count();
-            if (count == 0L) {
-                return 0L;
-            }
-            // 生产 FMDB 表必须支持标准删除语句，避免在 Driver 端搬运或覆盖整表。
-            sparkSession.sql("DELETE FROM " + validatedTable + " WHERE "
-                    + validatedColumn + " < " + cutoffExclusive);
-            LOGGER.info("FMDB 过期数据清理完成，tableName={}，deletedCount={}",
-                    validatedTable, count);
-            return count;
-        } catch (RuntimeException exception) {
-            LOGGER.error("FMDB 过期数据清理失败，tableName={}，timestampColumn={}，"
-                            + "cutoffExclusive={}",
-                    validatedTable, validatedColumn, cutoffExclusive, exception);
-            throw new IllegalStateException("FMDB 过期数据清理失败：" + validatedTable,
-                    exception);
-        }
-    }
-
     private static void validateRowsAndKeys(Dataset<Row> rows,
                                             List<String> keyColumns) {
         validateRows(rows);
