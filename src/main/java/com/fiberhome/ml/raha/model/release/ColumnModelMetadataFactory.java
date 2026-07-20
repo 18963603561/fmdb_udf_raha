@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.model.release;
 
 import com.fiberhome.ml.raha.data.type.ModelStatus;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
 import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
 import com.fiberhome.ml.raha.model.training.ColumnModelTrainingRequest;
@@ -28,6 +29,27 @@ public final class ColumnModelMetadataFactory {
     public RahaColumnModel create(ColumnModelTrainingRequest request,
                                   ColumnModelTrainingResult trainingResult,
                                   String modelPath) {
+        return create(request, trainingResult, modelPath,
+                trainingResult == null || trainingResult.getArtifact() == null
+                        ? "unknown" : trainingResult.getArtifact().getModelVersion(),
+                RowIdentityConfig.contentHash());
+    }
+
+    /**
+     * 根据训练结果创建包含模型集合和行身份上下文的模型元数据。
+     *
+     * @param request 列训练请求
+     * @param trainingResult 成功训练结果
+     * @param modelPath 模型参数路径
+     * @param modelSetVersion 不可变模型集合版本
+     * @param rowIdentityConfig 训练输入行身份规则
+     * @return 草稿列模型元数据
+     */
+    public RahaColumnModel create(ColumnModelTrainingRequest request,
+                                  ColumnModelTrainingResult trainingResult,
+                                  String modelPath,
+                                  String modelSetVersion,
+                                  RowIdentityConfig rowIdentityConfig) {
         if (request == null || trainingResult == null
                 || trainingResult.getStatus() != ColumnModelTrainingStatus.TRAINED
                 || trainingResult.getArtifact() == null) {
@@ -41,6 +63,7 @@ public final class ColumnModelMetadataFactory {
                 request.getDatasetId(), artifact.getColumnName(), request.getSchemaHash(),
                 artifact.getClassifierType(), artifact.getFeatureDictionaryVersion(),
                 request.getStrategyPlanVersion(), artifact.getThreshold(), modelPath,
-                ModelStatus.DRAFT, metrics, clock.millis());
+                ModelStatus.DRAFT, metrics, clock.millis(), null,
+                modelSetVersion, rowIdentityConfig);
     }
 }

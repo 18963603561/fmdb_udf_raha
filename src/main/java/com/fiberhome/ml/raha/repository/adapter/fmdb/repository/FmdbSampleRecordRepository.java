@@ -182,6 +182,32 @@ public final class FmdbSampleRecordRepository implements SampleRecordRepository 
     }
 
     @Override
+    public Optional<SampleBatch> findByBatchId(String sampleBatchId) {
+        String batchId = ValueUtils.requireNotBlank(
+                sampleBatchId, "全局采样批次标识");
+        if (!tableGateway.tableExists(tableName)) {
+            return Optional.empty();
+        }
+        LOGGER.debug("开始定位 FMDB 全局采样批次，sampleBatchId={}", batchId);
+        List<Row> locations = tableGateway.read(tableName,
+                Arrays.asList("dataset_id", "partition_month"),
+                functions.col("sample_batch_id").equalTo(batchId))
+                .distinct().collectAsList();
+        if (locations.isEmpty()) {
+            return Optional.empty();
+        }
+        if (locations.size() != 1) {
+            throw new IllegalStateException("采样批次标识不是全局唯一：" + batchId);
+        }
+        Row location = locations.get(0);
+        String datasetId = location.getAs("dataset_id");
+        String partitionMonth = location.getAs("partition_month");
+        LOGGER.debug("FMDB 全局采样批次定位完成，sampleBatchId={}，datasetId={}，"
+                        + "partitionMonth={}", batchId, datasetId, partitionMonth);
+        return find(datasetId, partitionMonth, batchId);
+    }
+
+    @Override
     public List<SampleAnnotationRow> findForAnnotation(
             String datasetId,
             String partitionMonth,

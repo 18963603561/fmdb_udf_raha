@@ -119,17 +119,25 @@ public final class TrainingInputMergeService {
         }
         RahaDataset original = request.getOriginalDataset();
         LOGGER.info("开始合并训练输入，trainingBatchId={}，datasetId={}，"
-                        + "sampleBatchId={}，annotationBatchId={}，snapshotId={}",
+                        + "batchCount={}，snapshotId={}",
                 request.getTrainingBatchId(), original.getDatasetId(),
-                request.getSampleBatchId(), request.getAnnotationBatchId(),
+                request.getBatchReferences().size(),
                 original.getSnapshotId());
-        SampleBatch sample = loadSample(request);
-        AnnotationBatch annotation = loadAnnotation(request);
-        validateIdentityAndSchema(original, sample,
-                request.getRowIdentityConfig());
+        List<SampleBatch> samples = new ArrayList<SampleBatch>();
+        List<AnnotationBatch> annotations = new ArrayList<AnnotationBatch>();
+        for (TrainingBatchReference reference : request.getBatchReferences()) {
+            SampleBatch sample = loadSample(request, reference);
+            AnnotationBatch annotation = loadAnnotation(request, reference);
+            validateIdentityAndSchema(original, sample,
+                    request.getRowIdentityConfig());
+            samples.add(sample);
+            annotations.add(annotation);
+        }
+        List<SampleRecord> sampleRecords = uniqueSampleRecords(
+                samples, request.getRowIdentityConfig());
         Dataset<Row> originalFrame = original.getDataFrame();
         long originalCount = originalFrame.count();
-        Dataset<Row> sampleFrame = sampleFrame(originalFrame.schema(), sample);
+        Dataset<Row> sampleFrame = sampleFrame(originalFrame.schema(), sampleRecords);
         Dataset<Row> taggedOriginal = originalFrame.withColumn(MERGE_SOURCE,
                 functions.lit("O1"));
         Dataset<Row> taggedSample = sampleFrame.withColumn(MERGE_SOURCE,
@@ -142,7 +150,7 @@ public final class TrainingInputMergeService {
         Dataset<Row> originalDeduplicated = deduplicateOriginal(
                 taggedOriginal, identityColumn, originalFrame.schema());
         Dataset<Row> c1Keys = taggedSample.select(identityColumn).distinct();
-        long estimatedBytes = estimateSampleBytes(sample);
+        long estimatedBytes = estimateSampleBytes(sampleRecords);
         boolean broadcastC1 = estimatedBytes <= request.getBroadcastThresholdBytes();
         Dataset<Row> joinKeys = broadcastC1 ? functions.broadcast(c1Keys) : c1Keys;
         Column joinCondition = originalDeduplicated.alias("o1")
@@ -158,10 +166,10 @@ public final class TrainingInputMergeService {
                 .selectExpr(originalFrame.schema().fieldNames());
         long mergedCount = merged.count();
         TrainingMergeMetrics metrics = metrics(rawUnion, identityColumn,
-                sample.getRecords().size(), originalCount, mergedCount);
+                sampleRecords.size(), originalCount, mergedCount);
         LOGGER.info("训练 c1 广播决策，trainingBatchId={}，sampleCount={}，"
                         + "estimatedBytes={}，thresholdBytes={}，broadcast={}",
-                request.getTrainingBatchId(), sample.getRecords().size(), estimatedBytes,
+                request.getTrainingBatchId(), sampleRecords.size(), estimatedBytes,
                 request.getBroadcastThresholdBytes(), broadcastC1);
         if (metrics.getKeyContentConflictCount() > 0L) {
             LOGGER.warn("训练合并存在联合键内容冲突，trainingBatchId={}，"
@@ -178,10 +186,7 @@ public final class TrainingInputMergeService {
                 metrics.getMergedCount(), metrics.getDedupGroupCount(),
                 metrics.getDedupRowCount(), metrics.getC1OnlyCount());
         String trainingSnapshotId = "train-" + HashUtils.sha256Hex(
-                original.getDatasetId() + "|" + original.getSnapshotId() + "|"
-                        + request.getSampleBatchId() + "|"
-                        + request.getAnnotationBatchId() + "|"
-                        + MERGE_ALGORITHM_VERSION).substring(0, 32);
+                trainingSnapshotSource(request, original)).substring(0, 32);
         RahaDataset trainingDataset = new RahaDataset(original.getDatasetId(),
                 trainingSnapshotId, original.getTableName(), original.getRowIdColumn(),
                 original.getColumns(), merged, original.getSchemaHash(),
@@ -189,9 +194,9 @@ public final class TrainingInputMergeService {
         // 合并后的集合必须重新画像，不能把 o1 或采样快照画像直接当作训练画像。
         trainingDataset = trainingDataset.withProfiles(columnProfiler.profile(
                 trainingDataset));
-        List<CellLabel> labels = remapLabels(annotation, original.getDatasetId(),
+        List<CellLabel> labels = remapLabels(annotations, original.getDatasetId(),
                 trainingSnapshotId);
-        Map<String, Object> context = context(request, original, sample, annotation,
+        Map<String, Object> context = context(request, original, samples, annotations,
                 metrics, trainingSnapshotId, startedAt);
         return new TrainingMergeResult(trainingDataset, labels,
                 request.getTrainingBatchId(), trainingSnapshotId,
@@ -211,9 +216,9 @@ public final class TrainingInputMergeService {
                 .drop(MERGE_ORDER, MERGE_ROW_NUMBER);
     }
 
-    private static long estimateSampleBytes(SampleBatch sample) {
+    private static long estimateSampleBytes(List<SampleRecord> records) {
         long bytes = 0L;
-        for (SampleRecord record : sample.getRecords()) {
+        for (SampleRecord record : records) {
             bytes = Math.addExact(bytes, FmdbJsonCodec.write(record.getRowData())
                     .getBytes(StandardCharsets.UTF_8).length);
             bytes = Math.addExact(bytes, record.getRowId().length()
@@ -222,25 +227,29 @@ public final class TrainingInputMergeService {
         return bytes;
     }
 
-    private SampleBatch loadSample(TrainingMergeRequest request) {
+    private SampleBatch loadSample(TrainingMergeRequest request,
+                                   TrainingBatchReference reference) {
         Optional<SampleBatch> result = sampleRepository.find(
                 request.getOriginalDataset().getDatasetId(),
-                request.getSamplePartitionMonth(), request.getSampleBatchId());
+                reference.getSamplePartitionMonth(),
+                reference.getSampleBatchId());
         if (!result.isPresent()) {
             throw new IllegalStateException("训练指定的 c1 采样批次不存在");
         }
         return result.get();
     }
 
-    private AnnotationBatch loadAnnotation(TrainingMergeRequest request) {
+    private AnnotationBatch loadAnnotation(TrainingMergeRequest request,
+                                           TrainingBatchReference reference) {
         Optional<AnnotationBatch> result = annotationRepository.find(
                 request.getOriginalDataset().getDatasetId(),
-                request.getAnnotationPartitionMonth(), request.getAnnotationBatchId());
+                reference.getAnnotationPartitionMonth(),
+                reference.getAnnotationBatchId());
         if (!result.isPresent()) {
             throw new IllegalStateException("训练指定的标注批次不存在");
         }
         AnnotationBatch batch = result.get();
-        if (!request.getSampleBatchId().equals(batch.getSampleBatchId())
+        if (!reference.getSampleBatchId().equals(batch.getSampleBatchId())
                 || !request.getOriginalDataset().getDatasetId().equals(
                 batch.getDatasetId())) {
             throw new IllegalArgumentException("标注批次与训练采样或数据集不一致");
@@ -292,9 +301,9 @@ public final class TrainingInputMergeService {
     }
 
     private Dataset<Row> sampleFrame(StructType originalSchema,
-                                     SampleBatch sample) {
-        List<Row> rows = new ArrayList<Row>(sample.getRecords().size());
-        for (SampleRecord record : sample.getRecords()) {
+                                     List<SampleRecord> records) {
+        List<Row> rows = new ArrayList<Row>(records.size());
+        for (SampleRecord record : records) {
             Object[] values = new Object[originalSchema.fields().length];
             for (int index = 0; index < values.length; index++) {
                 StructField field = originalSchema.fields()[index];
@@ -341,42 +350,67 @@ public final class TrainingInputMergeService {
                 matched, dedupGroups, union.count() - mergedCount, conflicts, c1Only);
     }
 
-    private static List<CellLabel> remapLabels(AnnotationBatch batch,
+    private static List<CellLabel> remapLabels(List<AnnotationBatch> batches,
                                                String datasetId,
                                                String trainingSnapshotId) {
         List<CellLabel> labels = new ArrayList<CellLabel>();
-        for (AnnotationRecord record : batch.getRecords()) {
-            RowAnnotation annotation = record.getAnnotation();
-            List<String> columns = new ArrayList<String>(
-                    annotation.getReviewedColumns());
-            for (int index = 0; index < columns.size(); index++) {
-                CellLabel source = annotation.getCellLabels().get(index);
-                String column = columns.get(index);
-                String cellId = new CellCoordinate(datasetId, trainingSnapshotId,
-                        annotation.getRowId(), column).toCellId();
-                String labelId = HashUtils.sha256Hex(source.getLabelId() + "|"
-                        + trainingSnapshotId);
-                labels.add(new CellLabel(labelId, cellId, source.getLabel(),
-                        source.getLabelSource(), source.getConfidence(), null, null,
-                        null, null, 1.0d, 0, null, source.getAnnotator(),
-                        source.getCreatedAt()));
+        Map<String, CellLabel> sourceByCell =
+                new LinkedHashMap<String, CellLabel>();
+        for (AnnotationBatch batch : batches) {
+            for (AnnotationRecord record : batch.getRecords()) {
+                RowAnnotation annotation = record.getAnnotation();
+                List<String> columns = new ArrayList<String>(
+                        annotation.getReviewedColumns());
+                for (int index = 0; index < columns.size(); index++) {
+                    CellLabel source = annotation.getCellLabels().get(index);
+                    String column = columns.get(index);
+                    String sourceCell = annotation.getRowId() + "\u0000" + column;
+                    CellLabel existing = sourceByCell.get(sourceCell);
+                    if (existing != null && existing.getLabel() != source.getLabel()) {
+                        throw new IllegalArgumentException("多批次训练包含冲突标签："
+                                + annotation.getRowId() + "/" + column);
+                    }
+                    if (existing != null) {
+                        continue;
+                    }
+                    sourceByCell.put(sourceCell, source);
+                    String cellId = new CellCoordinate(datasetId,
+                            trainingSnapshotId, annotation.getRowId(), column)
+                            .toCellId();
+                    String labelId = HashUtils.sha256Hex(source.getLabelId() + "|"
+                            + trainingSnapshotId);
+                    labels.add(new CellLabel(labelId, cellId, source.getLabel(),
+                            source.getLabelSource(), source.getConfidence(), null,
+                            null, null, null, 1.0d, 0, null,
+                            source.getAnnotator(), source.getCreatedAt()));
+                }
             }
         }
-        return labels;
+        return Collections.unmodifiableList(labels);
     }
 
     private static Map<String, Object> context(TrainingMergeRequest request,
                                                RahaDataset original,
-                                               SampleBatch sample,
-                                               AnnotationBatch annotation,
+                                               List<SampleBatch> samples,
+                                               List<AnnotationBatch> annotations,
                                                TrainingMergeMetrics metrics,
                                                String trainingSnapshotId,
                                                long sourceReadAt) {
         Map<String, Object> result = new LinkedHashMap<String, Object>();
+        List<String> sampleBatchIds = new ArrayList<String>();
+        List<String> annotationBatchIds = new ArrayList<String>();
+        for (SampleBatch sample : samples) {
+            sampleBatchIds.add(sample.getSampleBatchId());
+        }
+        for (AnnotationBatch annotation : annotations) {
+            annotationBatchIds.add(annotation.getAnnotationBatchId());
+        }
         result.put("trainingBatchId", request.getTrainingBatchId());
         result.put("trainingSnapshotId", trainingSnapshotId);
-        result.put("sampleBatchId", sample.getSampleBatchId());
-        result.put("annotationBatchId", annotation.getAnnotationBatchId());
+        result.put("sampleBatchId", joinIds(sampleBatchIds));
+        result.put("annotationBatchId", joinIds(annotationBatchIds));
+        result.put("sampleBatchIds", sampleBatchIds);
+        result.put("annotationBatchIds", annotationBatchIds);
         result.put("inputReference", original.getTableName());
         result.put("sourceReadAt", sourceReadAt);
         result.put("sampleDataCount", metrics.getSampleCount());
@@ -388,6 +422,60 @@ public final class TrainingInputMergeService {
         result.put("mergeAlgorithmVersion", MERGE_ALGORITHM_VERSION);
         result.put("rowIdentityMode", request.getRowIdentityConfig().getMode().name());
         return result;
+    }
+
+    private static List<SampleRecord> uniqueSampleRecords(
+            List<SampleBatch> samples,
+            RowIdentityConfig identityConfig) {
+        Map<String, SampleRecord> unique =
+                new LinkedHashMap<String, SampleRecord>();
+        for (SampleBatch sample : samples) {
+            for (SampleRecord record : sample.getRecords()) {
+                String identity = identityConfig.getMode()
+                        == RowIdentityMode.CONTENT_HASH
+                        ? record.getRowContentHash() : record.getRowId();
+                SampleRecord existing = unique.get(identity);
+                if (existing != null && !existing.getRowContentHash().equals(
+                        record.getRowContentHash())) {
+                    throw new IllegalArgumentException("多批次训练包含相同行身份的内容冲突："
+                            + identity);
+                }
+                if (existing == null) {
+                    unique.put(identity, record);
+                }
+            }
+        }
+        List<SampleRecord> result = new ArrayList<SampleRecord>(unique.values());
+        Collections.sort(result, new Comparator<SampleRecord>() {
+            @Override
+            public int compare(SampleRecord first, SampleRecord second) {
+                return first.getRowId().compareTo(second.getRowId());
+            }
+        });
+        return Collections.unmodifiableList(result);
+    }
+
+    private static String trainingSnapshotSource(TrainingMergeRequest request,
+                                                 RahaDataset original) {
+        StringBuilder source = new StringBuilder();
+        source.append(original.getDatasetId()).append('|')
+                .append(original.getSnapshotId()).append('|')
+                .append(MERGE_ALGORITHM_VERSION);
+        for (TrainingBatchReference reference : request.getBatchReferences()) {
+            source.append('|').append(reference.toCanonicalString());
+        }
+        return source.toString();
+    }
+
+    private static String joinIds(List<String> values) {
+        StringBuilder result = new StringBuilder();
+        for (String value : values) {
+            if (result.length() > 0) {
+                result.append(',');
+            }
+            result.append(value);
+        }
+        return result.toString();
     }
 
     @SuppressWarnings("unchecked")

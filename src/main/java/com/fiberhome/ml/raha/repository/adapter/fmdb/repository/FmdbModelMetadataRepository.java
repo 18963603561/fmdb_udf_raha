@@ -2,6 +2,9 @@ package com.fiberhome.ml.raha.repository.adapter.fmdb.repository;
 
 import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.data.type.ModelStatus;
+import com.fiberhome.ml.raha.data.loader.identity.RowFingerprintAlgorithm;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityMode;
 import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.gateway.FmdbTableGateway;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
@@ -137,6 +140,42 @@ public final class FmdbModelMetadataRepository implements ModelMetadataRepositor
     }
 
     @Override
+    public List<RahaColumnModel> findByModelSetVersion(String modelSetVersion) {
+        String version = ValueUtils.requireNotBlank(
+                modelSetVersion, "模型集合版本");
+        if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT)
+                || !tableGateway.tableExists(tableName)) {
+            return Collections.emptyList();
+        }
+        LOGGER.debug("开始按模型集合版本读取 FMDB 列模型，modelSetVersion={}",
+                version);
+        List<Row> rows = tableGateway.read(tableName,
+                FmdbTableSchemas.columns(FmdbPhysicalTable.MODEL_ARTIFACT),
+                functions.col("model_set_version").equalTo(version))
+                .collectAsList();
+        Map<String, Row> latestByModel = new LinkedHashMap<String, Row>();
+        for (Row row : rows) {
+            String key = String.valueOf((Object) row.getAs("column_name"))
+                    + "\u0000" + String.valueOf((Object) row.getAs("model_version"));
+            Row current = latestByModel.get(key);
+            if (current == null || ((Number) row.getAs("state_version")).intValue()
+                    > ((Number) current.getAs("state_version")).intValue()) {
+                latestByModel.put(key, row);
+            }
+        }
+        List<RahaColumnModel> models = new ArrayList<RahaColumnModel>();
+        for (Row row : latestByModel.values()) {
+            models.add(toModel(row));
+        }
+        Collections.sort(models, Comparator.comparing(
+                RahaColumnModel::getColumnName)
+                .thenComparing(RahaColumnModel::getModelVersion));
+        LOGGER.debug("FMDB 模型集合读取完成，modelSetVersion={}，modelCount={}",
+                version, models.size());
+        return Collections.unmodifiableList(models);
+    }
+
+    @Override
     public Optional<RahaColumnModel> findPublished(String datasetId,
                                                    String columnName) {
         List<RahaColumnModel> published = new ArrayList<RahaColumnModel>();
@@ -237,7 +276,32 @@ public final class FmdbModelMetadataRepository implements ModelMetadataRepositor
                 (String) row.getAs("model_path"),
                 ModelStatus.valueOf((String) row.getAs("model_set_status")), metrics,
                 ((Number) row.getAs("created_at")).longValue(),
-                published == null ? null : ((Number) published).longValue());
+                published == null ? null : ((Number) published).longValue(),
+                (String) row.getAs("model_set_version"), rowIdentity(payload));
+    }
+
+    private static RowIdentityConfig rowIdentity(Map<String, Object> payload) {
+        Object rawMode = payload.get("rowIdentityMode");
+        Object rawAlgorithm = payload.get("rowFingerprintAlgorithm");
+        Object rawVersion = payload.get("rowFingerprintVersion");
+        if (!(rawMode instanceof String) || !(rawAlgorithm instanceof String)
+                || !(rawVersion instanceof String)) {
+            // 兼容改造前的模型载荷；新模型必须显式保存完整行身份规则。
+            return RowIdentityConfig.contentHash();
+        }
+        List<String> keyColumns = new ArrayList<String>();
+        Object rawKeys = payload.get("rowKeyColumns");
+        if (rawKeys instanceof List) {
+            for (Object key : (List<?>) rawKeys) {
+                if (!(key instanceof String)) {
+                    throw new IllegalStateException("模型行身份业务键必须为文本");
+                }
+                keyColumns.add((String) key);
+            }
+        }
+        return new RowIdentityConfig(RowIdentityMode.valueOf((String) rawMode),
+                keyColumns, RowFingerprintAlgorithm.valueOf(
+                (String) rawAlgorithm), (String) rawVersion);
     }
 
     private static String schemaHash(Row row) {

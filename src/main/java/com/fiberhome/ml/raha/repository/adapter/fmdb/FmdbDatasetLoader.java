@@ -18,6 +18,7 @@ import com.fiberhome.ml.raha.data.loader.identity.RowIdentityResult;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityService;
 import com.fiberhome.ml.raha.data.loader.metadata.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.metadata.SnapshotMetadataFactory;
+import com.fiberhome.ml.raha.data.loader.metadata.DatasetContentFingerprinter;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.List;
@@ -94,8 +95,11 @@ public final class FmdbDatasetLoader implements RahaDatasetLoader {
             Dataset<Row> frame = identity.getDataFrame();
             RowIdValidationResult rowId = rowIdValidator.validate(
                     frame, RowIdentityColumns.ROW_ID);
+            String contentFingerprint = requiresContentFingerprint(request)
+                    ? new DatasetContentFingerprinter().fingerprint(frame) : null;
             DatasetSnapshot snapshot = snapshotFactory.create(request, schemaHash,
-                    rowId.getRowCount(), columns.size(), clock.millis());
+                    rowId.getRowCount(), columns.size(), clock.millis(),
+                    contentFingerprint);
             RahaDataset dataset = new RahaDataset(request.getDatasetId(),
                     snapshot.getSnapshotId(), request.getTableName(),
                     RowIdentityColumns.ROW_ID, columns, frame, schemaHash,
@@ -124,6 +128,13 @@ public final class FmdbDatasetLoader implements RahaDatasetLoader {
     private Dataset<Row> readTable(String tableName) {
         LOGGER.debug("调用 FMDB Catalog 读取表，tableName={}", tableName);
         return sparkSession.table(tableName);
+    }
+
+    private static boolean requiresContentFingerprint(DataLoadRequest request) {
+        return (request.getSnapshotId() == null
+                || request.getSnapshotId().trim().isEmpty())
+                && (request.getSourceVersion() == null
+                || request.getSourceVersion().trim().isEmpty());
     }
 
     private Dataset<Row> readSql(String sqlText) {

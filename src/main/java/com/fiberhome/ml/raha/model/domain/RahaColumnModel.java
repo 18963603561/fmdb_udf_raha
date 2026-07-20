@@ -2,6 +2,7 @@ package com.fiberhome.ml.raha.model.domain;
 
 import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.data.type.ModelStatus;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -16,6 +17,8 @@ public final class RahaColumnModel {
     private final String modelName;
     /** 不可变模型版本。 */
     private final String modelVersion;
+    /** 当前列模型所属的不可变模型集合版本。 */
+    private final String modelSetVersion;
     /** 训练数据集标识。 */
     private final String datasetId;
     /** 模型目标字段。 */
@@ -40,6 +43,8 @@ public final class RahaColumnModel {
     private final long createdAt;
     /** 模型首次发布时间，从未发布时为空。 */
     private final Long publishedAt;
+    /** 训练和检测必须保持一致的行身份规则。 */
+    private final RowIdentityConfig rowIdentityConfig;
 
     public RahaColumnModel(String modelName,
                            String modelVersion,
@@ -57,7 +62,8 @@ public final class RahaColumnModel {
         this(modelName, modelVersion, datasetId, columnName, schemaHash,
                 classifierType, featureDictionaryVersion, strategyPlanVersion,
                 threshold, modelPath, status, metrics, createdAt,
-                status == ModelStatus.PUBLISHED ? createdAt : null);
+                status == ModelStatus.PUBLISHED ? createdAt : null,
+                modelVersion, RowIdentityConfig.contentHash());
     }
 
     public RahaColumnModel(String modelName,
@@ -74,8 +80,32 @@ public final class RahaColumnModel {
                            Map<String, Double> metrics,
                            long createdAt,
                            Long publishedAt) {
+        this(modelName, modelVersion, datasetId, columnName, schemaHash,
+                classifierType, featureDictionaryVersion, strategyPlanVersion,
+                threshold, modelPath, status, metrics, createdAt, publishedAt,
+                modelVersion, RowIdentityConfig.contentHash());
+    }
+
+    public RahaColumnModel(String modelName,
+                           String modelVersion,
+                           String datasetId,
+                           String columnName,
+                           String schemaHash,
+                           ClassifierType classifierType,
+                           String featureDictionaryVersion,
+                           String strategyPlanVersion,
+                           double threshold,
+                           String modelPath,
+                           ModelStatus status,
+                           Map<String, Double> metrics,
+                           long createdAt,
+                           Long publishedAt,
+                           String modelSetVersion,
+                           RowIdentityConfig rowIdentityConfig) {
         this.modelName = ValueUtils.requireNotBlank(modelName, "模型名称");
         this.modelVersion = ValueUtils.requireNotBlank(modelVersion, "模型版本");
+        this.modelSetVersion = ValueUtils.requireNotBlank(
+                modelSetVersion, "模型集合版本");
         this.datasetId = ValueUtils.requireNotBlank(datasetId, "数据集标识");
         this.columnName = ValueUtils.requireNotBlank(columnName, "模型字段");
         this.schemaHash = ValueUtils.requireNotBlank(schemaHash, "模式哈希");
@@ -110,6 +140,10 @@ public final class RahaColumnModel {
                 : Collections.unmodifiableMap(new LinkedHashMap<String, Double>(metrics));
         this.createdAt = createdAt;
         this.publishedAt = publishedAt;
+        if (rowIdentityConfig == null) {
+            throw new IllegalArgumentException("模型行身份规则不能为空");
+        }
+        this.rowIdentityConfig = rowIdentityConfig;
     }
 
     public String getModelName() {
@@ -118,6 +152,10 @@ public final class RahaColumnModel {
 
     public String getModelVersion() {
         return modelVersion;
+    }
+
+    public String getModelSetVersion() {
+        return modelSetVersion;
     }
 
     public String getDatasetId() {
@@ -168,6 +206,27 @@ public final class RahaColumnModel {
         return publishedAt;
     }
 
+    public RowIdentityConfig getRowIdentityConfig() {
+        return rowIdentityConfig;
+    }
+
+    /**
+     * 创建补齐模型集合版本和行身份规则的列模型副本。
+     *
+     * @param newModelSetVersion 不可变模型集合版本
+     * @param newRowIdentityConfig 训练输入行身份规则
+     * @return 带模型集合上下文的新对象
+     */
+    public RahaColumnModel withModelSetContext(
+            String newModelSetVersion,
+            RowIdentityConfig newRowIdentityConfig) {
+        return new RahaColumnModel(modelName, modelVersion, datasetId,
+                columnName, schemaHash, classifierType,
+                featureDictionaryVersion, strategyPlanVersion, threshold,
+                modelPath, status, metrics, createdAt, publishedAt,
+                newModelSetVersion, newRowIdentityConfig);
+    }
+
     /**
      * 为草稿或候选模型保存评测选定阈值和指标，不改变训练参数版本。
      *
@@ -196,7 +255,7 @@ public final class RahaColumnModel {
         return new RahaColumnModel(modelName, modelVersion, datasetId, columnName,
                 schemaHash, classifierType, featureDictionaryVersion,
                 strategyPlanVersion, selectedThreshold, modelPath, status, merged,
-                createdAt, publishedAt);
+                createdAt, publishedAt, modelSetVersion, rowIdentityConfig);
     }
 
     /**
@@ -231,7 +290,7 @@ public final class RahaColumnModel {
         return new RahaColumnModel(modelName, modelVersion, datasetId, columnName,
                 schemaHash, classifierType, featureDictionaryVersion,
                 strategyPlanVersion, threshold, modelPath, target, metrics, createdAt,
-                nextPublishedAt);
+                nextPublishedAt, modelSetVersion, rowIdentityConfig);
     }
 
     private static boolean canTransition(ModelStatus source, ModelStatus target) {

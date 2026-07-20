@@ -3,6 +3,7 @@ package com.fiberhome.ml.raha.sampling.service;
 import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPartitionUtils;
@@ -64,11 +65,34 @@ public final class SampleRecordService {
 
     /**
      * 回取采样完整业务行并幂等写入最终采样表。
+     *
+     * <p>该重载用于兼容旧手工装配，不保存来源类型。需要通过最小训练入口恢复输入时，
+     * 应使用带 {@link DataFormat} 参数的重载。</p>
      */
     public SampleMaterializationResult materializeAndPersist(
             RahaDataset dataset,
             DatasetSnapshot snapshot,
             RowIdentityConfig identityConfig,
+            SamplingBatchResult sampling) {
+        return materializeAndPersist(dataset, snapshot, identityConfig, null,
+                sampling);
+    }
+
+    /**
+     * 回取采样完整业务行，并把调用入口明确选择的来源类型写入持久化上下文。
+     *
+     * @param dataset 已完成行身份处理的可信数据集
+     * @param snapshot 当前输入快照
+     * @param identityConfig 行身份规则
+     * @param sourceType 表、SQL 或文件等明确来源类型；为空时按旧协议不保存
+     * @param sampling 当前采样结果
+     * @return 采样批次物化和持久化结果
+     */
+    public SampleMaterializationResult materializeAndPersist(
+            RahaDataset dataset,
+            DatasetSnapshot snapshot,
+            RowIdentityConfig identityConfig,
+            DataFormat sourceType,
             SamplingBatchResult sampling) {
         if (dataset == null || snapshot == null || identityConfig == null
                 || sampling == null || sampling.getTasks().isEmpty()) {
@@ -96,7 +120,8 @@ public final class SampleRecordService {
                         + "selectedRowCount={}，samplingVersion={}", sampleBatchId,
                 dataset.getDatasetId(), rowIds.size(), sampling.getSamplingVersion());
         SampleBatch batch = buildBatch(sampleBatchId, dataset, snapshot,
-                identityConfig, sampling, taskByRow, createdAt, partitionMonth);
+                identityConfig, sourceType, sampling, taskByRow, createdAt,
+                partitionMonth);
         if (!repository.isPersistenceEnabled()) {
             LOGGER.info("c1 采样物理表开关已关闭，仅完成当前任务内存物化，"
                             + "sampleBatchId={}，recordCount={}", sampleBatchId,
@@ -126,6 +151,7 @@ public final class SampleRecordService {
             RahaDataset dataset,
             DatasetSnapshot snapshot,
             RowIdentityConfig identityConfig,
+            DataFormat sourceType,
             SamplingBatchResult sampling,
             Map<String, AnnotationTask> taskByRow,
             long createdAt,
@@ -159,7 +185,8 @@ public final class SampleRecordService {
                     dataset.getSchemaHash(), columnSchema,
                     rowData(row, frameSchema, dataset.getColumns()), duplicateCount,
                     sampling.getSamplingVersion(), samplingContext(task,
-                    snapshot.getSnapshotId()), createdAt, partitionMonth));
+                    snapshot.getSnapshotId(), sourceType), createdAt,
+                    partitionMonth));
         }
         Collections.sort(records, new Comparator<SampleRecord>() {
             @Override
@@ -218,7 +245,8 @@ public final class SampleRecordService {
     }
 
     private static Map<String, Object> samplingContext(AnnotationTask task,
-                                                       String snapshotId) {
+                                                       String snapshotId,
+                                                       DataFormat sourceType) {
         Map<String, Object> context = new LinkedHashMap<String, Object>();
         context.put("annotationTaskId", task.getTaskId());
         context.put("jobId", task.getJobId());
@@ -228,6 +256,10 @@ public final class SampleRecordService {
         context.put("taskStatus", task.getStatus().name());
         context.put("expiresAt", task.getExpiresAt());
         context.put("snapshotId", snapshotId);
+        if (sourceType != null) {
+            context.put(SampleRecord.SOURCE_TYPE_CONTEXT_KEY,
+                    sourceType.name());
+        }
         return context;
     }
 

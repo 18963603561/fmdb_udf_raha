@@ -94,7 +94,10 @@ public final class FmdbDetectionResultRepository
                 throw new IllegalArgumentException("检测结果与写入上下文不一致");
             }
         }
-        String modelSetVersion = modelSetVersion(
+        String modelSetVersion = context.getModelSetVersion() == null
+                ? modelSetVersion(context.getDataset().getDatasetId(),
+                context.getModelVersions()) : context.getModelSetVersion();
+        validateModelSetVersion(modelSetVersion,
                 context.getDataset().getDatasetId(), context.getModelVersions());
         FmdbDetectionWriteContext writeContext = new FmdbDetectionWriteContext(
                 context.getJobId(), context.getDataset().getTableName(),
@@ -193,6 +196,30 @@ public final class FmdbDetectionResultRepository
             throw new IllegalStateException("检测列模型不属于唯一模型集合：" + versions);
         }
         return versions.iterator().next();
+    }
+
+    private void validateModelSetVersion(String modelSetVersion,
+                                         String datasetId,
+                                         List<String> modelVersions) {
+        if (!tableGateway.tableExists(modelTable)) {
+            throw new IllegalStateException("检测结果缺少模型产物表");
+        }
+        List<Row> rows = tableGateway.read(modelTable,
+                Arrays.asList("model_set_version", "model_version"),
+                functions.col("dataset_id").equalTo(datasetId)
+                        .and(functions.col("model_set_version")
+                                .equalTo(modelSetVersion))
+                        .and(functions.col("model_version").isin(
+                                modelVersions.toArray(new Object[0]))))
+                .collectAsList();
+        Set<String> found = new LinkedHashSet<String>();
+        for (Row row : rows) {
+            found.add((String) row.getAs("model_version"));
+        }
+        if (!found.equals(new LinkedHashSet<String>(modelVersions))) {
+            throw new IllegalStateException("检测结果模型不属于指定模型集合："
+                    + modelSetVersion);
+        }
     }
 
     private static Map<String, Map<String, Object>> trustedRows(RahaDataset dataset) {

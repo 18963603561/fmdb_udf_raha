@@ -34,6 +34,8 @@ public enum RepositoryNamespace {
     LABEL_PROPAGATION_SUMMARY,
     /** 列级模型。 */
     COLUMN_MODEL,
+    /** 按模型集合版本建立的列模型索引。 */
+    MODEL_SET,
     /** 单元格检测结果。 */
     DETECTION_RESULT
 }

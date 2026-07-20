@@ -18,9 +18,18 @@ public final class DetectionResultSaveContext {
     private final RahaDataset dataset;
     /** 当前检测实际使用的列模型版本。 */
     private final List<String> modelVersions;
+    /** 调用方显式选择的模型集合版本，旧入口为空。 */
+    private final String modelSetVersion;
 
     public DetectionResultSaveContext(String jobId,
                                       RahaDataset dataset,
+                                      Collection<String> modelVersions) {
+        this(jobId, dataset, null, modelVersions);
+    }
+
+    public DetectionResultSaveContext(String jobId,
+                                      RahaDataset dataset,
+                                      String modelSetVersion,
                                       Collection<String> modelVersions) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "检测任务标识");
         if (dataset == null || dataset.getDataFrame() == null
@@ -33,6 +42,9 @@ public final class DetectionResultSaveContext {
         }
         this.dataset = dataset;
         this.modelVersions = Collections.unmodifiableList(copies);
+        this.modelSetVersion = modelSetVersion == null
+                || modelSetVersion.trim().isEmpty()
+                ? null : modelSetVersion.trim();
     }
 
     public String getJobId() {
@@ -45,5 +57,9 @@ public final class DetectionResultSaveContext {
 
     public List<String> getModelVersions() {
         return modelVersions;
+    }
+
+    public String getModelSetVersion() {
+        return modelSetVersion;
     }
 }

@@ -38,6 +38,8 @@ public final class RahaJobConfig {
     private final FailureToleranceConfig failureToleranceConfig;
     /** 影响执行语义的资源配置指纹。 */
     private final String executionConfigFingerprint;
+    /** 调用级批次、模型集合或其他执行输入指纹。 */
+    private final String executionInputFingerprint;
 
     public RahaJobConfig(JobType jobType,
                          String datasetId,
@@ -91,6 +93,27 @@ public final class RahaJobConfig {
                          ResourceConfig resourceConfig,
                          FailureToleranceConfig failureToleranceConfig,
                          String executionConfigFingerprint) {
+        this(jobType, datasetId, snapshotId, inputReference, rowIdentityConfig,
+                randomSeed, strategyConfig, featureConfig, modelConfig,
+                clusteringConfig, samplingConfig, resourceConfig,
+                failureToleranceConfig, executionConfigFingerprint, null);
+    }
+
+    public RahaJobConfig(JobType jobType,
+                         String datasetId,
+                         String snapshotId,
+                         String inputReference,
+                         RowIdentityConfig rowIdentityConfig,
+                         long randomSeed,
+                         StrategyConfig strategyConfig,
+                         FeatureConfig featureConfig,
+                         ModelConfig modelConfig,
+                         ClusteringConfig clusteringConfig,
+                         SamplingConfig samplingConfig,
+                         ResourceConfig resourceConfig,
+                         FailureToleranceConfig failureToleranceConfig,
+                         String executionConfigFingerprint,
+                         String executionInputFingerprint) {
         this.jobType = jobType;
         this.datasetId = datasetId;
         this.snapshotId = snapshotId;
@@ -105,6 +128,7 @@ public final class RahaJobConfig {
         this.resourceConfig = resourceConfig;
         this.failureToleranceConfig = failureToleranceConfig;
         this.executionConfigFingerprint = executionConfigFingerprint;
+        this.executionInputFingerprint = executionInputFingerprint;
     }
 
     /**
@@ -180,6 +204,48 @@ public final class RahaJobConfig {
         return executionConfigFingerprint;
     }
 
+    public String getExecutionInputFingerprint() {
+        return executionInputFingerprint;
+    }
+
+    /**
+     * 创建只覆盖快照标识的任务配置副本。
+     *
+     * @param newSnapshotId 可选平台快照标识
+     * @return 保留其他配置的新对象
+     */
+    public RahaJobConfig withSnapshotId(String newSnapshotId) {
+        return copy(newSnapshotId, samplingConfig, executionInputFingerprint);
+    }
+
+    /**
+     * 创建只覆盖采样参数的任务配置副本。
+     *
+     * @param newSamplingConfig 新采样配置
+     * @return 保留其他配置的新对象
+     */
+    public RahaJobConfig withSamplingConfig(SamplingConfig newSamplingConfig) {
+        if (newSamplingConfig == null) {
+            throw new IllegalArgumentException("任务采样配置不能为空");
+        }
+        return copy(snapshotId, newSamplingConfig, executionInputFingerprint);
+    }
+
+    /**
+     * 创建包含调用级执行输入指纹的任务配置副本。
+     *
+     * <p>该指纹用于区分同一输入快照下的不同训练批次或模型集合，必须进入配置版本和任务幂等语义。</p>
+     *
+     * @param fingerprint 调用级稳定指纹
+     * @return 保留其他配置的新对象
+     */
+    public RahaJobConfig withExecutionInputFingerprint(String fingerprint) {
+        if (fingerprint == null || fingerprint.trim().isEmpty()) {
+            throw new IllegalArgumentException("执行输入指纹不能为空");
+        }
+        return copy(snapshotId, samplingConfig, fingerprint.trim());
+    }
+
     /**
      * 生成用于配置版本计算的规范文本。
      *
@@ -205,6 +271,17 @@ public final class RahaJobConfig {
                 + ConfigTextUtils.token(resourceConfig == null ? null : resourceConfig.toCanonicalString())
                 + ConfigTextUtils.token(failureToleranceConfig == null
                 ? null : failureToleranceConfig.toCanonicalString())
-                + ConfigTextUtils.token(executionConfigFingerprint);
+                + ConfigTextUtils.token(executionConfigFingerprint)
+                + ConfigTextUtils.token(executionInputFingerprint);
+    }
+
+    private RahaJobConfig copy(String newSnapshotId,
+                               SamplingConfig newSamplingConfig,
+                               String newExecutionInputFingerprint) {
+        return new RahaJobConfig(jobType, datasetId, newSnapshotId,
+                inputReference, rowIdentityConfig, randomSeed, strategyConfig,
+                featureConfig, modelConfig, clusteringConfig, newSamplingConfig,
+                resourceConfig, failureToleranceConfig,
+                executionConfigFingerprint, newExecutionInputFingerprint);
     }
 }

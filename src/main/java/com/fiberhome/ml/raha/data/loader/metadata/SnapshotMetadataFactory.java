@@ -15,13 +15,39 @@ public final class SnapshotMetadataFactory {
                                   long rowCount,
                                   int columnCount,
                                   long createdAt) {
+        return create(request, schemaHash, rowCount, columnCount, createdAt,
+                null);
+    }
+
+    /**
+     * 根据平台版本或确定性数据内容指纹创建输入快照元数据。
+     *
+     * @param request 数据加载请求
+     * @param schemaHash 输入模式哈希
+     * @param rowCount 逻辑行数
+     * @param columnCount 业务字段数
+     * @param createdAt 快照创建时间
+     * @param contentFingerprint 无平台来源版本时的数据内容指纹
+     * @return 不可变数据集快照
+     */
+    public DatasetSnapshot create(DataLoadRequest request,
+                                  String schemaHash,
+                                  long rowCount,
+                                  int columnCount,
+                                  long createdAt,
+                                  String contentFingerprint) {
         if (request == null) {
             throw new IllegalArgumentException("数据加载请求不能为空");
         }
         String snapshotId = request.getSnapshotId();
         if (snapshotId == null || snapshotId.trim().isEmpty()) {
-            String sourceVersion = request.getSourceVersion() == null
-                    ? String.valueOf(createdAt) : request.getSourceVersion();
+            String sourceVersion = request.getSourceVersion();
+            if (sourceVersion == null || sourceVersion.trim().isEmpty()) {
+                sourceVersion = contentFingerprint == null
+                        || contentFingerprint.trim().isEmpty()
+                        ? "legacy-read-" + createdAt
+                        : "content-" + contentFingerprint;
+            }
             String source = request.getDatasetId() + "|" + request.getInputReference()
                     + "|" + sourceVersion + "|" + schemaHash + "|" + rowCount;
             snapshotId = "snapshot-" + HashUtils.sha256Hex(source).substring(0, 24);

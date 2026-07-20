@@ -4,6 +4,7 @@ import com.fiberhome.ml.raha.config.dto.ResourceConfig;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
 import com.fiberhome.ml.raha.feature.assembly.FeatureAssemblyResult;
 import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.service.task.MissingModelPolicy;
 import com.fiberhome.ml.raha.util.ValueUtils;
 
 /**
@@ -27,6 +28,10 @@ public final class RahaDetectRequest {
     private final ArtifactVersion artifactVersion;
     /** 列预测并发和阶段超时配置。 */
     private final ResourceConfig resourceConfig;
+    /** 调用方显式选择的不可变模型集合版本，旧入口使用当前发布模型时为空。 */
+    private final String modelSetVersion;
+    /** 字段模型缺失或不兼容时的处理策略。 */
+    private final MissingModelPolicy missingModelPolicy;
 
     public RahaDetectRequest(String jobId,
                              String stageId,
@@ -36,7 +41,8 @@ public final class RahaDetectRequest {
                              String strategyPlanVersion,
                              ArtifactVersion artifactVersion) {
         this(jobId, stageId, configVersion, dataset, features,
-                strategyPlanVersion, artifactVersion, ResourceConfig.defaults());
+                strategyPlanVersion, artifactVersion, ResourceConfig.defaults(),
+                null, MissingModelPolicy.PARTIAL);
     }
 
     public RahaDetectRequest(String jobId,
@@ -47,6 +53,21 @@ public final class RahaDetectRequest {
                              String strategyPlanVersion,
                              ArtifactVersion artifactVersion,
                              ResourceConfig resourceConfig) {
+        this(jobId, stageId, configVersion, dataset, features,
+                strategyPlanVersion, artifactVersion, resourceConfig,
+                null, MissingModelPolicy.PARTIAL);
+    }
+
+    public RahaDetectRequest(String jobId,
+                             String stageId,
+                             String configVersion,
+                             RahaDataset dataset,
+                             FeatureAssemblyResult features,
+                             String strategyPlanVersion,
+                             ArtifactVersion artifactVersion,
+                             ResourceConfig resourceConfig,
+                             String modelSetVersion,
+                             MissingModelPolicy missingModelPolicy) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "检测任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "检测阶段标识");
         this.configVersion = ValueUtils.requireNotBlank(configVersion, "检测配置版本");
@@ -61,6 +82,13 @@ public final class RahaDetectRequest {
         this.features = features;
         this.artifactVersion = artifactVersion;
         this.resourceConfig = resourceConfig;
+        this.modelSetVersion = modelSetVersion == null
+                || modelSetVersion.trim().isEmpty()
+                ? null : modelSetVersion.trim();
+        if (missingModelPolicy == null) {
+            throw new IllegalArgumentException("检测缺失模型策略不能为空");
+        }
+        this.missingModelPolicy = missingModelPolicy;
     }
 
     public String getJobId() { return jobId; }
@@ -71,4 +99,8 @@ public final class RahaDetectRequest {
     public String getStrategyPlanVersion() { return strategyPlanVersion; }
     public ArtifactVersion getArtifactVersion() { return artifactVersion; }
     public ResourceConfig getResourceConfig() { return resourceConfig; }
+    public String getModelSetVersion() { return modelSetVersion; }
+    public MissingModelPolicy getMissingModelPolicy() {
+        return missingModelPolicy;
+    }
 }

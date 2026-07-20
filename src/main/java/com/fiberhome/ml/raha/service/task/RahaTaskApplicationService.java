@@ -24,6 +24,8 @@ public final class RahaTaskApplicationService {
     private final RahaWorkflowRegistry workflowRegistry;
     /** 用于复用任务时查询已有阶段轨迹的仓储。 */
     private final StageRepository stageRepository;
+    /** 可选最小任务请求工厂，默认运行时会自动提供。 */
+    private final RahaTaskRequestFactory requestFactory;
 
     /**
      * 使用默认运行时装配创建任务应用服务。
@@ -38,12 +40,20 @@ public final class RahaTaskApplicationService {
     public RahaTaskApplicationService(RahaJobOrchestrator jobOrchestrator,
                                       RahaWorkflowRegistry workflowRegistry,
                                       StageRepository stageRepository) {
+        this(jobOrchestrator, workflowRegistry, stageRepository, null);
+    }
+
+    public RahaTaskApplicationService(RahaJobOrchestrator jobOrchestrator,
+                                      RahaWorkflowRegistry workflowRegistry,
+                                      StageRepository stageRepository,
+                                      RahaTaskRequestFactory requestFactory) {
         if (jobOrchestrator == null || workflowRegistry == null || stageRepository == null) {
             throw new IllegalArgumentException("统一任务应用服务依赖不能为空");
         }
         this.jobOrchestrator = jobOrchestrator;
         this.workflowRegistry = workflowRegistry;
         this.stageRepository = stageRepository;
+        this.requestFactory = requestFactory;
     }
 
     /**
@@ -54,7 +64,19 @@ public final class RahaTaskApplicationService {
     RahaTaskApplicationService(
             RahaTaskApplicationServiceFactory.DefaultComponents components) {
         this(components.getJobOrchestrator(), components.getWorkflowRegistry(),
-                components.getStageRepository());
+                components.getStageRepository(), components.getRequestFactory());
+    }
+
+    /**
+     * 获取与当前默认运行时共享仓储的最小请求工厂。
+     *
+     * @return 可创建采样、训练和检测最小请求的工厂
+     */
+    public RahaTaskRequestFactory getRequestFactory() {
+        if (requestFactory == null) {
+            throw new IllegalStateException("当前手工装配服务未提供最小任务请求工厂");
+        }
+        return requestFactory;
     }
 
     /**

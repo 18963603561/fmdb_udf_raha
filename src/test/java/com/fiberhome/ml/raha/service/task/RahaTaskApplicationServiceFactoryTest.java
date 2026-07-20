@@ -61,6 +61,7 @@ class RahaTaskApplicationServiceFactoryTest {
                         RahaStorageMode.IN_MEMORY);
 
         assertNotNull(service);
+        assertNotNull(service.getRequestFactory());
     }
 
     @Test

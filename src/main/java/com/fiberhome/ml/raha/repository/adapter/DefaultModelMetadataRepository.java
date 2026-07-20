@@ -47,6 +47,14 @@ public final class DefaultModelMetadataRepository implements ModelMetadataReposi
                                 partition(model.getDatasetId(), model.getColumnName()),
                                 model.getModelVersion()),
                         version, model, updatedAt));
+                transactionRepository.save(new RepositoryRecord<RahaColumnModel>(
+                        new RepositoryKey(RepositoryNamespace.MODEL_SET,
+                                model.getModelSetVersion(),
+                                model.getColumnName().length() + ":"
+                                        + model.getColumnName()
+                                        + model.getModelVersion().length() + ":"
+                                        + model.getModelVersion()),
+                        version, model, updatedAt));
             }
         });
     }
@@ -79,6 +87,23 @@ public final class DefaultModelMetadataRepository implements ModelMetadataReposi
         Collections.sort(models, Comparator.comparingLong(RahaColumnModel::getCreatedAt)
                 .thenComparing(RahaColumnModel::getModelVersion));
         return Collections.unmodifiableList(models);
+    }
+
+    @Override
+    public List<RahaColumnModel> findByModelSetVersion(String modelSetVersion) {
+        List<RepositoryRecord<RahaColumnModel>> records =
+                repository.findByPartition(RepositoryNamespace.MODEL_SET,
+                        ValueUtils.requireNotBlank(modelSetVersion, "模型集合版本"),
+                        RahaColumnModel.class);
+        List<RahaColumnModel> result =
+                new ArrayList<RahaColumnModel>(records.size());
+        for (RepositoryRecord<RahaColumnModel> record : records) {
+            result.add(record.getPayload());
+        }
+        Collections.sort(result, Comparator.comparing(
+                RahaColumnModel::getColumnName)
+                .thenComparing(RahaColumnModel::getModelVersion));
+        return Collections.unmodifiableList(result);
     }
 
     @Override

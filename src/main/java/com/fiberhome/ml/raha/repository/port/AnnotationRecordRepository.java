@@ -21,6 +21,21 @@ public interface AnnotationRecordRepository {
                                                   String sampleBatchId);
 
     /**
+     * 按全局采样批次标识选择最新可用于训练的标注批次。
+     *
+     * <p>默认实现用于兼容不支持全局索引的测试仓储；生产 FMDB 适配器必须覆盖该方法。</p>
+     *
+     * @param sampleBatchId 全局唯一采样批次标识
+     * @param allowPartial 是否允许部分成功导入批次
+     * @return 最新符合状态规则的标注批次
+     */
+    default Optional<AnnotationBatch> findLatestTrainableForSample(
+            String sampleBatchId,
+            boolean allowPartial) {
+        return Optional.empty();
+    }
+
+    /**
      * 判断同一采样批次的相同上传文件是否已经成功入库。
      *
      * @param datasetId 数据集标识

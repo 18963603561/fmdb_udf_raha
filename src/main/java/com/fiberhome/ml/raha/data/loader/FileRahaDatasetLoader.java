@@ -9,6 +9,7 @@ import com.fiberhome.ml.raha.data.loader.identity.RowIdValidator;
 import com.fiberhome.ml.raha.data.loader.metadata.ColumnMetadataFactory;
 import com.fiberhome.ml.raha.data.loader.metadata.SchemaHasher;
 import com.fiberhome.ml.raha.data.loader.metadata.SnapshotMetadataFactory;
+import com.fiberhome.ml.raha.data.loader.metadata.DatasetContentFingerprinter;
 import com.fiberhome.ml.raha.data.loader.validation.DataValidationErrorCode;
 import com.fiberhome.ml.raha.data.loader.validation.DataValidationException;
 import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
@@ -94,8 +95,11 @@ public final class FileRahaDatasetLoader implements RahaDatasetLoader {
             Dataset<Row> dataFrame = identity.getDataFrame();
             RowIdValidationResult rowIdResult = rowIdValidator.validate(
                     dataFrame, RowIdentityColumns.ROW_ID);
+            String contentFingerprint = requiresContentFingerprint(request)
+                    ? new DatasetContentFingerprinter().fingerprint(dataFrame) : null;
             DatasetSnapshot snapshot = snapshotMetadataFactory.create(request, schemaHash,
-                    rowIdResult.getRowCount(), columns.size(), clock.millis());
+                    rowIdResult.getRowCount(), columns.size(), clock.millis(),
+                    contentFingerprint);
             RahaDataset dataset = new RahaDataset(request.getDatasetId(), snapshot.getSnapshotId(),
                     request.getTableName(), RowIdentityColumns.ROW_ID, columns, dataFrame,
                     schemaHash, Collections.emptyMap());
@@ -116,5 +120,12 @@ public final class FileRahaDatasetLoader implements RahaDatasetLoader {
             throw new DataValidationException(DataValidationErrorCode.DATA_LOAD_FAILED,
                     "外部文件数据读取失败", exception);
         }
+    }
+
+    private static boolean requiresContentFingerprint(DataLoadRequest request) {
+        return (request.getSnapshotId() == null
+                || request.getSnapshotId().trim().isEmpty())
+                && (request.getSourceVersion() == null
+                || request.getSourceVersion().trim().isEmpty());
     }
 }

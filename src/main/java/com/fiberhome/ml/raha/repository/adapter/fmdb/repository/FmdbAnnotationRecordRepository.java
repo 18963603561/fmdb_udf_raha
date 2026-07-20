@@ -188,6 +188,49 @@ public final class FmdbAnnotationRecordRepository
     }
 
     @Override
+    public Optional<AnnotationBatch> findLatestTrainableForSample(
+            String sampleBatchId,
+            boolean allowPartial) {
+        String sample = ValueUtils.requireNotBlank(
+                sampleBatchId, "全局采样批次标识");
+        if (!tableGateway.tableExists(tableName)) {
+            return Optional.empty();
+        }
+        org.apache.spark.sql.Column status = functions.col("batch_status")
+                .equalTo(AnnotationBatchStatus.IMPORTED.name());
+        if (allowPartial) {
+            status = status.or(functions.col("batch_status")
+                    .equalTo(AnnotationBatchStatus.PARTIAL.name()));
+        }
+        LOGGER.debug("开始定位训练可用标注批次，sampleBatchId={}，allowPartial={}",
+                sample, allowPartial);
+        List<Row> locations = tableGateway.read(tableName,
+                Arrays.asList("dataset_id", "partition_month",
+                        "annotation_batch_id", "annotated_at"),
+                functions.col("sample_batch_id").equalTo(sample).and(status))
+                .orderBy(functions.col("annotated_at").desc(),
+                        functions.col("annotation_batch_id").desc())
+                .collectAsList();
+        if (locations.isEmpty()) {
+            return Optional.empty();
+        }
+        Row latest = locations.get(0);
+        String datasetId = latest.getAs("dataset_id");
+        String month = latest.getAs("partition_month");
+        String annotationBatchId = latest.getAs("annotation_batch_id");
+        for (Row row : locations) {
+            if (!datasetId.equals(row.getAs("dataset_id"))) {
+                throw new IllegalStateException("采样批次跨多个数据集存在标注：" + sample);
+            }
+        }
+        rawValueAccessPolicy.requireRead(datasetId, "读取训练标注批次原始行");
+        LOGGER.debug("训练标注批次定位完成，sampleBatchId={}，"
+                        + "annotationBatchId={}，partitionMonth={}", sample,
+                annotationBatchId, month);
+        return find(datasetId, month, annotationBatchId);
+    }
+
+    @Override
     public boolean existsImportFingerprint(String datasetId,
                                            String sampleBatchId,
                                            String importFingerprint) {

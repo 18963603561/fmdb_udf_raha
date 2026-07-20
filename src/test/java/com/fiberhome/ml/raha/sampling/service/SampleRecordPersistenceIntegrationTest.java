@@ -3,6 +3,7 @@ package com.fiberhome.ml.raha.sampling.service;
 import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
+import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityResult;
@@ -14,6 +15,7 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
 import com.fiberhome.ml.raha.sampling.domain.SampleBatch;
+import com.fiberhome.ml.raha.sampling.domain.SampleRecord;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import java.time.Clock;
 import java.time.Instant;
@@ -67,10 +69,10 @@ class SampleRecordPersistenceIntegrationTest {
 
         SampleMaterializationResult first = service.materializeAndPersist(
                 fixture.dataset, fixture.snapshot, fixture.identityConfig,
-                fixture.sampling);
+                DataFormat.FMDB_TABLE, fixture.sampling);
         SampleMaterializationResult repeated = service.materializeAndPersist(
                 fixture.dataset, fixture.snapshot, fixture.identityConfig,
-                fixture.sampling);
+                DataFormat.FMDB_TABLE, fixture.sampling);
         FmdbSampleRecordRepository restarted = new FmdbSampleRecordRepository(
                 SparkTestSession.get(), gateway, config);
         SampleBatch loaded = restarted.find(fixture.dataset.getDatasetId(),
@@ -95,6 +97,8 @@ class SampleRecordPersistenceIntegrationTest {
         assertNotNull(loaded.getRecords().get(0).getColumnSchema().get("columns"));
         assertEquals(fixture.dataset.getSchemaHash(),
                 loaded.getRecords().get(0).getSchemaHash());
+        assertEquals(DataFormat.FMDB_TABLE.name(), loaded.getRecords().get(0)
+                .getSamplingContext().get(SampleRecord.SOURCE_TYPE_CONTEXT_KEY));
         Map<String, String> expectedHashes = new LinkedHashMap<String, String>();
         for (Row row : fixture.dataset.getDataFrame().select(
                 RowIdentityColumns.ROW_ID,

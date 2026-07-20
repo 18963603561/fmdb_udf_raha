@@ -43,6 +43,20 @@ public final class SamplingConfig {
         return RahaDefaultConfigProvider.factory().samplingConfig();
     }
 
+    /**
+     * 创建只覆盖标注预算的采样配置副本。
+     *
+     * @param newLabelingBudget 新标注预算，必须大于零
+     * @return 保留其他运行参数的新配置
+     */
+    public SamplingConfig withLabelingBudget(int newLabelingBudget) {
+        if (newLabelingBudget <= 0) {
+            throw new IllegalArgumentException("标注预算必须大于零");
+        }
+        return new SamplingConfig(newLabelingBudget, clusteringBasedSampling,
+                reviewEnabled, taskTtlMillis, coverageScoreExponentCap);
+    }
+
     public int getLabelingBudget() {
         return labelingBudget;
     }

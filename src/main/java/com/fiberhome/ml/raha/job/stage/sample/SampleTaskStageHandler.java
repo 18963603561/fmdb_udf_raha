@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.job.stage.sample;
 
+import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.job.stage.core.ServiceStageResultMapper;
 import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
@@ -42,9 +43,20 @@ public final class SampleTaskStageHandler implements StageHandler {
     private final int samplingRound;
     /** 工作流调用方已经持有的标签。 */
     private final List<CellLabel> initialLabels;
+    /** 采样输入的明确来源类型，旧手工装配入口允许为空。 */
+    private final DataFormat sourceType;
 
     public SampleTaskStageHandler(RahaSampleService sampleService,
                                   SampleRecordService sampleRecordService,
+                                  int samplingRound,
+                                  List<CellLabel> initialLabels) {
+        this(sampleService, sampleRecordService, null, samplingRound,
+                initialLabels);
+    }
+
+    public SampleTaskStageHandler(RahaSampleService sampleService,
+                                  SampleRecordService sampleRecordService,
+                                  DataFormat sourceType,
                                   int samplingRound,
                                   List<CellLabel> initialLabels) {
         if (sampleService == null || sampleRecordService == null
@@ -56,6 +68,7 @@ public final class SampleTaskStageHandler implements StageHandler {
         }
         this.sampleService = sampleService;
         this.sampleRecordService = sampleRecordService;
+        this.sourceType = sourceType;
         this.samplingRound = samplingRound;
         this.initialLabels = Collections.unmodifiableList(
                 new ArrayList<CellLabel>(initialLabels));
@@ -125,6 +138,7 @@ public final class SampleTaskStageHandler implements StageHandler {
                             (RahaDataset) datasetValue,
                             (DatasetSnapshot) snapshotValue,
                             context.getConfig().getRowIdentityConfig(),
+                            sourceType,
                             result.getPayload().getSampling());
             // 首个可用闭环要求采样成功时 c1 已真实入库，关闭表开关不能伪造成功。
             if (!materialized.isPersisted()) {

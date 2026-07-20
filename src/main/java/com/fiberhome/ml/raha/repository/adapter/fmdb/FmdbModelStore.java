@@ -102,6 +102,14 @@ public final class FmdbModelStore implements ColumnModelStore {
         payload.put("intercept", artifact.getIntercept());
         payload.put("modelName", artifact.getModelName());
         payload.put("trainingMode", artifact.getTrainingMode());
+        payload.put("rowIdentityMode",
+                context.getRowIdentityConfig().getMode().name());
+        payload.put("rowKeyColumns",
+                context.getRowIdentityConfig().getKeyColumns());
+        payload.put("rowFingerprintAlgorithm",
+                context.getRowIdentityConfig().getFingerprintAlgorithm().name());
+        payload.put("rowFingerprintVersion",
+                context.getRowIdentityConfig().getNormalizationVersion());
         Map<String, Object> values = new LinkedHashMap<String, Object>();
         values.put("model_set_version", context.getModelSetVersion());
         values.put("dataset_id", context.getDatasetId());

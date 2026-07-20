@@ -108,9 +108,7 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
             }
             // 合并必须紧随数据加载，确保画像及全部训练派生产物只处理新快照。
             handlers.add(1, new TrainingInputMergeStageHandler(inputMergeService,
-                    request.getSampleBatchId(), request.getSamplePartitionMonth(),
-                    request.getAnnotationBatchId(),
-                    request.getAnnotationPartitionMonth(),
+                    request.getTrainingBatchReferences(),
                     request.getRowIdentityConfig()));
         }
         handlers.add(new ClusterStageHandler(clusteringService));

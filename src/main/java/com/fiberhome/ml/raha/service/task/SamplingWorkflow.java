@@ -78,6 +78,7 @@ public final class SamplingWorkflow extends AbstractRahaWorkflow {
         List<StageHandler> handlers = preparationStages(request);
         handlers.add(new ClusterStageHandler(clusteringService));
         handlers.add(new SampleTaskStageHandler(sampleService, sampleRecordService,
+                request.getDataLoadRequest().getFormat(),
                 request.getSamplingRound(), request.getLabels()));
         handlers.add(new ResultPersistenceStageHandler(
                 StageAttributeKeys.SAMPLE_SERVICE_RESULT,

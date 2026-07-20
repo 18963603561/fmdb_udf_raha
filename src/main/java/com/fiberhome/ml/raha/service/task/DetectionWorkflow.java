@@ -62,7 +62,8 @@ public final class DetectionWorkflow extends AbstractRahaWorkflow {
             throw new IllegalArgumentException("检测工作流请求类型不匹配");
         }
         List<StageHandler> handlers = preparationStages(request);
-        handlers.add(new PublishedModelDetectionStageHandler(detectService));
+        handlers.add(new PublishedModelDetectionStageHandler(detectService,
+                request.getModelSetVersion(), request.getMissingModelPolicy()));
         if (request.getEvaluator() != null) {
             handlers.add(new EvaluationStageHandler(request.getEvaluator()));
         }

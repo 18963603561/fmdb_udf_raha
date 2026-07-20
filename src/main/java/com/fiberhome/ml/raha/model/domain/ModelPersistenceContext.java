@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.model.domain;
 
 import com.fiberhome.ml.raha.data.type.ModelStatus;
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -31,6 +32,8 @@ public final class ModelPersistenceContext {
     private final long createdAt;
     /** 首次发布时间，未发布时为空。 */
     private final Long publishedAt;
+    /** 模型集合继承的行身份规则。 */
+    private final RowIdentityConfig rowIdentityConfig;
 
     public ModelPersistenceContext(String modelSetVersion,
                                    String datasetId,
@@ -43,7 +46,7 @@ public final class ModelPersistenceContext {
                                    Long publishedAt) {
         this(modelSetVersion, datasetId, "unknown", trainingBatchId, status,
                 strategyPlanVersion, mergeAlgorithmVersion, metrics, createdAt,
-                publishedAt);
+                publishedAt, RowIdentityConfig.contentHash());
     }
 
     public ModelPersistenceContext(String modelSetVersion,
@@ -56,6 +59,22 @@ public final class ModelPersistenceContext {
                                    Map<String, Double> metrics,
                                    long createdAt,
                                    Long publishedAt) {
+        this(modelSetVersion, datasetId, schemaHash, trainingBatchId, status,
+                strategyPlanVersion, mergeAlgorithmVersion, metrics, createdAt,
+                publishedAt, RowIdentityConfig.contentHash());
+    }
+
+    public ModelPersistenceContext(String modelSetVersion,
+                                   String datasetId,
+                                   String schemaHash,
+                                   String trainingBatchId,
+                                   ModelStatus status,
+                                   String strategyPlanVersion,
+                                   String mergeAlgorithmVersion,
+                                   Map<String, Double> metrics,
+                                   long createdAt,
+                                   Long publishedAt,
+                                   RowIdentityConfig rowIdentityConfig) {
         this.modelSetVersion = ValueUtils.requireNotBlank(
                 modelSetVersion, "模型集合版本");
         this.datasetId = ValueUtils.requireNotBlank(datasetId, "模型数据集标识");
@@ -79,6 +98,10 @@ public final class ModelPersistenceContext {
                 new LinkedHashMap<String, Double>(metrics));
         this.createdAt = createdAt;
         this.publishedAt = publishedAt;
+        if (rowIdentityConfig == null) {
+            throw new IllegalArgumentException("模型集合行身份规则不能为空");
+        }
+        this.rowIdentityConfig = rowIdentityConfig;
     }
 
     public String getModelSetVersion() { return modelSetVersion; }
@@ -91,4 +114,5 @@ public final class ModelPersistenceContext {
     public Map<String, Double> getMetrics() { return metrics; }
     public long getCreatedAt() { return createdAt; }
     public Long getPublishedAt() { return publishedAt; }
+    public RowIdentityConfig getRowIdentityConfig() { return rowIdentityConfig; }
 }

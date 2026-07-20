@@ -85,8 +85,10 @@ public final class RahaDetectService {
             throw new IllegalArgumentException("检测服务请求不能为空");
         }
         long startedAt = clock.millis();
-        LOGGER.info("开始 Raha 已发布模型检测，jobId={}，datasetId={}，columnCount={}",
+        LOGGER.info("开始 Raha 已发布模型检测，jobId={}，datasetId={}，"
+                        + "modelSetVersion={}，columnCount={}",
                 request.getJobId(), request.getDataset().getDatasetId(),
+                request.getModelSetVersion(),
                 request.getFeatures().getDictionaries().size());
         List<DetectionResult> results = new ArrayList<DetectionResult>();
         Map<String, String> modelVersions = new LinkedHashMap<String, String>();
@@ -115,12 +117,6 @@ public final class RahaDetectService {
                 failedColumns.put(columnName, failure == null
                         ? "RuntimeException" : failure.getErrorType());
             }
-            if (!results.isEmpty()) {
-                repository.saveAll(new DetectionResultSaveContext(
-                                request.getJobId(), request.getDataset(),
-                                modelVersions.values()), results,
-                        request.getArtifactVersion(), clock.millis());
-            }
             RahaDetectOutput output = new RahaDetectOutput(
                     results, modelVersions, failedColumns);
             JobStatus status;
@@ -130,6 +126,12 @@ public final class RahaDetectService {
                 status = JobStatus.FAILED;
                 errorCode = "NO_PUBLISHED_MODEL_RESULT";
                 errorMessage = "没有字段完成已发布模型检测";
+            } else if (!failedColumns.isEmpty()
+                    && request.getMissingModelPolicy()
+                    == com.fiberhome.ml.raha.service.task.MissingModelPolicy.FAIL) {
+                status = JobStatus.FAILED;
+                errorCode = "MODEL_SET_INCOMPLETE";
+                errorMessage = "指定模型集合存在缺失或不兼容字段";
             } else if (!failedColumns.isEmpty()) {
                 status = JobStatus.PARTIAL_SUCCESS;
                 errorCode = "PARTIAL_DETECTION_FAILURE";
@@ -137,9 +139,18 @@ public final class RahaDetectService {
             } else {
                 status = JobStatus.SUCCEEDED;
             }
+            if (!results.isEmpty() && status != JobStatus.FAILED) {
+                repository.saveAll(new DetectionResultSaveContext(
+                                request.getJobId(), request.getDataset(),
+                                request.getModelSetVersion(),
+                                modelVersions.values()), results,
+                        request.getArtifactVersion(), clock.millis());
+            }
             Map<String, String> details = new LinkedHashMap<String, String>();
             details.put("detectedCellCount", String.valueOf(results.size()));
             details.put("modelVersions", modelVersions.toString());
+            details.put("modelSetVersion", String.valueOf(
+                    request.getModelSetVersion()));
             details.put("scoreDiagnostics", scoreDiagnostics(results));
             details.put("maxObservedColumnConcurrency",
                     String.valueOf(parallel.getMaxObservedConcurrency()));
@@ -168,7 +179,11 @@ public final class RahaDetectService {
     private DetectColumnOutcome detectColumn(RahaDetectRequest request,
                                              String columnName,
                                              FeatureDictionary dictionary) {
-        ColumnModelArtifact model = modelLoader.load(
+        ColumnModelArtifact model = request.getModelSetVersion() == null
+                ? modelLoader.load(request.getDataset().getDatasetId(), columnName,
+                request.getDataset().getSchemaHash(), dictionary.getVersion(),
+                request.getStrategyPlanVersion())
+                : modelLoader.load(request.getModelSetVersion(),
                 request.getDataset().getDatasetId(), columnName,
                 request.getDataset().getSchemaHash(), dictionary.getVersion(),
                 request.getStrategyPlanVersion());

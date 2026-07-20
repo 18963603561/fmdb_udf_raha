@@ -1,5 +1,6 @@
 package com.fiberhome.ml.raha.fmdb;
 
+import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.data.type.JobType;
@@ -50,15 +51,18 @@ class FmdbRuntimeRepositoryIntegrationTest {
                 "model-v1", "value", ClassifierType.LOGISTIC_REGRESSION,
                 "dict-v1", 1, 0.5d, 0.1d,
                 Collections.singletonMap(0, 1.0d), "SPARK_MLLIB");
+        RowIdentityConfig identity = RowIdentityConfig.sourceKey("order_id");
         String path = store.save(artifact, new ModelPersistenceContext(
                 "model-set-v1", "dataset-1", "schema-v1", "training-1",
                 ModelStatus.CANDIDATE, "strategy-v1", "merge-v1",
-                Collections.singletonMap("accuracy", 1.0d), 2000L, null));
+                Collections.singletonMap("accuracy", 1.0d), 2000L, null,
+                identity));
         RahaColumnModel candidate = new RahaColumnModel("value-model", "model-v1",
                 "dataset-1", "value", "schema-v1",
                 ClassifierType.LOGISTIC_REGRESSION, "dict-v1", "strategy-v1",
                 0.5d, path, ModelStatus.CANDIDATE,
-                Collections.singletonMap("accuracy", 1.0d), 2000L);
+                Collections.singletonMap("accuracy", 1.0d), 2000L, null,
+                "model-set-v1", identity);
         ArtifactVersion version = new ArtifactVersion("config-v1", "snapshot-v1",
                 "stage-v1", 1);
         FmdbModelMetadataRepository first = new FmdbModelMetadataRepository(
@@ -70,6 +74,11 @@ class FmdbRuntimeRepositoryIntegrationTest {
         RahaColumnModel restored = restarted.find("dataset-1", "value", "model-v1")
                 .orElseThrow(() -> new AssertionError("候选模型未恢复"));
         assertEquals(ModelStatus.CANDIDATE, restored.getStatus());
+        assertEquals("model-set-v1", restored.getModelSetVersion());
+        assertEquals(Collections.singletonList("order_id"),
+                restored.getRowIdentityConfig().getKeyColumns());
+        assertEquals(1, restarted.findByModelSetVersion(
+                "model-set-v1").size());
         RahaColumnModel published = restored.withStatus(ModelStatus.PUBLISHED, 3000L);
         restarted.saveAll(Collections.singletonList(published), version, 3000L);
 

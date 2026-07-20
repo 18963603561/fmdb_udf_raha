@@ -13,6 +13,7 @@ import com.fiberhome.ml.raha.service.common.RahaServiceResult;
 import com.fiberhome.ml.raha.service.detect.RahaDetectOutput;
 import com.fiberhome.ml.raha.service.detect.RahaDetectRequest;
 import com.fiberhome.ml.raha.service.detect.RahaDetectService;
+import com.fiberhome.ml.raha.service.task.MissingModelPolicy;
 
 /**
  * 加载兼容的已发布列模型并执行生产预测。
@@ -21,12 +22,28 @@ public final class PublishedModelDetectionStageHandler implements StageHandler {
 
     /** 已发布模型检测服务。 */
     private final RahaDetectService detectService;
+    /** 调用方显式选择的模型集合版本。 */
+    private final String modelSetVersion;
+    /** 字段模型缺失或不兼容时的处理策略。 */
+    private final MissingModelPolicy missingModelPolicy;
 
     public PublishedModelDetectionStageHandler(RahaDetectService detectService) {
+        this(detectService, null, MissingModelPolicy.PARTIAL);
+    }
+
+    public PublishedModelDetectionStageHandler(
+            RahaDetectService detectService,
+            String modelSetVersion,
+            MissingModelPolicy missingModelPolicy) {
         if (detectService == null) {
             throw new IllegalArgumentException("已发布模型检测服务不能为空");
         }
+        if (missingModelPolicy == null) {
+            throw new IllegalArgumentException("检测缺失模型策略不能为空");
+        }
         this.detectService = detectService;
+        this.modelSetVersion = modelSetVersion;
+        this.missingModelPolicy = missingModelPolicy;
     }
 
     @Override
@@ -55,7 +72,8 @@ public final class PublishedModelDetectionStageHandler implements StageHandler {
                         context.getStage().getStageId(), context.getJob().getConfigVersion(),
                         (RahaDataset) datasetValue, (FeatureAssemblyResult) featureValue,
                         (String) planVersionValue, version,
-                        context.getConfig().getResourceConfig()));
+                        context.getConfig().getResourceConfig(),
+                        modelSetVersion, missingModelPolicy));
         context.getAttributes().put(StageAttributeKeys.DETECT_SERVICE_RESULT, result);
         if (result.getPayload() != null) {
             context.getAttributes().put(StageAttributeKeys.DETECT_OUTPUT, result.getPayload());

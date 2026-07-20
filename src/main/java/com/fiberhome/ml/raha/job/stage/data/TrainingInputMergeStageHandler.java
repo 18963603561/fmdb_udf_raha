@@ -8,8 +8,12 @@ import com.fiberhome.ml.raha.job.stage.core.StageExecutionContext;
 import com.fiberhome.ml.raha.job.stage.core.StageHandler;
 import com.fiberhome.ml.raha.job.stage.core.StageResult;
 import com.fiberhome.ml.raha.service.train.TrainingInputMergeService;
+import com.fiberhome.ml.raha.service.train.TrainingBatchReference;
 import com.fiberhome.ml.raha.service.train.TrainingMergeRequest;
 import com.fiberhome.ml.raha.service.train.TrainingMergeResult;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 在画像之前把持久化 c1 和标注批次合并进当前 o1，并替换后续训练输入。
@@ -18,14 +22,8 @@ public final class TrainingInputMergeStageHandler implements StageHandler {
 
     /** c1、标注批次和 o1 合并服务。 */
     private final TrainingInputMergeService mergeService;
-    /** c1 采样批次标识。 */
-    private final String sampleBatchId;
-    /** c1 采样月分区。 */
-    private final String samplePartitionMonth;
-    /** 标注批次标识。 */
-    private final String annotationBatchId;
-    /** 标注月分区。 */
-    private final String annotationPartitionMonth;
+    /** 一个或多个已经解析完成的采样和标注批次引用。 */
+    private final List<TrainingBatchReference> batchReferences;
     /** c1 和 o1 共用的行身份配置。 */
     private final RowIdentityConfig rowIdentityConfig;
 
@@ -36,16 +34,23 @@ public final class TrainingInputMergeStageHandler implements StageHandler {
             String annotationBatchId,
             String annotationPartitionMonth,
             RowIdentityConfig rowIdentityConfig) {
-        if (mergeService == null || sampleBatchId == null
-                || samplePartitionMonth == null || annotationBatchId == null
-                || annotationPartitionMonth == null || rowIdentityConfig == null) {
+        this(mergeService, Collections.singletonList(
+                new TrainingBatchReference(sampleBatchId, samplePartitionMonth,
+                        annotationBatchId, annotationPartitionMonth)),
+                rowIdentityConfig);
+    }
+
+    public TrainingInputMergeStageHandler(
+            TrainingInputMergeService mergeService,
+            List<TrainingBatchReference> batchReferences,
+            RowIdentityConfig rowIdentityConfig) {
+        if (mergeService == null || batchReferences == null
+                || batchReferences.isEmpty() || rowIdentityConfig == null) {
             throw new IllegalArgumentException("训练合并阶段依赖和批次引用不能为空");
         }
         this.mergeService = mergeService;
-        this.sampleBatchId = sampleBatchId;
-        this.samplePartitionMonth = samplePartitionMonth;
-        this.annotationBatchId = annotationBatchId;
-        this.annotationPartitionMonth = annotationPartitionMonth;
+        this.batchReferences = Collections.unmodifiableList(
+                new ArrayList<TrainingBatchReference>(batchReferences));
         this.rowIdentityConfig = rowIdentityConfig;
     }
 
@@ -63,8 +68,7 @@ public final class TrainingInputMergeStageHandler implements StageHandler {
         }
         TrainingMergeResult result = mergeService.merge(new TrainingMergeRequest(
                 context.getJob().getJobId(), (RahaDataset) value, rowIdentityConfig,
-                sampleBatchId, samplePartitionMonth, annotationBatchId,
-                annotationPartitionMonth, context.getConfig().getResourceConfig()
+                batchReferences, context.getConfig().getResourceConfig()
                         .getBroadcastThresholdBytes()));
         context.getAttributes().put(StageAttributeKeys.RAHA_DATASET,
                 result.getDataset());

@@ -91,6 +91,9 @@ class ModelLifecycleIntegrationTest {
         secondManager.markCandidate(second, version("candidate-second"));
         secondManager.publish("dataset", "code", second.getModelVersion(),
                 version("publish-second"));
+        assertEquals(first.getModelVersion(), loader.load(
+                first.getModelSetVersion(), "dataset", "code", "schema-v1",
+                "dictionary-v1", "plan-v1").getModelVersion());
 
         RahaColumnModel storedSecond = repository.find(
                 "dataset", "code", second.getModelVersion()).get();

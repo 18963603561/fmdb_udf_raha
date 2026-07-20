@@ -14,6 +14,9 @@ import java.util.Map;
  */
 public final class SampleRecord {
 
+    /** 采样上下文中保存明确输入来源类型的字段名。 */
+    public static final String SOURCE_TYPE_CONTEXT_KEY = "sourceType";
+
     /** 采样批次标识。 */
     private final String sampleBatchId;
     /** 数据集标识。 */

@@ -470,11 +470,13 @@ public final class RahaTrainService {
                 request.getTrainingMergeResult() == null ? request.getJobId()
                         : request.getTrainingMergeResult().getTrainingBatchId(),
                 ModelStatus.CANDIDATE, planVersion,
-                "direct-input-v1", trainingResult.getMetrics(), clock.millis(), null);
+                "direct-input-v1", trainingResult.getMetrics(), clock.millis(), null,
+                request.getConfig().getRowIdentityConfig());
         String modelPath = modelStore.save(
                 trainingResult.getArtifact(), persistenceContext);
         RahaColumnModel draft = metadataFactory.create(
-                trainingRequest, trainingResult, modelPath);
+                trainingRequest, trainingResult, modelPath, modelSetVersion,
+                request.getConfig().getRowIdentityConfig());
         RahaColumnModel candidate = releaseManager.markCandidate(
                 draft, request.getArtifactVersion());
         return new ColumnTrainingOutcome(trainingResult, candidate);

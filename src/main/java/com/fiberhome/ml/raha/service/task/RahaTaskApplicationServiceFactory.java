@@ -47,6 +47,7 @@ import com.fiberhome.ml.raha.repository.adapter.DefaultDetectionResultRepository
 import com.fiberhome.ml.raha.repository.adapter.DefaultFeatureRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultJobRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultModelMetadataRepository;
+import com.fiberhome.ml.raha.repository.adapter.DefaultModelSetRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultStageRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultStrategyRepository;
 import com.fiberhome.ml.raha.repository.adapter.InMemoryRahaRepository;
@@ -74,6 +75,7 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.repository.core.RahaRepository;
 import com.fiberhome.ml.raha.repository.port.AnnotationTaskRepository;
+import com.fiberhome.ml.raha.repository.port.AnnotationRecordRepository;
 import com.fiberhome.ml.raha.repository.port.CellLabelRepository;
 import com.fiberhome.ml.raha.repository.port.ClusterRepository;
 import com.fiberhome.ml.raha.repository.port.ColumnProfileRepository;
@@ -81,6 +83,8 @@ import com.fiberhome.ml.raha.repository.port.DetectionResultRepository;
 import com.fiberhome.ml.raha.repository.port.FeatureRepository;
 import com.fiberhome.ml.raha.repository.port.JobRepository;
 import com.fiberhome.ml.raha.repository.port.ModelMetadataRepository;
+import com.fiberhome.ml.raha.repository.port.ModelSetRepository;
+import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
 import com.fiberhome.ml.raha.repository.port.StageRepository;
 import com.fiberhome.ml.raha.repository.port.StrategyRepository;
 import com.fiberhome.ml.raha.sampling.ClusterCoverageScorer;
@@ -408,7 +412,7 @@ public final class RahaTaskApplicationServiceFactory {
         LOGGER.info("Raha 默认运行时创建完成，storageMode={}，workflowCount={}",
                 storageMode, 3);
         return new DefaultComponents(orchestrator, workflowRegistry,
-                runtimeRepositories);
+                runtimeRepositories, taskServices.getRequestFactory());
     }
 
     /**
@@ -587,10 +591,21 @@ public final class RahaTaskApplicationServiceFactory {
             PreparationServices preparationServices) {
         ModelMetadataRepository modelMetadataRepository = modelMetadataRepository(
                 sparkSession, storageMode, infrastructure, repository);
+        SampleRecordRepository sampleRecordRepository =
+                new FmdbSampleRecordRepository(sparkSession,
+                        infrastructure.getTableGateway(),
+                        infrastructure.getPersistenceConfig());
+        AnnotationRecordRepository annotationRecordRepository =
+                new FmdbAnnotationRecordRepository(sparkSession,
+                        infrastructure.getTableGateway(),
+                        infrastructure.getPersistenceConfig());
+        ModelSetRepository modelSetRepository = new DefaultModelSetRepository(
+                modelMetadataRepository);
         ColumnModelStore modelStore = modelStore(sparkSession, modelDirectory,
                 storageMode, infrastructure);
         TrainingInputMergeService inputMergeService = trainingInputMergeService(
-                sparkSession, storageMode, infrastructure);
+                sparkSession, sampleRecordRepository,
+                annotationRecordRepository, infrastructure.getClock());
         TrainingArtifactMaterializationService materializationService =
                 trainingArtifactMaterializationService(sparkSession, storageMode,
                         infrastructure);
@@ -598,14 +613,18 @@ public final class RahaTaskApplicationServiceFactory {
                 modelMetadataRepository, preparationServices,
                 inputMergeService, materializationService, infrastructure.getClock());
         SampleRecordService sampleRecordService = sampleRecordService(
-                sparkSession, infrastructure);
+                sampleRecordRepository, infrastructure.getClock());
         RahaSampleService sampleService = sampleService(repository,
                 preparationServices, infrastructure.getClock());
         RahaDetectService detectService = detectService(modelMetadataRepository,
                 modelStore, runtimeRepositories.getDetectionResultRepository(),
                 infrastructure.getClock());
+        RahaTaskRequestFactory requestFactory = new RahaTaskRequestFactory(
+                RahaDefaultConfigProvider.factory(), sampleRecordRepository,
+                annotationRecordRepository, modelSetRepository);
         return new TaskServices(trainService, sampleService,
-                sampleRecordService, detectService, inputMergeService);
+                sampleRecordService, detectService, inputMergeService,
+                requestFactory);
     }
 
     /**
@@ -680,41 +699,30 @@ public final class RahaTaskApplicationServiceFactory {
     }
 
     /**
-     * 创建 FMDB 模式下的训练输入合并服务。
+     * 创建持久化采样批次训练使用的输入合并服务。
      *
-     * <p>仅 FMDB 模式需要把采样结果与人工标注合并成训练输入；其他模式返回空，
-     * 调用方应据此跳过相关物化步骤。</p>
+     * <p>服务复用请求工厂使用的采样和标注仓储，确保批次解析与执行阶段读取同一份数据。</p>
      */
     private static TrainingInputMergeService trainingInputMergeService(
             SparkSession sparkSession,
-            RahaStorageMode storageMode,
-            RuntimeInfrastructure infrastructure) {
-        if (storageMode != RahaStorageMode.FMDB) {
-            return null;
-        }
+            SampleRecordRepository sampleRecordRepository,
+            AnnotationRecordRepository annotationRecordRepository,
+            Clock clock) {
         return new TrainingInputMergeService(sparkSession,
-                new FmdbSampleRecordRepository(sparkSession,
-                        infrastructure.getTableGateway(),
-                        infrastructure.getPersistenceConfig()),
-                new FmdbAnnotationRecordRepository(sparkSession,
-                        infrastructure.getTableGateway(),
-                        infrastructure.getPersistenceConfig()),
-                infrastructure.getClock());
+                sampleRecordRepository, annotationRecordRepository, clock);
     }
 
     /**
-     * 创建 FMDB 模式下的训练产物物化服务。
+     * 创建训练产物物化服务。
      *
-     * <p>仅 FMDB 模式需要把训练过程中的中间产物写入物理表；其他模式返回空。</p>
+     * <p>两种运行模式都通过当前表网关保存冻结产物，具体是否落盘由持久化配置控制。</p>
      */
     private static TrainingArtifactMaterializationService
             trainingArtifactMaterializationService(
             SparkSession sparkSession,
             RahaStorageMode storageMode,
             RuntimeInfrastructure infrastructure) {
-        if (storageMode != RahaStorageMode.FMDB) {
-            return null;
-        }
+        // 两种运行模式都通过当前表网关保存冻结训练产物，内存模式由进程内网关承接。
         return new TrainingArtifactMaterializationService(
                 new FmdbTrainingArtifactRepository(sparkSession,
                         infrastructure.getTableGateway(),
@@ -728,13 +736,9 @@ public final class RahaTaskApplicationServiceFactory {
      * <p>采样记录服务负责把采样过程中的宽表记录写入 FMDB，供后续审计和追踪。</p>
      */
     private static SampleRecordService sampleRecordService(
-            SparkSession sparkSession,
-            RuntimeInfrastructure infrastructure) {
-        return new SampleRecordService(
-                new FmdbSampleRecordRepository(sparkSession,
-                        infrastructure.getTableGateway(),
-                        infrastructure.getPersistenceConfig()),
-                infrastructure.getClock());
+            SampleRecordRepository sampleRecordRepository,
+            Clock clock) {
+        return new SampleRecordService(sampleRecordRepository, clock);
     }
 
     /**
@@ -1208,17 +1212,26 @@ public final class RahaTaskApplicationServiceFactory {
         private final RahaDetectService detectService;
         /** FMDB 模式下的持久化训练输入合并服务。 */
         private final TrainingInputMergeService inputMergeService;
+        /** 面向调用方的最小任务请求工厂。 */
+        private final RahaTaskRequestFactory requestFactory;
 
         private TaskServices(RahaTrainService trainService,
                              RahaSampleService sampleService,
                              SampleRecordService sampleRecordService,
                              RahaDetectService detectService,
-                             TrainingInputMergeService inputMergeService) {
+                             TrainingInputMergeService inputMergeService,
+                             RahaTaskRequestFactory requestFactory) {
+            if (trainService == null || sampleService == null
+                    || sampleRecordService == null || detectService == null
+                    || inputMergeService == null || requestFactory == null) {
+                throw new IllegalArgumentException("任务服务集合依赖不能为空");
+            }
             this.trainService = trainService;
             this.sampleService = sampleService;
             this.sampleRecordService = sampleRecordService;
             this.detectService = detectService;
             this.inputMergeService = inputMergeService;
+            this.requestFactory = requestFactory;
         }
 
         /**
@@ -1265,6 +1278,15 @@ public final class RahaTaskApplicationServiceFactory {
         TrainingInputMergeService getInputMergeService() {
             return inputMergeService;
         }
+
+        /**
+         * 获取共享仓储实例的最小任务请求工厂。
+         *
+         * @return 最小任务请求工厂
+         */
+        RahaTaskRequestFactory getRequestFactory() {
+            return requestFactory;
+        }
     }
 
     /** 默认应用服务依赖的最小组件集合。 */
@@ -1276,13 +1298,20 @@ public final class RahaTaskApplicationServiceFactory {
         private final RahaWorkflowRegistry workflowRegistry;
         /** 当前存储模式下实际装配的六类仓储。 */
         private final RuntimeRepositories runtimeRepositories;
+        /** 与默认工作流共享仓储的最小任务请求工厂。 */
+        private final RahaTaskRequestFactory requestFactory;
 
         private DefaultComponents(RahaJobOrchestrator jobOrchestrator,
                                   RahaWorkflowRegistry workflowRegistry,
-                                  RuntimeRepositories runtimeRepositories) {
+                                  RuntimeRepositories runtimeRepositories,
+                                  RahaTaskRequestFactory requestFactory) {
+            if (requestFactory == null) {
+                throw new IllegalArgumentException("默认最小任务请求工厂不能为空");
+            }
             this.jobOrchestrator = jobOrchestrator;
             this.workflowRegistry = workflowRegistry;
             this.runtimeRepositories = runtimeRepositories;
+            this.requestFactory = requestFactory;
         }
 
         /**
@@ -1319,6 +1348,15 @@ public final class RahaTaskApplicationServiceFactory {
          */
         RuntimeRepositories getRuntimeRepositories() {
             return runtimeRepositories;
+        }
+
+        /**
+         * 获取最小任务请求工厂。
+         *
+         * @return 与默认运行时共享仓储的请求工厂
+         */
+        RahaTaskRequestFactory getRequestFactory() {
+            return requestFactory;
         }
     }
 }

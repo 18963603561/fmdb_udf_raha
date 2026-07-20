@@ -10,6 +10,7 @@ import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
 import com.fiberhome.ml.raha.model.training.LogisticRegressionTrainingConfig;
+import com.fiberhome.ml.raha.service.train.TrainingBatchReference;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,6 +52,12 @@ public final class RahaTaskExecutionRequest {
     private final String annotationPartitionMonth;
     /** c1 与 o1 共用的行身份配置。 */
     private final RowIdentityConfig rowIdentityConfig;
+    /** 一个或多个已经解析完成的持久化训练批次引用。 */
+    private final List<TrainingBatchReference> trainingBatchReferences;
+    /** 检测显式选择的不可变模型集合版本，旧入口使用当前已发布模型时为空。 */
+    private final String modelSetVersion;
+    /** 检测字段缺少模型或模型不兼容时的处理策略。 */
+    private final MissingModelPolicy missingModelPolicy;
 
     private RahaTaskExecutionRequest(RahaJobConfig config,
                                      DataLoadRequest dataLoadRequest,
@@ -66,6 +73,32 @@ public final class RahaTaskExecutionRequest {
                                      String annotationBatchId,
                                      String annotationPartitionMonth,
                                      RowIdentityConfig rowIdentityConfig) {
+        this(config, dataLoadRequest, labels, propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix,
+                samplingRound, evaluator, sampleBatchId, samplePartitionMonth,
+                annotationBatchId, annotationPartitionMonth, rowIdentityConfig,
+                legacyBatchReferences(sampleBatchId, samplePartitionMonth,
+                        annotationBatchId, annotationPartitionMonth),
+                null, MissingModelPolicy.PARTIAL);
+    }
+
+    private RahaTaskExecutionRequest(RahaJobConfig config,
+                                     DataLoadRequest dataLoadRequest,
+                                     List<CellLabel> labels,
+                                     LabelPropagationMethod propagationMethod,
+                                     LabelPropagationConfig propagationConfig,
+                                     LogisticRegressionTrainingConfig trainingConfig,
+                                     String modelNamePrefix,
+                                     int samplingRound,
+                                     StageEvaluator evaluator,
+                                     String sampleBatchId,
+                                     String samplePartitionMonth,
+                                     String annotationBatchId,
+                                     String annotationPartitionMonth,
+                                     RowIdentityConfig rowIdentityConfig,
+                                     List<TrainingBatchReference> trainingBatchReferences,
+                                     String modelSetVersion,
+                                     MissingModelPolicy missingModelPolicy) {
         if (config == null || dataLoadRequest == null) {
             throw new IllegalArgumentException("任务配置和数据加载请求不能为空");
         }
@@ -87,6 +120,11 @@ public final class RahaTaskExecutionRequest {
         this.annotationBatchId = annotationBatchId;
         this.annotationPartitionMonth = annotationPartitionMonth;
         this.rowIdentityConfig = rowIdentityConfig;
+        this.trainingBatchReferences = immutableBatchReferences(
+                trainingBatchReferences);
+        this.modelSetVersion = trimToNull(modelSetVersion);
+        this.missingModelPolicy = missingModelPolicy == null
+                ? MissingModelPolicy.FAIL : missingModelPolicy;
         validateByType();
     }
 
@@ -182,6 +220,43 @@ public final class RahaTaskExecutionRequest {
                 annotationPartitionMonth, rowIdentityConfig);
     }
 
+    /**
+     * 创建已经解析好一个或多个持久化采样和标注批次的训练请求。
+     *
+     * @param config 完整训练任务配置
+     * @param dataLoadRequest 当前原始输入加载请求
+     * @param propagationMethod 标签传播方法
+     * @param propagationConfig 标签传播配置
+     * @param trainingConfig 模型训练配置
+     * @param modelNamePrefix 模型名称前缀
+     * @param batchReferences 按稳定顺序保存的训练批次引用
+     * @param rowIdentityConfig 全部批次共用的行身份规则
+     * @return 多批次持久化训练请求
+     */
+    public static RahaTaskExecutionRequest trainingBatches(
+            RahaJobConfig config,
+            DataLoadRequest dataLoadRequest,
+            LabelPropagationMethod propagationMethod,
+            LabelPropagationConfig propagationConfig,
+            LogisticRegressionTrainingConfig trainingConfig,
+            String modelNamePrefix,
+            List<TrainingBatchReference> batchReferences,
+            RowIdentityConfig rowIdentityConfig) {
+        List<TrainingBatchReference> references = immutableBatchReferences(
+                batchReferences);
+        if (references.isEmpty()) {
+            throw new IllegalArgumentException("持久化训练批次引用不能为空");
+        }
+        TrainingBatchReference first = references.get(0);
+        return new RahaTaskExecutionRequest(config, dataLoadRequest,
+                Collections.<CellLabel>emptyList(), propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix, 0, null,
+                first.getSampleBatchId(), first.getSamplePartitionMonth(),
+                first.getAnnotationBatchId(),
+                first.getAnnotationPartitionMonth(), rowIdentityConfig,
+                references, null, MissingModelPolicy.FAIL);
+    }
+
     public static RahaTaskExecutionRequest detection(
             RahaJobConfig config,
             DataLoadRequest dataLoadRequest) {
@@ -195,6 +270,27 @@ public final class RahaTaskExecutionRequest {
         return new RahaTaskExecutionRequest(config, dataLoadRequest,
                 Collections.<CellLabel>emptyList(), null, null,
                 null, null, 0, evaluator, null, null, null, null, null);
+    }
+
+    /**
+     * 创建显式选择不可变模型集合的检测请求。
+     *
+     * @param config 完整检测任务配置，必须包含模型集合输入指纹
+     * @param dataLoadRequest 待检测数据加载请求
+     * @param modelSetVersion 不可变模型集合版本
+     * @param missingModelPolicy 缺少字段模型时的处理策略
+     * @return 显式模型集合检测请求
+     */
+    public static RahaTaskExecutionRequest detection(
+            RahaJobConfig config,
+            DataLoadRequest dataLoadRequest,
+            String modelSetVersion,
+            MissingModelPolicy missingModelPolicy) {
+        return new RahaTaskExecutionRequest(config, dataLoadRequest,
+                Collections.<CellLabel>emptyList(), null, null, null, null,
+                0, null, null, null, null, null, null,
+                Collections.<TrainingBatchReference>emptyList(),
+                modelSetVersion, missingModelPolicy);
     }
 
     public static RahaTaskExecutionRequest sampling(
@@ -229,10 +325,16 @@ public final class RahaTaskExecutionRequest {
         boolean hasAllBatchReferences = sampleBatchId != null
                 && samplePartitionMonth != null && annotationBatchId != null
                 && annotationPartitionMonth != null && rowIdentityConfig != null;
+        if (!trainingBatchReferences.isEmpty() && rowIdentityConfig == null) {
+            throw new IllegalArgumentException("多批次训练必须提供统一行身份配置");
+        }
         if (hasAnyBatchReference && !hasAllBatchReferences) {
             throw new IllegalArgumentException("训练批次引用和行身份配置必须完整提供");
         }
         if (jobType == JobType.TRAINING) {
+            if (modelSetVersion != null) {
+                throw new IllegalArgumentException("训练任务不能指定检测模型集合");
+            }
             if (propagationMethod == null || propagationConfig == null
                     || trainingConfig == null) {
                 throw new IllegalArgumentException("训练任务缺少传播或模型训练配置");
@@ -252,6 +354,9 @@ public final class RahaTaskExecutionRequest {
             throw new IllegalArgumentException("仅训练任务可以引用 c1 和标注批次");
         }
         if (jobType == JobType.SAMPLING) {
+            if (modelSetVersion != null) {
+                throw new IllegalArgumentException("采样任务不能指定检测模型集合");
+            }
             if (samplingRound <= 0) {
                 throw new IllegalArgumentException("采样轮次必须大于零");
             }
@@ -259,6 +364,10 @@ public final class RahaTaskExecutionRequest {
         }
         if (jobType != JobType.DETECTION) {
             throw new IllegalArgumentException("统一入口暂不支持任务类型：" + jobType);
+        }
+        if (modelSetVersion != null
+                && config.getExecutionInputFingerprint() == null) {
+            throw new IllegalArgumentException("显式模型集合必须进入任务执行输入指纹");
         }
     }
 
@@ -276,8 +385,47 @@ public final class RahaTaskExecutionRequest {
     public String getAnnotationBatchId() { return annotationBatchId; }
     public String getAnnotationPartitionMonth() { return annotationPartitionMonth; }
     public RowIdentityConfig getRowIdentityConfig() { return rowIdentityConfig; }
+    public List<TrainingBatchReference> getTrainingBatchReferences() {
+        return trainingBatchReferences;
+    }
+    public String getModelSetVersion() { return modelSetVersion; }
+    public MissingModelPolicy getMissingModelPolicy() { return missingModelPolicy; }
 
     public boolean hasPersistedTrainingInput() {
-        return sampleBatchId != null;
+        return !trainingBatchReferences.isEmpty();
+    }
+
+    private static List<TrainingBatchReference> legacyBatchReferences(
+            String sampleBatchId,
+            String samplePartitionMonth,
+            String annotationBatchId,
+            String annotationPartitionMonth) {
+        if (sampleBatchId == null || samplePartitionMonth == null
+                || annotationBatchId == null || annotationPartitionMonth == null) {
+            return Collections.emptyList();
+        }
+        return Collections.singletonList(new TrainingBatchReference(
+                sampleBatchId, samplePartitionMonth, annotationBatchId,
+                annotationPartitionMonth));
+    }
+
+    private static List<TrainingBatchReference> immutableBatchReferences(
+            List<TrainingBatchReference> values) {
+        if (values == null || values.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<TrainingBatchReference> result =
+                new ArrayList<TrainingBatchReference>(values.size());
+        for (TrainingBatchReference value : values) {
+            if (value == null) {
+                throw new IllegalArgumentException("训练批次引用不能包含空值");
+            }
+            result.add(value);
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 }

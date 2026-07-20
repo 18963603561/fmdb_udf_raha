@@ -31,6 +31,18 @@ public interface SampleRecordRepository {
                                String sampleBatchId);
 
     /**
+     * 按全局唯一采样批次标识查询完整批次。
+     *
+     * <p>默认实现用于兼容不支持全局索引的测试仓储；生产 FMDB 适配器必须覆盖该方法。</p>
+     *
+     * @param sampleBatchId 全局唯一采样批次标识
+     * @return 找到时返回完整批次
+     */
+    default Optional<SampleBatch> findByBatchId(String sampleBatchId) {
+        return Optional.empty();
+    }
+
+    /**
      * 使用最小字段投影读取标注展示行，禁止标注热路径扫描整张宽表字段。
      */
     List<SampleAnnotationRow> findForAnnotation(String datasetId,

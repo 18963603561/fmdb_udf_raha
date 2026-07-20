@@ -52,7 +52,7 @@ class TrainingInputMergeServiceIntegrationTest {
     }
 
     @Test
-    void shouldKeepC1OnKeyContentChangeAndRemapLabelsToTrainingSnapshot() {
+    void shouldMergeMultipleBatchesAndRemapLabelsToTrainingSnapshot() {
         SparkSession spark = SparkTestSession.get();
         StructType schema = new StructType()
                 .add("id", DataTypes.StringType, false)
@@ -84,19 +84,30 @@ class TrainingInputMergeServiceIntegrationTest {
                 "id = 'B'").collectAsList().get(0), schemaHash, "sample-1",
                 "B", "b-value", "c1-snapshot", columns);
         SampleRecord third = sampleRecord(c1Identified.getDataFrame().filter(
-                "id = 'D'").collectAsList().get(0), schemaHash, "sample-1",
+                "id = 'D'").collectAsList().get(0), schemaHash, "sample-2",
                 "D", "c1-only", "c1-snapshot", columns);
-        SampleBatch sampleBatch = new SampleBatch("sample-1", "dataset-1",
+        SampleBatch firstSampleBatch = new SampleBatch("sample-1", "dataset-1",
                 "c1-snapshot", "source-v1", "sampling-v1", 1000L,
-                "2026-07", Arrays.asList(first, second, third));
-        AnnotationBatch annotationBatch = annotationBatch(first, schemaHash);
+                "2026-07", Arrays.asList(first, second));
+        SampleBatch secondSampleBatch = new SampleBatch("sample-2", "dataset-1",
+                "c1-snapshot", "source-v1", "sampling-v1", 1000L,
+                "2026-07", Collections.singletonList(third));
+        AnnotationBatch firstAnnotation = annotationBatch(first, schemaHash,
+                "sample-1", "annotation-1");
+        AnnotationBatch secondAnnotation = annotationBatch(third, schemaHash,
+                "sample-2", "annotation-2");
         TrainingInputMergeService service = new TrainingInputMergeService(spark,
-                new SampleRepository(sampleBatch),
-                new AnnotationRepository(annotationBatch), fixedClock(2000L));
+                new SampleRepository(Arrays.asList(firstSampleBatch,
+                        secondSampleBatch)),
+                new AnnotationRepository(Arrays.asList(firstAnnotation,
+                        secondAnnotation)), fixedClock(2000L));
 
         TrainingMergeResult result = service.merge(new TrainingMergeRequest(
-                "training-1", original, identity, "sample-1", "2026-07",
-                "annotation-1", "2026-07"));
+                "training-1", original, identity, Arrays.asList(
+                new TrainingBatchReference("sample-1", "2026-07",
+                        "annotation-1", "2026-07"),
+                new TrainingBatchReference("sample-2", "2026-07",
+                        "annotation-2", "2026-07")), 1024L * 1024L));
 
         assertEquals(4L, result.getMetrics().getMergedCount());
         assertEquals(2L, result.getMetrics().getMatchedIdentityCount());
@@ -104,7 +115,7 @@ class TrainingInputMergeServiceIntegrationTest {
         assertEquals(2L, result.getMetrics().getDedupRowCount());
         assertEquals(1L, result.getMetrics().getC1OnlyCount());
         assertEquals(4L, result.getDataset().getDataFrame().count());
-        assertEquals(1, result.getDirectLabels().size());
+        assertEquals(2, result.getDirectLabels().size());
         String expectedCell = new CellCoordinate("dataset-1",
                 result.getTrainingSnapshotId(), first.getRowId(), "value").toCellId();
         assertEquals(expectedCell, result.getDirectLabels().get(0).getCellId());
@@ -112,6 +123,8 @@ class TrainingInputMergeServiceIntegrationTest {
                 first.getRowId(), "value").toCellId(),
                 result.getDirectLabels().get(0).getCellId());
         assertTrue(result.getTrainingContext().containsKey("dedupRowCount"));
+        assertEquals(Arrays.asList("sample-1", "sample-2"),
+                result.getTrainingContext().get("sampleBatchIds"));
         assertEquals("old", result.getDataset().getDataFrame()
                 .filter("id = 'A'").select("value").first().getString(0));
     }
@@ -152,21 +165,25 @@ class TrainingInputMergeServiceIntegrationTest {
     }
 
     private static AnnotationBatch annotationBatch(SampleRecord record,
-                                                   String schemaHash) {
+                                                    String schemaHash,
+                                                    String sampleBatchId,
+                                                    String annotationBatchId) {
         AnnotationLabelExpander expander = new AnnotationLabelExpander();
         List<com.fiberhome.ml.raha.label.CellLabel> labels = expander.expand(
                 "dataset-1", "c1-snapshot", record.getRowId(), 1,
                 Collections.singletonList("value"),
-                Collections.singleton("value"), "tester", 1500L, "annotation-1");
+                Collections.singleton("value"), "tester", 1500L,
+                annotationBatchId);
         RowAnnotation annotation = new RowAnnotation("task-1", record.getRowId(),
                 "c1-snapshot", record.getRowContentHash(), 1,
                 Collections.singleton("value"), Collections.singleton("value"),
                 "人工异常", labels);
-        AnnotationRecord row = new AnnotationRecord("annotation-1", "sample-1",
+        AnnotationRecord row = new AnnotationRecord(annotationBatchId,
+                sampleBatchId,
                 "dataset-1", annotation, record.getRowData(), "xls-v1",
                 "label.xls", schemaHash, "tester", AnnotationBatchStatus.IMPORTED,
                 1L, 1L, 0L, null, 1500L, "2026-07", "fingerprint-1");
-        return new AnnotationBatch("annotation-1", "sample-1", "dataset-1",
+        return new AnnotationBatch(annotationBatchId, sampleBatchId, "dataset-1",
                 AnnotationBatchStatus.IMPORTED, 1500L, "2026-07", null,
                 Collections.singletonList(row));
     }
@@ -177,15 +194,21 @@ class TrainingInputMergeServiceIntegrationTest {
 
     private static final class SampleRepository implements SampleRecordRepository {
 
-        private final SampleBatch batch;
+        /** 按批次标识保存测试采样批次。 */
+        private final Map<String, SampleBatch> batches =
+                new LinkedHashMap<String, SampleBatch>();
 
-        private SampleRepository(SampleBatch batch) { this.batch = batch; }
+        private SampleRepository(List<SampleBatch> values) {
+            for (SampleBatch value : values) {
+                batches.put(value.getSampleBatchId(), value);
+            }
+        }
         @Override public boolean isPersistenceEnabled() { return true; }
         @Override public long saveAll(SampleBatch value) { return value.getRecords().size(); }
         @Override public Optional<SampleBatch> find(String datasetId,
                                                     String partitionMonth,
                                                     String sampleBatchId) {
-            return Optional.of(batch);
+            return Optional.ofNullable(batches.get(sampleBatchId));
         }
         @Override public List<com.fiberhome.ml.raha.sampling.domain.SampleAnnotationRow>
                 findForAnnotation(String datasetId, String partitionMonth,
@@ -197,19 +220,30 @@ class TrainingInputMergeServiceIntegrationTest {
     private static final class AnnotationRepository
             implements AnnotationRecordRepository {
 
-        private final AnnotationBatch batch;
+        /** 按标注批次标识保存测试标注批次。 */
+        private final Map<String, AnnotationBatch> batches =
+                new LinkedHashMap<String, AnnotationBatch>();
 
-        private AnnotationRepository(AnnotationBatch batch) { this.batch = batch; }
+        private AnnotationRepository(List<AnnotationBatch> values) {
+            for (AnnotationBatch value : values) {
+                batches.put(value.getAnnotationBatchId(), value);
+            }
+        }
         @Override public boolean isPersistenceEnabled() { return true; }
         @Override public long saveAll(AnnotationBatch value) { return value.getRecords().size(); }
         @Override public Optional<AnnotationBatch> find(String datasetId,
                                                          String partitionMonth,
                                                          String annotationBatchId) {
-            return Optional.of(batch);
+            return Optional.ofNullable(batches.get(annotationBatchId));
         }
         @Override public Optional<AnnotationBatch> findLatestForSample(
                 String datasetId, String partitionMonth, String sampleBatchId) {
-            return Optional.of(batch);
+            for (AnnotationBatch batch : batches.values()) {
+                if (sampleBatchId.equals(batch.getSampleBatchId())) {
+                    return Optional.of(batch);
+                }
+            }
+            return Optional.empty();
         }
         @Override public boolean existsImportFingerprint(String datasetId,
                                                          String sampleBatchId,
