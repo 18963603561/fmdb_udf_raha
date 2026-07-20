@@ -93,11 +93,15 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
     }
 
     @Override
-    public synchronized long appendIdempotent(String tableName,
-                                              Dataset<Row> rows,
-                                              List<String> keyColumns) {
+    public synchronized long append(String tableName,
+                                    Dataset<Row> rows,
+                                    List<String> keyColumns,
+                                    long expectedCount) {
         String validated = validateTableName(tableName);
         validateRowsAndKeys(rows, keyColumns);
+        if (expectedCount < 0L) {
+            throw new IllegalArgumentException("FMDB 预期写入行数不能小于 0");
+        }
         FmdbPhysicalTable physicalTable = FmdbPhysicalTable.fromTableName(validated);
         // 标准九表在网关层再次执行开关，防止专用写入器遗漏判断。
         if (physicalTable != null && !persistenceConfig.shouldPersist(physicalTable)) {
@@ -105,6 +109,18 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
                     validated, physicalTable.getConfigKey());
             return 0L;
         }
+        if (persistenceConfig.isDirectAppend()) {
+            LOGGER.info("FMDB 全局写入模式为直接追加，跳过幂等主键扫描，tableName={}，keyColumns={}",
+                    validated, keyColumns);
+            return appendDirect(validated, rows, expectedCount);
+        }
+        return appendByKeyFilter(validated, rows, keyColumns);
+    }
+
+    private long appendByKeyFilter(String tableName,
+                                   Dataset<Row> rows,
+                                   List<String> keyColumns) {
+        String validated = validateTableName(tableName);
         LOGGER.info("开始向 FMDB 表幂等写入，tableName={}，keyColumns={}",
                 validated, keyColumns);
         try {

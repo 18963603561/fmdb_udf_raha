@@ -66,8 +66,8 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbSchemaResolver;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableRecord;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableSchemas;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbFeatureDictionaryCodec;
-import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbDetectionResultWriteMode;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbWriteMode;
 import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.repository.port.DetectionResultRepository;
 import com.fiberhome.ml.raha.repository.port.ModelMetadataRepository;
@@ -206,8 +206,7 @@ class Iteration9FmdbPipelineIntegrationTest {
         assertEquals(JobStatus.SUCCEEDED, detected.getStatus());
         assertEquals(8, detected.getPayload().getResults().size());
         FmdbPersistenceConfig idempotentConfig = FmdbPersistenceConfig.builder()
-                .detectionResultWriteMode(
-                        FmdbDetectionResultWriteMode.IDEMPOTENT_BY_KEY)
+                .writeMode(FmdbWriteMode.IDEMPOTENT_BY_KEY)
                 .build();
         SparkSqlFmdbResultWriter resultWriter = new SparkSqlFmdbResultWriter(
                 spark, fmdbGateway, clock, idempotentConfig);
@@ -329,13 +328,13 @@ class Iteration9FmdbPipelineIntegrationTest {
         values.put("cluster_summary_json", null);
         values.put("propagation_summary_json", null);
         values.put("created_at", 1000L);
-        gateway.appendIdempotent(DICTIONARY_TABLE,
+        gateway.append(DICTIONARY_TABLE,
                 spark.createDataFrame(Collections.singletonList(
                                 FmdbTableRecord.of(
                                         FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT,
                                         values).toRow()),
                         FmdbTableSchemas.schema(
                                 FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT)),
-                Arrays.asList("training_batch_id", "column_name"));
+                Arrays.asList("training_batch_id", "column_name"), 1L);
     }
 }

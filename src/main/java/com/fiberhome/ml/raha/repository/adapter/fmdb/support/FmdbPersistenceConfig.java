@@ -17,9 +17,8 @@ public final class FmdbPersistenceConfig {
     /** 默认建表 SQL 的类路径资源。 */
     private static final String DEFAULT_SCHEMA_RESOURCE =
             "db/fmdb/raha-fmdb-schema.sql";
-    /** 检测错误结果表写入模式配置键。 */
-    private static final String DETECTION_RESULT_WRITE_MODE_KEY =
-            "raha.persistence.table.detection-result.write-mode";
+    /** 全局 FMDB 表写入模式配置键。 */
+    private static final String WRITE_MODE_KEY = "raha.persistence.write-mode";
     /** 是否启用 FMDB 物理表持久化。 */
     private final boolean enabled;
     /** 是否自动创建不存在的默认表。 */
@@ -30,15 +29,15 @@ public final class FmdbPersistenceConfig {
     private final Map<FmdbPhysicalTable, Boolean> tableSwitches;
     /** 训练列级产物表内各类 JSON 产物的入库开关。 */
     private final Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches;
-    /** 检测错误结果表的追加写入模式。 */
-    private final FmdbDetectionResultWriteMode detectionResultWriteMode;
+    /** FMDB 标准物理表的全局追加写入模式。 */
+    private final FmdbWriteMode writeMode;
 
     private FmdbPersistenceConfig(boolean enabled,
                                   boolean autoCreateTables,
                                   String schemaResource,
                                   Map<FmdbPhysicalTable, Boolean> tableSwitches,
                                   Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches,
-                                  FmdbDetectionResultWriteMode detectionResultWriteMode) {
+                                  FmdbWriteMode writeMode) {
         this.enabled = enabled;
         this.autoCreateTables = autoCreateTables;
         this.schemaResource = ValueUtils.requireNotBlank(
@@ -46,10 +45,10 @@ public final class FmdbPersistenceConfig {
         this.tableSwitches = immutableTableSwitches(tableSwitches);
         this.columnArtifactSwitches = immutableColumnArtifactSwitches(
                 columnArtifactSwitches);
-        if (detectionResultWriteMode == null) {
-            throw new IllegalArgumentException("FMDB 检测结果写入模式不能为空");
+        if (writeMode == null) {
+            throw new IllegalArgumentException("FMDB 写入模式不能为空");
         }
-        this.detectionResultWriteMode = detectionResultWriteMode;
+        this.writeMode = writeMode;
         validateDependencies();
     }
 
@@ -88,8 +87,7 @@ public final class FmdbPersistenceConfig {
                 properties.getBoolean("raha.persistence.schema.auto-create"),
                 properties.getRequired("raha.persistence.schema.resource"),
                 tableValues, artifactValues,
-                properties.getEnum(DETECTION_RESULT_WRITE_MODE_KEY,
-                        FmdbDetectionResultWriteMode.class));
+                properties.getEnum(WRITE_MODE_KEY, FmdbWriteMode.class));
     }
 
     /**
@@ -146,13 +144,12 @@ public final class FmdbPersistenceConfig {
         return columnArtifactSwitches.get(artifact);
     }
 
-    public FmdbDetectionResultWriteMode getDetectionResultWriteMode() {
-        return detectionResultWriteMode;
+    public FmdbWriteMode getWriteMode() {
+        return writeMode;
     }
 
-    public boolean isDetectionResultDirectAppend() {
-        return detectionResultWriteMode
-                == FmdbDetectionResultWriteMode.DIRECT_APPEND;
+    public boolean isDirectAppend() {
+        return writeMode == FmdbWriteMode.DIRECT_APPEND;
     }
 
     private void validateDependencies() {
@@ -271,9 +268,8 @@ public final class FmdbPersistenceConfig {
         /** 构建中的列级产物开关。 */
         private final EnumMap<FmdbColumnArtifact, Boolean> columnArtifactSwitches =
                 new EnumMap<FmdbColumnArtifact, Boolean>(FmdbColumnArtifact.class);
-        /** 检测错误结果表的追加写入模式。 */
-        private FmdbDetectionResultWriteMode detectionResultWriteMode =
-                FmdbDetectionResultWriteMode.DIRECT_APPEND;
+        /** FMDB 标准物理表的全局追加写入模式。 */
+        private FmdbWriteMode writeMode = FmdbWriteMode.DIRECT_APPEND;
 
         private Builder() {
             for (FmdbPhysicalTable table : FmdbPhysicalTable.values()) {
@@ -349,17 +345,16 @@ public final class FmdbPersistenceConfig {
         }
 
         /**
-         * 设置检测错误结果表的写入模式。
+         * 设置 FMDB 标准物理表的全局写入模式。
          *
          * @param value 写入模式
          * @return 当前构建器
          */
-        public Builder detectionResultWriteMode(
-                FmdbDetectionResultWriteMode value) {
+        public Builder writeMode(FmdbWriteMode value) {
             if (value == null) {
-                throw new IllegalArgumentException("检测结果写入模式不能为空");
+                throw new IllegalArgumentException("FMDB 写入模式不能为空");
             }
-            this.detectionResultWriteMode = value;
+            this.writeMode = value;
             return this;
         }
 
@@ -371,7 +366,7 @@ public final class FmdbPersistenceConfig {
         public FmdbPersistenceConfig build() {
             return new FmdbPersistenceConfig(enabled, autoCreateTables,
                     schemaResource, tableSwitches, columnArtifactSwitches,
-                    detectionResultWriteMode);
+                    writeMode);
         }
     }
 }

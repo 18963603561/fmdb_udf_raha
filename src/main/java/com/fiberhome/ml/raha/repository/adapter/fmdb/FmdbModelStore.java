@@ -135,9 +135,9 @@ public final class FmdbModelStore implements ColumnModelStore {
                 Collections.singletonList(FmdbTableRecord.of(
                         FmdbPhysicalTable.MODEL_ARTIFACT, values).toRow()),
                 FmdbTableSchemas.schema(FmdbPhysicalTable.MODEL_ARTIFACT));
-        tableGateway.appendIdempotent(modelTable, frame,
+        tableGateway.append(modelTable, frame,
                 Arrays.asList("model_set_version", "column_name",
-                        "model_version", "state_version"));
+                        "model_version", "state_version"), 1L);
         modelCache.put(path, artifact);
         LOGGER.info("FMDB 列级模型保存完成，modelSetVersion={}，modelVersion={}，"
                         + "columnName={}", context.getModelSetVersion(),

@@ -97,9 +97,9 @@ public final class FmdbModelMetadataRepository implements ModelMetadataRepositor
                     Collections.singletonList(FmdbTableRecord.of(
                             FmdbPhysicalTable.MODEL_ARTIFACT, values).toRow()),
                     FmdbTableSchemas.schema(FmdbPhysicalTable.MODEL_ARTIFACT));
-            long written = tableGateway.appendIdempotent(tableName, frame,
+            long written = tableGateway.append(tableName, frame,
                     Arrays.asList("model_set_version", "column_name",
-                            "model_version", "state_version"));
+                            "model_version", "state_version"), 1L);
             LOGGER.info("FMDB 模型状态追加完成，datasetId={}，columnName={}，"
                             + "modelVersion={}，status={}，writtenCount={}",
                     model.getDatasetId(), model.getColumnName(), model.getModelVersion(),

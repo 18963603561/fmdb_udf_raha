@@ -8,9 +8,9 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableRecord;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableSchemas;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
-import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbDetectionResultWriteMode;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbRawValueAccessPolicy;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbWriteMode;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -118,8 +118,8 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
         LOGGER.info("开始写入 FMDB 任务状态，jobId={}，stateVersion={}，status={}，"
                         + "tableName={}", job.getJobId(), stateVersion,
                 job.getStatus(), tableName);
-        return tableGateway.appendIdempotent(tableName, frame,
-                Arrays.asList("job_id", "state_version"));
+        return tableGateway.append(tableName, frame,
+                Arrays.asList("job_id", "state_version"), 1L);
     }
 
     @Override
@@ -191,16 +191,10 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
             return 0L;
         }
         Dataset<Row> frame = frame(FmdbPhysicalTable.DETECTION_RESULT, records);
-        FmdbDetectionResultWriteMode writeMode =
-                persistenceConfig.getDetectionResultWriteMode();
-        long count;
-        if (writeMode == FmdbDetectionResultWriteMode.DIRECT_APPEND) {
-            // 直接追加模式用于避免检测结果写入前扫描目标表历史主键。
-            count = tableGateway.appendDirect(tableName, frame, records.size());
-        } else {
-            count = tableGateway.appendIdempotent(tableName, frame,
-                    Arrays.asList("detection_batch_id", "cell_id", "model_version"));
-        }
+        FmdbWriteMode writeMode = persistenceConfig.getWriteMode();
+        long count = tableGateway.append(tableName, frame,
+                Arrays.asList("detection_batch_id", "cell_id", "model_version"),
+                records.size());
         LOGGER.info("FMDB 错误结果写入完成，detectionBatchId={}，writeMode={}，writtenCount={}",
                 context.getDetectionBatchId(), writeMode, count);
         return count;

@@ -61,9 +61,20 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
     }
 
     @Override
-    public synchronized long appendIdempotent(String tableName,
-                                              Dataset<Row> rows,
-                                              List<String> keyColumns) {
+    public synchronized long append(String tableName,
+                                    Dataset<Row> rows,
+                                    List<String> keyColumns,
+                                    long expectedCount) {
+        validateRowsAndKeys(rows, keyColumns);
+        if (expectedCount < 0L) {
+            throw new IllegalArgumentException("内存 FMDB 预期写入行数不能小于 0");
+        }
+        return appendByKeyFilter(tableName, rows, keyColumns);
+    }
+
+    private long appendByKeyFilter(String tableName,
+                                   Dataset<Row> rows,
+                                   List<String> keyColumns) {
         String validated = SparkSqlFmdbTableGateway.validateTableName(tableName);
         validateRowsAndKeys(rows, keyColumns);
         Dataset<Row> existing = tables.get(validated);

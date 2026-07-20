@@ -27,16 +27,18 @@ public interface FmdbTableGateway {
                       Column condition);
 
     /**
-     * 只追加业务主键尚不存在的记录。
+     * 按全局写入模式追加记录。
      *
      * @param tableName FMDB 目标表
      * @param rows 待写入数据
-     * @param keyColumns 幂等业务主键字段
+     * @param keyColumns 幂等模式使用的业务主键字段
+     * @param expectedCount 调用方已知的待写入记录数
      * @return 实际追加行数
      */
-    long appendIdempotent(String tableName,
-                          Dataset<Row> rows,
-                          List<String> keyColumns);
+    long append(String tableName,
+                Dataset<Row> rows,
+                List<String> keyColumns,
+                long expectedCount);
 
     /**
      * 不读取目标表业务主键，直接追加写入数据。

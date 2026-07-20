@@ -108,8 +108,8 @@ public final class FmdbStageRepository implements StageRepository {
                         + "stateVersion={}，status={}", stage.getJobId(), stage.getStageId(),
                 stage.getAttemptId(), stateVersion, stage.getStatus());
         try {
-            long written = tableGateway.appendIdempotent(stageTable, frame,
-                    Arrays.asList("job_id", "stage_id", "attempt_id", "state_version"));
+            long written = tableGateway.append(stageTable, frame,
+                    Arrays.asList("job_id", "stage_id", "attempt_id", "state_version"), 1L);
             if (written != 1L) {
                 throw new IllegalStateException("FMDB 阶段状态写入数量异常：" + written);
             }

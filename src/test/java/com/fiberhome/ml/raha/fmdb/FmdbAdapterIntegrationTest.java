@@ -34,8 +34,8 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbSchemaResolver;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableRecord;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableSchemas;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbFeatureDictionaryCodec;
-import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbDetectionResultWriteMode;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbWriteMode;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import com.fiberhome.ml.raha.util.HashUtils;
 import java.time.Clock;
@@ -126,8 +126,7 @@ class FmdbAdapterIntegrationTest {
     void shouldWriteJobsAndDetectionResultsIdempotently() {
         SparkSession spark = SparkTestSession.get();
         FmdbPersistenceConfig config = FmdbPersistenceConfig.builder()
-                .detectionResultWriteMode(
-                        FmdbDetectionResultWriteMode.IDEMPOTENT_BY_KEY)
+                .writeMode(FmdbWriteMode.IDEMPOTENT_BY_KEY)
                 .build();
         SparkSqlFmdbResultWriter writer = new SparkSqlFmdbResultWriter(
                 spark, gateway, fixedClock(2000L),
@@ -266,10 +265,10 @@ class FmdbAdapterIntegrationTest {
         org.apache.spark.sql.Dataset<Row> second = spark.createDataFrame(
                 Collections.singletonList(RowFactory.create("2", "B")), schema);
 
-        assertEquals(1L, gateway.appendIdempotent(
-                LINEAGE_TABLE, first, Collections.singletonList("id")));
-        assertEquals(1L, gateway.appendIdempotent(
-                LINEAGE_TABLE, second, Collections.singletonList("id")));
+        assertEquals(1L, gateway.append(
+                LINEAGE_TABLE, first, Collections.singletonList("id"), 1L));
+        assertEquals(1L, gateway.append(
+                LINEAGE_TABLE, second, Collections.singletonList("id"), 1L));
 
         assertEquals(2L, gateway.read(LINEAGE_TABLE).count());
         assertFalse(gateway.read(LINEAGE_TABLE).queryExecution()
@@ -375,14 +374,14 @@ class FmdbAdapterIntegrationTest {
         values.put("cluster_summary_json", null);
         values.put("propagation_summary_json", null);
         values.put("created_at", 2000L);
-        gateway.appendIdempotent(DICTIONARY_TABLE,
+        gateway.append(DICTIONARY_TABLE,
                 spark.createDataFrame(Collections.singletonList(
                                 FmdbTableRecord.of(
                                         FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT,
                                         values).toRow()),
                         FmdbTableSchemas.schema(
                                 FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT)),
-                Arrays.asList("training_batch_id", "column_name"));
+                Arrays.asList("training_batch_id", "column_name"), 1L);
     }
 
     private static Clock fixedClock(long millis) {

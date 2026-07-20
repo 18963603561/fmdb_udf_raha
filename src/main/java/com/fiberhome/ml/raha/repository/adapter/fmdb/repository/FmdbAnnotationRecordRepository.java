@@ -117,8 +117,8 @@ public final class FmdbAnnotationRecordRepository
         LOGGER.info("开始追加 FMDB 标注批次，annotationBatchId={}，recordCount={}",
                 batch.getAnnotationBatchId(), rows.size());
         try {
-            long written = tableGateway.appendIdempotent(tableName, frame,
-                    Arrays.asList("annotation_batch_id", "row_id"));
+            long written = tableGateway.append(tableName, frame,
+                    Arrays.asList("annotation_batch_id", "row_id"), rows.size());
             LOGGER.info("FMDB 标注批次追加完成，annotationBatchId={}，"
                             + "writtenCount={}，skippedCount={}",
                     batch.getAnnotationBatchId(), written, rows.size() - written);

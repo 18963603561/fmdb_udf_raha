@@ -285,7 +285,7 @@ public final class FmdbTrainingArtifactRepository {
         LOGGER.info("开始追加训练物理产物，tableName={}，recordCount={}",
                 tableName, rows.size());
         try {
-            long written = tableGateway.appendIdempotent(tableName, frame, keys);
+            long written = tableGateway.append(tableName, frame, keys, rows.size());
             LOGGER.info("训练物理产物追加完成，tableName={}，writtenCount={}，"
                             + "skippedCount={}", tableName, written,
                     rows.size() - written);

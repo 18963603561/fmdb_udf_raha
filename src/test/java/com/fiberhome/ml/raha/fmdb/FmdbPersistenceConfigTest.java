@@ -3,8 +3,8 @@ package com.fiberhome.ml.raha.fmdb;
 import com.fiberhome.ml.raha.config.core.RahaConfigurationException;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbColumnArtifact;
-import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbDetectionResultWriteMode;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbWriteMode;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,9 +33,8 @@ class FmdbPersistenceConfigTest {
         assertTrue(config.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY));
         assertFalse(config.shouldPersist(FmdbColumnArtifact.CLUSTER_SUMMARY));
         assertFalse(config.shouldPersist(FmdbColumnArtifact.PROPAGATION_SUMMARY));
-        assertEquals(FmdbDetectionResultWriteMode.DIRECT_APPEND,
-                config.getDetectionResultWriteMode());
-        assertTrue(config.isDetectionResultDirectAppend());
+        assertEquals(FmdbWriteMode.DIRECT_APPEND, config.getWriteMode());
+        assertTrue(config.isDirectAppend());
     }
 
     @Test
@@ -52,8 +51,7 @@ class FmdbPersistenceConfigTest {
                     builder.isColumnArtifactEnabled(artifact),
                     artifact.getConfigKey());
         }
-        assertEquals(properties.getDetectionResultWriteMode(),
-                builder.getDetectionResultWriteMode());
+        assertEquals(properties.getWriteMode(), builder.getWriteMode());
     }
 
     @Test

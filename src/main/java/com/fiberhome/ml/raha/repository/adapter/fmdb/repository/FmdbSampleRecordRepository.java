@@ -116,8 +116,8 @@ public final class FmdbSampleRecordRepository implements SampleRecordRepository 
                         + "tableName={}", batch.getSampleBatchId(), rows.size(),
                 tableName);
         try {
-            long written = tableGateway.appendIdempotent(tableName, frame,
-                    Arrays.asList("sample_batch_id", "row_id"));
+            long written = tableGateway.append(tableName, frame,
+                    Arrays.asList("sample_batch_id", "row_id"), rows.size());
             LOGGER.info("FMDB 采样记录追加完成，sampleBatchId={}，inputCount={}，"
                             + "writtenCount={}，skippedCount={}",
                     batch.getSampleBatchId(), rows.size(), written,
