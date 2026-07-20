@@ -10,7 +10,7 @@ import java.util.Optional;
  */
 public interface DetectionResultRepository {
 
-    void saveAll(String jobId,
+    long saveAll(String jobId,
                  List<DetectionResult> results,
                  ArtifactVersion version,
                  long updatedAt);
@@ -22,15 +22,16 @@ public interface DetectionResultRepository {
      * @param results 全量预测结果
      * @param version 结果版本
      * @param updatedAt 更新时间
+     * @return 对外可观测的错误结果写入数量
      */
-    default void saveAll(DetectionResultSaveContext context,
+    default long saveAll(DetectionResultSaveContext context,
                          List<DetectionResult> results,
                          ArtifactVersion version,
                          long updatedAt) {
         if (context == null) {
             throw new IllegalArgumentException("检测写入上下文不能为空");
         }
-        saveAll(context.getJobId(), results, version, updatedAt);
+        return saveAll(context.getJobId(), results, version, updatedAt);
     }
 
     List<DetectionResult> findByJob(String jobId);

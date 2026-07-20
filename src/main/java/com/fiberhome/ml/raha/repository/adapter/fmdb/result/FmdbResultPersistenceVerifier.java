@@ -1,9 +1,7 @@
 package com.fiberhome.ml.raha.repository.adapter.fmdb.result;
 
-import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.DetectionResult;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
-import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
 import com.fiberhome.ml.raha.job.stage.core.StageExecutionContext;
@@ -20,16 +18,11 @@ import com.fiberhome.ml.raha.service.train.RahaTrainOutput;
 import com.fiberhome.ml.raha.service.train.TrainingArtifactMaterializationResult;
 import com.fiberhome.ml.raha.service.train.TrainingMergeResult;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.spark.sql.Column;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
 import org.apache.spark.sql.functions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,20 +38,15 @@ public final class FmdbResultPersistenceVerifier
             FmdbResultPersistenceVerifier.class);
     /** FMDB 表网关。 */
     private final FmdbTableGateway tableGateway;
-    /** 任务和检测结果写入器。 */
-    private final FmdbResultWriter resultWriter;
     /** 持久化开关。 */
     private final FmdbPersistenceConfig persistenceConfig;
 
     public FmdbResultPersistenceVerifier(FmdbTableGateway tableGateway,
-                                         FmdbResultWriter resultWriter,
                                          FmdbPersistenceConfig persistenceConfig) {
-        if (tableGateway == null || resultWriter == null
-                || persistenceConfig == null) {
+        if (tableGateway == null || persistenceConfig == null) {
             throw new IllegalArgumentException("FMDB 结果验证器依赖不能为空");
         }
         this.tableGateway = tableGateway;
-        this.resultWriter = resultWriter;
         this.persistenceConfig = persistenceConfig;
     }
 
@@ -147,7 +135,6 @@ public final class FmdbResultPersistenceVerifier
                 + "/" + output.getModelSetVersion();
     }
 
-    @SuppressWarnings("unchecked")
     private String persistAndVerifyDetection(StageExecutionContext context,
                                              RahaServiceResult<?> result) {
         if (!(result.getPayload() instanceof RahaDetectOutput)
@@ -161,14 +148,6 @@ public final class FmdbResultPersistenceVerifier
         }
         RahaDetectOutput output = (RahaDetectOutput) result.getPayload();
         RahaDataset dataset = (RahaDataset) datasetValue;
-        String modelSetVersion = modelSetVersion(dataset.getDatasetId(),
-                output.getModelVersions().values());
-        FmdbDetectionWriteContext writeContext = new FmdbDetectionWriteContext(
-                result.getJobId(), dataset.getTableName(), modelSetVersion,
-                trustedRows(dataset));
-        resultWriter.writeDetectionResults(
-                FmdbPhysicalTable.DETECTION_RESULT.getTableName(), writeContext,
-                output.getResults());
         List<DetectionResult> errors = new ArrayList<DetectionResult>();
         Set<String> partitionDates = new LinkedHashSet<String>();
         for (DetectionResult detection : output.getResults()) {
@@ -190,49 +169,6 @@ public final class FmdbResultPersistenceVerifier
         requireCount("检测错误结果", errors.size(), actual);
         return "fmdb://" + FmdbPhysicalTable.DETECTION_RESULT.getTableName()
                 + "/" + result.getJobId();
-    }
-
-    private String modelSetVersion(String datasetId,
-                                   java.util.Collection<String> modelVersions) {
-        if (modelVersions.isEmpty()
-                || !tableGateway.tableExists(
-                FmdbPhysicalTable.MODEL_ARTIFACT.getTableName())) {
-            throw new IllegalStateException("检测结果缺少已发布模型集合");
-        }
-        Dataset<Row> rows = tableGateway.read(
-                FmdbPhysicalTable.MODEL_ARTIFACT.getTableName(),
-                Arrays.asList("model_set_version", "model_version"),
-                functions.col("dataset_id").equalTo(datasetId)
-                        .and(functions.col("model_version").isin(
-                                modelVersions.toArray(new Object[0]))));
-        Set<String> versions = new LinkedHashSet<String>();
-        for (Row row : rows.collectAsList()) {
-            versions.add((String) row.getAs("model_set_version"));
-        }
-        if (versions.size() != 1) {
-            throw new IllegalStateException("检测字段模型不属于同一模型集合");
-        }
-        return versions.iterator().next();
-    }
-
-    private static Map<String, Map<String, Object>> trustedRows(
-            RahaDataset dataset) {
-        Map<String, Map<String, Object>> result =
-                new LinkedHashMap<String, Map<String, Object>>();
-        for (Row row : dataset.getDataFrame().collectAsList()) {
-            String rowId = String.valueOf((Object) row.getAs(
-                    dataset.getRowIdColumn()));
-            Map<String, Object> values = new LinkedHashMap<String, Object>();
-            for (ColumnMetadata column : dataset.getColumns()) {
-                if (!RowIdentityColumns.isTechnical(column.getName())) {
-                    values.put(column.getName(), row.getAs(column.getName()));
-                }
-            }
-            if (result.put(rowId, values) != null) {
-                throw new IllegalStateException("检测输入包含重复行标识");
-            }
-        }
-        return result;
     }
 
     private long count(FmdbPhysicalTable table, Column condition, String projection) {

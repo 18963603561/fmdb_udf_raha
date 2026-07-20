@@ -69,7 +69,7 @@ public final class FmdbDetectionResultRepository
     }
 
     @Override
-    public void saveAll(String jobId,
+    public long saveAll(String jobId,
                         List<DetectionResult> results,
                         ArtifactVersion version,
                         long updatedAt) {
@@ -77,7 +77,7 @@ public final class FmdbDetectionResultRepository
     }
 
     @Override
-    public void saveAll(DetectionResultSaveContext context,
+    public long saveAll(DetectionResultSaveContext context,
                         List<DetectionResult> results,
                         ArtifactVersion version,
                         long updatedAt) {
@@ -105,7 +105,7 @@ public final class FmdbDetectionResultRepository
         LOGGER.info("开始通过仓储写入 FMDB 检测错误，jobId={}，resultCount={}",
                 context.getJobId(), results.size());
         try {
-            resultWriter.writeDetectionResults(tableName, writeContext, results);
+            return resultWriter.writeDetectionResults(tableName, writeContext, results);
         } catch (RuntimeException exception) {
             LOGGER.error("FMDB 检测错误仓储写入失败，jobId={}，resultCount={}",
                     context.getJobId(), results.size(), exception);

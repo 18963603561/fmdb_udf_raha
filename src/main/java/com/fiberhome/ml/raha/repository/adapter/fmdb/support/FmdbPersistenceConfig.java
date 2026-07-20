@@ -17,6 +17,9 @@ public final class FmdbPersistenceConfig {
     /** 默认建表 SQL 的类路径资源。 */
     private static final String DEFAULT_SCHEMA_RESOURCE =
             "db/fmdb/raha-fmdb-schema.sql";
+    /** 检测错误结果表写入模式配置键。 */
+    private static final String DETECTION_RESULT_WRITE_MODE_KEY =
+            "raha.persistence.table.detection-result.write-mode";
     /** 是否启用 FMDB 物理表持久化。 */
     private final boolean enabled;
     /** 是否自动创建不存在的默认表。 */
@@ -27,12 +30,15 @@ public final class FmdbPersistenceConfig {
     private final Map<FmdbPhysicalTable, Boolean> tableSwitches;
     /** 训练列级产物表内各类 JSON 产物的入库开关。 */
     private final Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches;
+    /** 检测错误结果表的追加写入模式。 */
+    private final FmdbDetectionResultWriteMode detectionResultWriteMode;
 
     private FmdbPersistenceConfig(boolean enabled,
                                   boolean autoCreateTables,
                                   String schemaResource,
                                   Map<FmdbPhysicalTable, Boolean> tableSwitches,
-                                  Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches) {
+                                  Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches,
+                                  FmdbDetectionResultWriteMode detectionResultWriteMode) {
         this.enabled = enabled;
         this.autoCreateTables = autoCreateTables;
         this.schemaResource = ValueUtils.requireNotBlank(
@@ -40,6 +46,10 @@ public final class FmdbPersistenceConfig {
         this.tableSwitches = immutableTableSwitches(tableSwitches);
         this.columnArtifactSwitches = immutableColumnArtifactSwitches(
                 columnArtifactSwitches);
+        if (detectionResultWriteMode == null) {
+            throw new IllegalArgumentException("FMDB 检测结果写入模式不能为空");
+        }
+        this.detectionResultWriteMode = detectionResultWriteMode;
         validateDependencies();
     }
 
@@ -77,7 +87,9 @@ public final class FmdbPersistenceConfig {
                 properties.getBoolean("raha.persistence.enabled"),
                 properties.getBoolean("raha.persistence.schema.auto-create"),
                 properties.getRequired("raha.persistence.schema.resource"),
-                tableValues, artifactValues);
+                tableValues, artifactValues,
+                properties.getEnum(DETECTION_RESULT_WRITE_MODE_KEY,
+                        FmdbDetectionResultWriteMode.class));
     }
 
     /**
@@ -132,6 +144,15 @@ public final class FmdbPersistenceConfig {
     public boolean isColumnArtifactEnabled(FmdbColumnArtifact artifact) {
         requireColumnArtifact(artifact);
         return columnArtifactSwitches.get(artifact);
+    }
+
+    public FmdbDetectionResultWriteMode getDetectionResultWriteMode() {
+        return detectionResultWriteMode;
+    }
+
+    public boolean isDetectionResultDirectAppend() {
+        return detectionResultWriteMode
+                == FmdbDetectionResultWriteMode.DIRECT_APPEND;
     }
 
     private void validateDependencies() {
@@ -250,6 +271,9 @@ public final class FmdbPersistenceConfig {
         /** 构建中的列级产物开关。 */
         private final EnumMap<FmdbColumnArtifact, Boolean> columnArtifactSwitches =
                 new EnumMap<FmdbColumnArtifact, Boolean>(FmdbColumnArtifact.class);
+        /** 检测错误结果表的追加写入模式。 */
+        private FmdbDetectionResultWriteMode detectionResultWriteMode =
+                FmdbDetectionResultWriteMode.DIRECT_APPEND;
 
         private Builder() {
             for (FmdbPhysicalTable table : FmdbPhysicalTable.values()) {
@@ -325,13 +349,29 @@ public final class FmdbPersistenceConfig {
         }
 
         /**
+         * 设置检测错误结果表的写入模式。
+         *
+         * @param value 写入模式
+         * @return 当前构建器
+         */
+        public Builder detectionResultWriteMode(
+                FmdbDetectionResultWriteMode value) {
+            if (value == null) {
+                throw new IllegalArgumentException("检测结果写入模式不能为空");
+            }
+            this.detectionResultWriteMode = value;
+            return this;
+        }
+
+        /**
          * 校验依赖并生成不可变配置。
          *
          * @return 完整持久化配置
          */
         public FmdbPersistenceConfig build() {
             return new FmdbPersistenceConfig(enabled, autoCreateTables,
-                    schemaResource, tableSwitches, columnArtifactSwitches);
+                    schemaResource, tableSwitches, columnArtifactSwitches,
+                    detectionResultWriteMode);
         }
     }
 }

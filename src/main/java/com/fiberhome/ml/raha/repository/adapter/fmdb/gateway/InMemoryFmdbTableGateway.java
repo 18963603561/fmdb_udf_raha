@@ -97,6 +97,38 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
     }
 
     @Override
+    public synchronized long appendDirect(String tableName,
+                                          Dataset<Row> rows,
+                                          long expectedCount) {
+        String validated = SparkSqlFmdbTableGateway.validateTableName(tableName);
+        validateRows(rows);
+        if (expectedCount < 0L) {
+            throw new IllegalArgumentException("内存 FMDB 直接追加预期行数不能小于 0");
+        }
+        if (expectedCount == 0L) {
+            return 0L;
+        }
+        Dataset<Row> existing = tables.get(validated);
+        Dataset<Row> pending = rows;
+        if (existing != null) {
+            if (!schemasCompatible(existing.schema(), rows.schema())) {
+                throw new IllegalStateException("内存 FMDB 表模式与写入模式不一致：" + validated);
+            }
+            // 内存网关同样按目标表列顺序重排，保持与 Spark Catalog 写入语义一致。
+            pending = rows.selectExpr(existing.columns());
+        }
+        Dataset<Row> combined = existing == null ? pending : existing.unionByName(pending);
+        Dataset<Row> materialized = combined.localCheckpoint(true);
+        if (existing != null) {
+            existing.unpersist(false);
+        }
+        tables.put(validated, materialized);
+        LOGGER.info("内存 FMDB 表直接追加完成，tableName={}，writtenCount={}",
+                validated, expectedCount);
+        return expectedCount;
+    }
+
+    @Override
     public synchronized long deleteOlderThan(String tableName,
                                              String timestampColumn,
                                              long cutoffExclusive) {
@@ -127,6 +159,7 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
 
     private static void validateRowsAndKeys(Dataset<Row> rows,
                                             List<String> keyColumns) {
+        validateRows(rows);
         if (rows == null || keyColumns == null || keyColumns.isEmpty()) {
             throw new IllegalArgumentException("内存 FMDB 写入数据和业务主键不能为空");
         }
@@ -137,6 +170,12 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
             if (!columns.contains(validated) || !keys.add(validated)) {
                 throw new IllegalArgumentException("内存 FMDB 业务主键缺失或重复：" + validated);
             }
+        }
+    }
+
+    private static void validateRows(Dataset<Row> rows) {
+        if (rows == null) {
+            throw new IllegalArgumentException("内存 FMDB 写入数据不能为空");
         }
     }
 

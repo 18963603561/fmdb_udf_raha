@@ -154,6 +154,56 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
     }
 
     @Override
+    public synchronized long appendDirect(String tableName,
+                                          Dataset<Row> rows,
+                                          long expectedCount) {
+        String validated = validateTableName(tableName);
+        validateRows(rows);
+        if (expectedCount < 0L) {
+            throw new IllegalArgumentException("FMDB 直接追加预期行数不能小于 0");
+        }
+        FmdbPhysicalTable physicalTable = FmdbPhysicalTable.fromTableName(validated);
+        // 标准九表在网关层再次执行开关，防止专用写入器遗漏判断。
+        if (physicalTable != null && !persistenceConfig.shouldPersist(physicalTable)) {
+            LOGGER.info("FMDB 物理表入库已关闭，跳过直接追加，tableName={}，configKey={}",
+                    validated, physicalTable.getConfigKey());
+            return 0L;
+        }
+        if (expectedCount == 0L) {
+            LOGGER.info("FMDB 直接追加数据为空，跳过写入，tableName={}", validated);
+            return 0L;
+        }
+        LOGGER.info("开始向 FMDB 表直接追加，tableName={}，expectedCount={}",
+                validated, expectedCount);
+        try {
+            Dataset<Row> pending = rows;
+            boolean targetExists = tableExists(validated);
+            if (targetExists) {
+                Dataset<Row> existing = read(validated);
+                if (!schemasCompatible(existing.schema(), rows.schema())) {
+                    String difference = schemaDifference(existing.schema(), rows.schema());
+                    throw new IllegalStateException("FMDB 目标表模式与写入模式不一致："
+                            + validated + "，差异=" + difference);
+                }
+                // Spark 读取分区表时可能移动分区字段顺序，直接追加前仍需按目标表重排列。
+                pending = alignColumns(rows, existing.schema());
+            }
+            if (targetExists) {
+                pending.write().mode(SaveMode.Append).insertInto(validated);
+            } else {
+                pending.write().mode(SaveMode.Append).saveAsTable(validated);
+            }
+            LOGGER.info("FMDB 表直接追加完成，tableName={}，writtenCount={}",
+                    validated, expectedCount);
+            return expectedCount;
+        } catch (RuntimeException exception) {
+            LOGGER.error("FMDB 表直接追加失败，tableName={}，expectedCount={}",
+                    validated, expectedCount, exception);
+            throw new IllegalStateException("FMDB 表直接追加失败：" + validated, exception);
+        }
+    }
+
+    @Override
     public synchronized long deleteOlderThan(String tableName,
                                              String timestampColumn,
                                              long cutoffExclusive) {
@@ -189,6 +239,7 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
 
     private static void validateRowsAndKeys(Dataset<Row> rows,
                                             List<String> keyColumns) {
+        validateRows(rows);
         if (rows == null || keyColumns == null || keyColumns.isEmpty()) {
             throw new IllegalArgumentException("FMDB 写入数据和业务主键不能为空");
         }
@@ -199,6 +250,12 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
             if (!columns.contains(validated) || !uniqueKeys.add(validated)) {
                 throw new IllegalArgumentException("FMDB 业务主键缺失或重复：" + validated);
             }
+        }
+    }
+
+    private static void validateRows(Dataset<Row> rows) {
+        if (rows == null) {
+            throw new IllegalArgumentException("FMDB 写入数据不能为空");
         }
     }
 

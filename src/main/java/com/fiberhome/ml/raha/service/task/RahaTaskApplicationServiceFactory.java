@@ -788,8 +788,7 @@ public final class RahaTaskApplicationServiceFactory {
         RahaDatasetLoader loader = datasetLoader(sparkSession,
                 infrastructure.getClock());
         ResultPersistenceVerifier verifier = new FmdbResultPersistenceVerifier(
-                infrastructure.getTableGateway(), infrastructure.getResultWriter(),
-                infrastructure.getPersistenceConfig());
+                infrastructure.getTableGateway(), infrastructure.getPersistenceConfig());
         TrainingWorkflow trainingWorkflow = new TrainingWorkflow(loader,
                 preparationServices.getProfileService(),
                 preparationServices.getPlanService(),

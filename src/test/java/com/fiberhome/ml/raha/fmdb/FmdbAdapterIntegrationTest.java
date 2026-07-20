@@ -34,6 +34,7 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbSchemaResolver;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableRecord;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableSchemas;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbFeatureDictionaryCodec;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbDetectionResultWriteMode;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.testsupport.SparkTestSession;
 import com.fiberhome.ml.raha.util.HashUtils;
@@ -124,9 +125,13 @@ class FmdbAdapterIntegrationTest {
     @Test
     void shouldWriteJobsAndDetectionResultsIdempotently() {
         SparkSession spark = SparkTestSession.get();
+        FmdbPersistenceConfig config = FmdbPersistenceConfig.builder()
+                .detectionResultWriteMode(
+                        FmdbDetectionResultWriteMode.IDEMPOTENT_BY_KEY)
+                .build();
         SparkSqlFmdbResultWriter writer = new SparkSqlFmdbResultWriter(
                 spark, gateway, fixedClock(2000L),
-                FmdbPersistenceConfig.fromDefaults());
+                config);
         RahaJob job = new RahaJob("job-1", "request-1", JobType.DETECTION,
                 "dataset", "snapshot-v1", "config-v1", 1000L);
 
@@ -144,6 +149,21 @@ class FmdbAdapterIntegrationTest {
         assertEquals(1L, gateway.read(RESULT_TABLE).count());
         assertEquals("VALUE-1", gateway.read(RESULT_TABLE).first()
                 .getAs("original_value"));
+    }
+
+    @Test
+    void shouldAppendDetectionResultsDirectlyWhenConfigured() {
+        SparkSession spark = SparkTestSession.get();
+        SparkSqlFmdbResultWriter writer = new SparkSqlFmdbResultWriter(
+                spark, gateway, fixedClock(2000L),
+                FmdbPersistenceConfig.fromDefaults());
+        List<DetectionResult> results = Arrays.asList(
+                detection("1", true, 0.9d), detection("2", false, 0.1d));
+        FmdbDetectionWriteContext context = detectionContext("1", "2");
+
+        assertEquals(1L, writer.writeDetectionResults(RESULT_TABLE, context, results));
+        assertEquals(1L, writer.writeDetectionResults(RESULT_TABLE, context, results));
+        assertEquals(2L, gateway.read(RESULT_TABLE).count());
     }
 
     @Test

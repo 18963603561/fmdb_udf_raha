@@ -139,8 +139,10 @@ public final class RahaDetectService {
             } else {
                 status = JobStatus.SUCCEEDED;
             }
+            long errorCellCount = errorCellCount(results);
+            long writtenErrorCount = 0L;
             if (!results.isEmpty() && status != JobStatus.FAILED) {
-                repository.saveAll(new DetectionResultSaveContext(
+                writtenErrorCount = repository.saveAll(new DetectionResultSaveContext(
                                 request.getJobId(), request.getDataset(),
                                 request.getModelSetVersion(),
                                 modelVersions.values()), results,
@@ -148,6 +150,9 @@ public final class RahaDetectService {
             }
             Map<String, String> details = new LinkedHashMap<String, String>();
             details.put("detectedCellCount", String.valueOf(results.size()));
+            details.put("errorCellCount", String.valueOf(errorCellCount));
+            details.put("writtenErrorCount", String.valueOf(writtenErrorCount));
+            details.put("detectionBatchId", request.getJobId());
             details.put("modelVersions", modelVersions.toString());
             details.put("modelSetVersion", String.valueOf(
                     request.getModelSetVersion()));
@@ -244,6 +249,16 @@ public final class RahaDetectService {
             summaries.put(entry.getKey(), entry.getValue().summary());
         }
         return summaries.toString();
+    }
+
+    private static long errorCellCount(List<DetectionResult> results) {
+        long count = 0L;
+        for (DetectionResult result : results) {
+            if (result.isError()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static final class DetectColumnOutcome {

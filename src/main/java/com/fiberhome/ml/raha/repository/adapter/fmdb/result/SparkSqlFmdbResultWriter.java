@@ -8,6 +8,7 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableRecord;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableSchemas;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbDetectionResultWriteMode;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbRawValueAccessPolicy;
 
@@ -190,10 +191,18 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
             return 0L;
         }
         Dataset<Row> frame = frame(FmdbPhysicalTable.DETECTION_RESULT, records);
-        long count = tableGateway.appendIdempotent(tableName, frame,
-                Arrays.asList("detection_batch_id", "cell_id", "model_version"));
-        LOGGER.info("FMDB 错误结果写入完成，detectionBatchId={}，writtenCount={}",
-                context.getDetectionBatchId(), count);
+        FmdbDetectionResultWriteMode writeMode =
+                persistenceConfig.getDetectionResultWriteMode();
+        long count;
+        if (writeMode == FmdbDetectionResultWriteMode.DIRECT_APPEND) {
+            // 直接追加模式用于避免检测结果写入前扫描目标表历史主键。
+            count = tableGateway.appendDirect(tableName, frame, records.size());
+        } else {
+            count = tableGateway.appendIdempotent(tableName, frame,
+                    Arrays.asList("detection_batch_id", "cell_id", "model_version"));
+        }
+        LOGGER.info("FMDB 错误结果写入完成，detectionBatchId={}，writeMode={}，writtenCount={}",
+                context.getDetectionBatchId(), writeMode, count);
         return count;
     }
 

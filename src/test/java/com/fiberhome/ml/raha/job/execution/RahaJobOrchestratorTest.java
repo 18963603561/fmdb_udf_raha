@@ -54,7 +54,8 @@ class RahaJobOrchestratorTest {
 
     @Test
     void shouldChainStagesBindSnapshotAndRetryRecoverableFailure() {
-        Fixture fixture = new Fixture(defaultConfig());
+        Fixture fixture = new Fixture(configWithFailureTolerance(
+                new FailureToleranceConfig(false, 0.2d, 1)));
         RahaJob job = fixture.orchestrator.submit(fixture.config);
         AtomicInteger strategyAttempts = new AtomicInteger();
         List<StageHandler> handlers = Arrays.asList(

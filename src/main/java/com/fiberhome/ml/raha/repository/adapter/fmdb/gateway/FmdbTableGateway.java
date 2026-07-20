@@ -39,6 +39,18 @@ public interface FmdbTableGateway {
                           List<String> keyColumns);
 
     /**
+     * 不读取目标表业务主键，直接追加写入数据。
+     *
+     * @param tableName FMDB 目标表
+     * @param rows 待写入数据
+     * @param expectedCount 调用方已知的待写入记录数
+     * @return 追加提交的记录数
+     */
+    long appendDirect(String tableName,
+                      Dataset<Row> rows,
+                      long expectedCount);
+
+    /**
      * 删除时间字段早于截止时间的记录。
      *
      * @param tableName FMDB 目标表

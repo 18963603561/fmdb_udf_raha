@@ -29,7 +29,7 @@ public final class DefaultDetectionResultRepository implements DetectionResultRe
     }
 
     @Override
-    public void saveAll(String jobId,
+    public long saveAll(String jobId,
                         List<DetectionResult> results,
                         ArtifactVersion version,
                         long updatedAt) {
@@ -45,6 +45,13 @@ public final class DefaultDetectionResultRepository implements DetectionResultRe
                         version, result, updatedAt));
             }
         });
+        long errorCount = 0L;
+        for (DetectionResult result : results) {
+            if (result != null && result.isError()) {
+                errorCount++;
+            }
+        }
+        return errorCount;
     }
 
     @Override
