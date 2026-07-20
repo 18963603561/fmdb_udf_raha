@@ -121,6 +121,10 @@
                             <artifactSet>
                                 <includes>
                                     <include>org.apache.poi:poi</include>
+                                    <include>com.zaxxer:SparseBitSet</include>
+                                    <include>org.apache.commons:commons-collections4</include>
+                                    <include>commons-codec:commons-codec</include>
+                                    <include>commons-io:commons-io</include>
                                 </includes>
                             </artifactSet>
                             <filters>
