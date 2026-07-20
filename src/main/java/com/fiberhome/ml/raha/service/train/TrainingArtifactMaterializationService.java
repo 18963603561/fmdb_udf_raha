@@ -17,6 +17,7 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbTrainingColu
 import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbTrainingExampleRecord;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPartitionUtils;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbFeatureDictionaryCodec;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbClusterSummaryCodec;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
 import com.fiberhome.ml.raha.data.domain.CellCoordinate;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
@@ -299,25 +300,11 @@ public final class TrainingArtifactMaterializationService {
                     strategy, entry.getValue().getVersion(),
                     FmdbFeatureDictionaryCodec.write(entry.getValue()),
                     clusteringResult == null ? null : clusteringResult.getClusterVersion(),
-                    clusteringResult == null ? null : FmdbJsonCodec.write(
-                            clusterSummary(clusteringResult)),
+                    clusteringResult == null ? null
+                            : FmdbClusterSummaryCodec.write(clusteringResult),
                     propagationSummaries.isEmpty() ? null
                             : FmdbJsonCodec.write(propagationSummaries), createdAt));
         }
-        return result;
-    }
-
-    private static Map<String, Object> clusterSummary(
-            ColumnClusteringResult clustering) {
-        Map<String, Object> result = new LinkedHashMap<String, Object>();
-        result.put("algorithm", clustering.getAlgorithm());
-        result.put("distanceMetric", clustering.getDistanceMetric().name());
-        result.put("requestedClusterCount", clustering.getRequestedClusterCount());
-        result.put("effectiveClusterCount", clustering.getEffectiveClusterCount());
-        result.put("assignmentCount", clustering.getAssignments().size());
-        result.put("status", clustering.getStatus().name());
-        result.put("message", clustering.getMessage());
-        result.put("createdAt", clustering.getCreatedAt());
         return result;
     }
 

@@ -256,7 +256,6 @@ public final class FmdbPersistenceConfig {
                 tableSwitches.put(table, true);
             }
             tableSwitches.put(FmdbPhysicalTable.TRAINING_CELL, false);
-            tableSwitches.put(FmdbPhysicalTable.JOB_STAGE_ATTEMPT, false);
             for (FmdbColumnArtifact artifact : FmdbColumnArtifact.values()) {
                 columnArtifactSwitches.put(artifact, true);
             }

@@ -129,6 +129,61 @@ public final class RahaStage {
         return copy;
     }
 
+    /**
+     * 从追加式阶段状态快照恢复领域对象。
+     *
+     * @param stageId 阶段标识
+     * @param jobId 任务标识
+     * @param stageType 阶段类型
+     * @param attemptId 尝试序号
+     * @param status 阶段状态
+     * @param startedAt 开始时间
+     * @param finishedAt 完成时间
+     * @param errorCode 失败编码
+     * @param errorMessage 脱敏失败说明
+     * @return 已恢复的独立阶段对象
+     */
+    public static RahaStage restore(String stageId,
+                                    String jobId,
+                                    StageType stageType,
+                                    int attemptId,
+                                    StageStatus status,
+                                    long startedAt,
+                                    long finishedAt,
+                                    String errorCode,
+                                    String errorMessage) {
+        if (status == null) {
+            throw new IllegalArgumentException("恢复阶段状态不能为空");
+        }
+        RahaStage stage = new RahaStage(stageId, jobId, stageType, attemptId);
+        if (status == StageStatus.PENDING) {
+            return stage;
+        }
+        stage.start(startedAt);
+        switch (status) {
+            case RUNNING:
+                return stage;
+            case SUCCEEDED:
+                stage.succeed(finishedAt);
+                break;
+            case PARTIAL_SUCCESS:
+                stage.partialSucceed(finishedAt);
+                break;
+            case FAILED:
+                stage.fail(errorCode, errorMessage, finishedAt);
+                break;
+            case SKIPPED:
+                stage.skip(finishedAt);
+                break;
+            case CANCELLED:
+                stage.cancel(finishedAt);
+                break;
+            default:
+                throw new IllegalArgumentException("不支持恢复阶段状态：" + status);
+        }
+        return stage;
+    }
+
     public String getStageId() {
         return stageId;
     }

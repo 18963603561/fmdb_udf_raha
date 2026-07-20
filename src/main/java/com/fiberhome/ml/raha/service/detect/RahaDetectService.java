@@ -14,6 +14,7 @@ import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
 import com.fiberhome.ml.raha.parallel.ParallelFailure;
 import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
 import com.fiberhome.ml.raha.repository.port.DetectionResultRepository;
+import com.fiberhome.ml.raha.repository.port.DetectionResultSaveContext;
 import com.fiberhome.ml.raha.service.common.RahaServiceResult;
 import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.common.RahaServiceSummary;
@@ -115,7 +116,9 @@ public final class RahaDetectService {
                         ? "RuntimeException" : failure.getErrorType());
             }
             if (!results.isEmpty()) {
-                repository.saveAll(request.getJobId(), results,
+                repository.saveAll(new DetectionResultSaveContext(
+                                request.getJobId(), request.getDataset(),
+                                modelVersions.values()), results,
                         request.getArtifactVersion(), clock.millis());
             }
             RahaDetectOutput output = new RahaDetectOutput(

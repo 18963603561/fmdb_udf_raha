@@ -27,7 +27,7 @@ class FmdbPersistenceConfigTest {
         assertTrue(config.shouldPersist(FmdbPhysicalTable.SAMPLE_RECORD));
         assertTrue(config.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT));
         assertFalse(config.shouldPersist(FmdbPhysicalTable.TRAINING_CELL));
-        assertFalse(config.shouldPersist(FmdbPhysicalTable.JOB_STAGE_ATTEMPT));
+        assertTrue(config.shouldPersist(FmdbPhysicalTable.JOB_STAGE_ATTEMPT));
         assertTrue(config.shouldPersist(FmdbColumnArtifact.PROFILE));
         assertTrue(config.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY));
         assertFalse(config.shouldPersist(FmdbColumnArtifact.CLUSTER_SUMMARY));

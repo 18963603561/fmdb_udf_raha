@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,6 +22,9 @@ public final class FmdbJsonCodec {
     /** 通用对象映射类型。 */
     private static final TypeReference<Map<String, Object>> OBJECT_TYPE =
             new TypeReference<Map<String, Object>>() { };
+    /** 通用数组映射类型。 */
+    private static final TypeReference<List<Object>> ARRAY_TYPE =
+            new TypeReference<List<Object>>() { };
 
     private FmdbJsonCodec() {
     }
@@ -55,6 +60,25 @@ public final class FmdbJsonCodec {
                     new LinkedHashMap<String, Object>(result));
         } catch (IOException exception) {
             throw new IllegalArgumentException("FMDB JSON 解码失败", exception);
+        }
+    }
+
+    /**
+     * 将 JSON 数组解码为不可修改列表。
+     *
+     * @param json JSON 数组文本
+     * @return 保持原始顺序的不可修改列表
+     */
+    public static List<Object> readArray(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        try {
+            List<Object> result = MAPPER.readValue(json, ARRAY_TYPE);
+            return result == null ? Collections.emptyList()
+                    : Collections.unmodifiableList(new ArrayList<Object>(result));
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("FMDB JSON 数组解码失败", exception);
         }
     }
 

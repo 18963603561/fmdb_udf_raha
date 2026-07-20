@@ -93,7 +93,6 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
             existing.unpersist(false);
         }
         tables.put(validated, materialized);
-        materialized.createOrReplaceTempView(validated);
         return count;
     }
 
@@ -120,7 +119,6 @@ public final class InMemoryFmdbTableGateway implements FmdbTableGateway {
                         functions.col(validatedColumn).geq(cutoffExclusive)));
         long after = retained.count();
         tables.put(validatedTable, retained);
-        retained.createOrReplaceTempView(validatedTable);
         LOGGER.info("内存 FMDB 过期数据清理完成，tableName={}，timestampColumn={}，"
                         + "cutoffExclusive={}，deletedCount={}",
                 validatedTable, validatedColumn, cutoffExclusive, before - after);

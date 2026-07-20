@@ -152,11 +152,16 @@ public final class SparkSqlFmdbResultWriter implements FmdbResultWriter {
                     result.getCoordinate().getRowId());
             String columnName = result.getCoordinate().getColumnName();
             Map<String, Object> reason = new LinkedHashMap<String, Object>();
+            reason.put("configVersion", result.getConfigVersion());
             reason.put("featureDictionaryVersion",
                     result.getFeatureDictionaryVersion());
+            reason.put("maskedValue", result.getMaskedValue());
             reason.put("modelName", result.getModelName());
             reason.put("reasons", result.getReasons());
+            reason.put("snapshotId", result.getCoordinate().getSnapshotId());
+            reason.put("stageId", result.getStageId());
             reason.put("strategyIds", result.getStrategyIds());
+            reason.put("valueHash", result.getValueHash());
             Map<String, Object> values = new LinkedHashMap<String, Object>();
             values.put("detection_batch_id", context.getDetectionBatchId());
             values.put("dataset_id", result.getCoordinate().getDatasetId());

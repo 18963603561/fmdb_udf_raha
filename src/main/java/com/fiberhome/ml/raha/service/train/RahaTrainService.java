@@ -34,6 +34,8 @@ import com.fiberhome.ml.raha.parallel.ParallelBatchResult;
 import com.fiberhome.ml.raha.parallel.ParallelFailure;
 import com.fiberhome.ml.raha.parallel.ParallelWorkItem;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbColumnProfileCodec;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbStrategyArtifactCodec;
 import com.fiberhome.ml.raha.service.common.RahaServiceResult;
 import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.common.RahaServiceSummary;
@@ -43,7 +45,9 @@ import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationRequest;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationResult;
 import com.fiberhome.ml.raha.service.prepare.RahaFeaturePreparationService;
 import com.fiberhome.ml.raha.strategy.execution.StrategyBatchResult;
+import com.fiberhome.ml.raha.strategy.execution.StrategyExecutionResult;
 import com.fiberhome.ml.raha.strategy.execution.StrategyExecutionService;
+import com.fiberhome.ml.raha.strategy.execution.StrategyRunSummary;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlan;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlanService;
 import com.fiberhome.ml.raha.util.HashUtils;
@@ -327,7 +331,7 @@ public final class RahaTrainService {
                         artifactMaterializationService.materialize(mergeResult, features,
                         clustering, trainingPropagation, modelSetVersion, planVersion,
                         builtDatasets, profileJsonByColumn(request.getDataset()),
-                        strategyPlanJsonByColumn(plans));
+                        strategyPlanJsonByColumn(plans, strategyBatch));
                 frozenDatasets = loadFrozenDatasets(request, features, modelSetVersion,
                         materialization);
             }
@@ -463,7 +467,9 @@ public final class RahaTrainService {
         ModelPersistenceContext persistenceContext = new ModelPersistenceContext(
                 modelSetVersion, request.getDataset().getDatasetId(),
                 request.getDataset().getSchemaHash(),
-                request.getJobId(), ModelStatus.CANDIDATE, planVersion,
+                request.getTrainingMergeResult() == null ? request.getJobId()
+                        : request.getTrainingMergeResult().getTrainingBatchId(),
+                ModelStatus.CANDIDATE, planVersion,
                 "direct-input-v1", trainingResult.getMetrics(), clock.millis(), null);
         String modelPath = modelStore.save(
                 trainingResult.getArtifact(), persistenceContext);
@@ -608,26 +614,40 @@ public final class RahaTrainService {
     private static Map<String, String> profileJsonByColumn(RahaDataset dataset) {
         Map<String, String> result = new LinkedHashMap<String, String>();
         for (Map.Entry<String, ColumnProfile> entry : dataset.getProfiles().entrySet()) {
-            result.put(entry.getKey(), FmdbJsonCodec.write(entry.getValue()));
+            result.put(entry.getKey(), FmdbColumnProfileCodec.write(entry.getValue()));
         }
         return result;
     }
 
     private static Map<String, String> strategyPlanJsonByColumn(
-            List<StrategyPlan> plans) {
+            List<StrategyPlan> plans,
+            StrategyBatchResult strategyBatch) {
         Map<String, List<StrategyPlan>> grouped =
                 new LinkedHashMap<String, List<StrategyPlan>>();
+        Map<String, List<StrategyRunSummary>> summaries =
+                new LinkedHashMap<String, List<StrategyRunSummary>>();
+        Map<String, StrategyRunSummary> summaryByStrategy =
+                new LinkedHashMap<String, StrategyRunSummary>();
+        for (StrategyExecutionResult execution : strategyBatch.getExecutions()) {
+            summaryByStrategy.put(execution.getSummary().getStrategyId(),
+                    execution.getSummary());
+        }
         for (StrategyPlan plan : plans) {
             for (String column : plan.getTargetColumns()) {
                 if (!grouped.containsKey(column)) {
                     grouped.put(column, new ArrayList<StrategyPlan>());
+                    summaries.put(column, new ArrayList<StrategyRunSummary>());
                 }
                 grouped.get(column).add(plan);
+                if (summaryByStrategy.containsKey(plan.getStrategyId())) {
+                    summaries.get(column).add(summaryByStrategy.get(plan.getStrategyId()));
+                }
             }
         }
         Map<String, String> result = new LinkedHashMap<String, String>();
         for (Map.Entry<String, List<StrategyPlan>> entry : grouped.entrySet()) {
-            result.put(entry.getKey(), FmdbJsonCodec.write(entry.getValue()));
+            result.put(entry.getKey(), FmdbStrategyArtifactCodec.write(
+                    entry.getValue(), summaries.get(entry.getKey())));
         }
         return result;
     }

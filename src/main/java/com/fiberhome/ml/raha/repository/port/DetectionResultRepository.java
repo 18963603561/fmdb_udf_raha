@@ -15,6 +15,24 @@ public interface DetectionResultRepository {
                  ArtifactVersion version,
                  long updatedAt);
 
+    /**
+     * 使用可信输入上下文保存检测结果；默认实现兼容现有内存仓储。
+     *
+     * @param context 检测写入上下文
+     * @param results 全量预测结果
+     * @param version 结果版本
+     * @param updatedAt 更新时间
+     */
+    default void saveAll(DetectionResultSaveContext context,
+                         List<DetectionResult> results,
+                         ArtifactVersion version,
+                         long updatedAt) {
+        if (context == null) {
+            throw new IllegalArgumentException("检测写入上下文不能为空");
+        }
+        saveAll(context.getJobId(), results, version, updatedAt);
+    }
+
     List<DetectionResult> findByJob(String jobId);
 
     Optional<DetectionResult> find(String jobId, String cellId);
