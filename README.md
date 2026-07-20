@@ -1,202 +1,371 @@
-# Raha 数据检测工程
+# fmdb_udf_raha
 
-## 工程定位
+`fmdb_udf_raha` 提供 Raha 检测链路的 Hive/Spark `GenericUDF` 函数封装，用于在数仓 SQL 中完成样本采集、人工标注结果训练和模型执行检测。
 
-本工程是面向 FMDB 和 Spark 的单元格级数据检测组件，采用任务模型组织数据加载、字段画像、策略生成、特征组装、聚类采样、标签传播、模型训练、模型预测、规则检测、结果评估和结果登记。
+当前提供三个函数：
 
-当前工程只保留任务模型主线，不包含 UDF、文件任务队列、后台消费者和容器验收入口。业务调用方在同一进程内提交任务并直接执行，不需要先生成任务文件，再由另一个进程消费。
-
-## 统一入口
-
-训练、预测和采样统一通过 `RahaTaskApplicationService.execute` 执行。该入口负责：
-
-1. 校验任务请求和任务类型。
-2. 通过 `RahaJobOrchestrator.submit` 完成幂等建单。
-3. 根据 `JobType` 选择对应工作流。
-4. 创建阶段处理器并调用 `RahaJobOrchestrator.execute`。
-5. 返回任务状态、阶段轨迹、业务输出和结果位置。
-
-最小调用形式如下：
-
-```java
-RahaTaskExecutionRequest request = RahaTaskExecutionRequest.training(
-        config,
-        dataLoadRequest,
-        trainConfig,
-        labelPropagationConfig,
-        labels);
-
-RahaTaskExecutionResult result = applicationService.execute(request);
-```
-
-直接执行的调用链如下：
-
-```text
-业务调用方
-  -> service.task.RahaTaskApplicationService
-  -> service.task.RahaWorkflow
-  -> job.execution.RahaJobOrchestrator
-  -> job.stage.StageHandler
-  -> service.* 和领域算法组件
-  -> repository.port
-```
-
-`submit` 和 `execute` 仍然保留在任务编排层，分别负责建单和执行；业务方不再需要自行拼装这两个动作。统一入口不是队列消费者，也不会启动定时器或常驻线程。
-
-## 支持的工作流
-
-| 任务类型 | 工作流 | 主要阶段 | 主要输出 |
+| 功能 | 推荐函数名 | 实现类 | 含义 |
 | --- | --- | --- | --- |
-| `TRAINING` | `TrainingWorkflow` | 加载、画像、策略、特征、聚类、标签、传播、训练、评估、结果登记 | 候选模型和训练结果 |
-| `DETECTION` | `DetectionWorkflow` | 加载、画像、策略、特征、已发布模型预测、评估、结果登记 | 检测结果 |
-| `SAMPLING` | `SamplingWorkflow` | 加载、画像、策略、特征、聚类、主动采样、结果登记 | 采样任务和样本结果 |
+| 采集样本 | `F_DW_DETCOLLECT` | `com.fiberhome.ml.raha.udf.F_DW_DETCOLLECT` | 采集检测样本并生成待标注压缩包 |
+| 模型训练 | `F_DW_DETTRAIN` | `com.fiberhome.ml.raha.udf.F_DW_DETTRAIN` | 根据样本批次和人工标注训练检测模型 |
+| 执行检测 | `F_DW_DETRUN` | `com.fiberhome.ml.raha.udf.F_DW_DETRUN` | 使用模型版本对表或 SQL 数据执行检测 |
 
-训练阶段生成的是候选模型。模型是否成为生产可用模型，仍由 `model.release` 中的发布服务单独完成，这是审批边界，不是第二个任务消费进程。预测工作流只读取已发布模型，避免把训练候选模型直接当成生产模型。
+## 构建
 
-## 任务模型和服务的关系
+工程要求使用 JDK 8 构建。若本地不是 JDK 8，可在验证时临时跳过 enforcer。
 
-任务模型负责记录执行过程和生命周期，服务包负责完成具体业务动作：
+```bash
+mvn -q -DskipTests package
+```
 
-| 模块 | 职责 |
-| --- | --- |
-| `job.domain` | 任务、阶段和任务运行结果领域对象 |
-| `job.execution` | 幂等提交、阶段编排、重试、失败决策和终态管理 |
-| `job.stage` | 阶段上下文、阶段结果和具体阶段适配器 |
-| `service.task` | 统一业务入口、工作流注册和训练预测采样编排 |
-| `service.prepare` | 数据画像、策略计划和特征准备 |
-| `service.train` | 候选模型训练 |
-| `service.detect` | 已发布模型预测 |
-| `service.sample` | 主动采样和采样任务生成 |
-| `repository.port` | 任务、阶段、结果和模型存储接口 |
-| `repository.adapter` | 内存或持久化仓储实现 |
+非 JDK 8 环境临时验证：
 
-服务包不再自行维护一套 `RahaTaskType`、`RahaTaskStatus` 和 `RahaTaskResult`。任务类型和生命周期统一使用 `data.type.JobType`、`data.type.JobStatus`，服务返回统一使用 `service.common.RahaServiceResult`。
+```bash
+mvn -q -DskipTests "-Denforcer.skip=true" package
+```
 
-## 包结构
+构建完成后，将生成的包含依赖包上传到 Hive 或 Spark SQL 可访问的位置。
+
+## 函数注册
+
+### 临时函数注册
+
+```sql
+ADD JAR /path/to/fmdb-udf-raha-1.0.0-SNAPSHOT-all.jar;
+
+CREATE TEMPORARY FUNCTION F_DW_DETCOLLECT
+AS 'com.fiberhome.ml.raha.udf.F_DW_DETCOLLECT';
+
+CREATE TEMPORARY FUNCTION F_DW_DETTRAIN
+AS 'com.fiberhome.ml.raha.udf.F_DW_DETTRAIN';
+
+CREATE TEMPORARY FUNCTION F_DW_DETRUN
+AS 'com.fiberhome.ml.raha.udf.F_DW_DETRUN';
+```
+
+### 永久函数注册
+
+如果平台支持永久函数，可按平台规范注册：
+
+```sql
+CREATE FUNCTION F_DW_DETCOLLECT
+AS 'com.fiberhome.ml.raha.udf.F_DW_DETCOLLECT'
+USING JAR '/path/to/fmdb-udf-raha-1.0.0-SNAPSHOT-all.jar';
+
+CREATE FUNCTION F_DW_DETTRAIN
+AS 'com.fiberhome.ml.raha.udf.F_DW_DETTRAIN'
+USING JAR '/path/to/fmdb-udf-raha-1.0.0-SNAPSHOT-all.jar';
+
+CREATE FUNCTION F_DW_DETRUN
+AS 'com.fiberhome.ml.raha.udf.F_DW_DETRUN'
+USING JAR '/path/to/fmdb-udf-raha-1.0.0-SNAPSHOT-all.jar';
+```
+
+不同执行引擎对永久函数语法存在差异，以上语句可按实际 Hive、Spark SQL 或平台网关规范调整。
+
+## 入参格式
+
+三个函数均继承 `GenericUDF`，当前统一使用单字符串参数。字符串支持两种格式：
+
+### 表单编码格式
 
 ```text
-com.fiberhome.ml.raha
-  checkpoint
-  cluster
-    algorithm
-    domain
-  config
-    core
-    dto
-    validation
-  data
-    domain
-    loader
-    profile
-    type
-  detection
-    explanation
-    scoring
-    service
-  evaluation
-    metrics
-    threshold
-  feature
-    assembly
-    domain
-  fmdb
-    gateway
-  job
-    domain
-    execution
-    id
-    stage
-  label
-    propagation
-  model
-    domain
-    prediction
-    release
-    training
-  repository
-    adapter
-    core
-    port
-  sampling
-    domain
-    service
-  service
-    common
-    detect
-    prepare
-    sample
-    task
-    train
-  strategy
-    api
-    domain
-    execution
-    impl
-    plan
+sourceType=TABLE&tableName=dw.customer&rowKeyColumns=id&publishZip=true
 ```
 
-## 结果和状态
+### JSON 格式
 
-成功执行返回 `RahaTaskExecutionResult`。调用方可以读取：
+```json
+{"sourceType":"TABLE","tableName":"dw.customer","rowKeyColumns":"id","publishZip":"true"}
+```
 
-- `getJob()`：任务标识、类型、状态和时间信息。
-- `getStages()`：每个阶段的执行状态和失败信息。
-- `getPayload()`：训练模型、检测结果或采样输出。
-- `getResultLocation()`：业务结果的逻辑存储位置。
+字段值中的特殊字符建议使用 JSON 格式，或者对表单编码格式做 URL 编码。
 
-任务终态包括 `SUCCEEDED`、`PARTIAL_SUCCESS`、`FAILED` 和 `CANCELLED`。可容忍失败的阶段不会阻断后续阶段，但最终任务会标记为 `PARTIAL_SUCCESS`，避免把不完整结果误报为完全成功。
+## 公共入参
 
-同一个幂等键重复提交时，入口返回已有任务及其阶段轨迹，不会重复执行阶段。当前仓储接口主要保存任务和阶段状态，重复请求不会重新恢复内存中的业务 payload；业务方应根据结果位置重新读取持久化结果。
+| 参数 | 是否必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `sourceType` | 采集和检测建议传入 | 自动推断 | 数据来源类型，支持 `TABLE`、`SQL`。当传入 `tableName` 时推断为 `TABLE`，传入 `sqlText` 时推断为 `SQL` |
+| `tableName` | `sourceType=TABLE` 时必填 | 无 | 待处理表名 |
+| `sqlText` | `sourceType=SQL` 时必填 | 无 | 待处理查询语句，仅支持 `SELECT` 或 `WITH` 开头的查询 |
+| `datasetId` | SQL 来源建议必填 | TABLE 来源按表名生成 | 数据集标识，用于关联快照、样本、模型和结果 |
+| `snapshotId` | 否 | 自动生成 | 快照标识 |
+| `sourceVersion` | 否 | 空 | 来源数据版本 |
+| `rowKeyColumns` | 否 | 空 | 行主键字段，多个字段用英文逗号分隔 |
+| `includeColumns` | 否 | 空 | 只处理指定字段，多个字段用英文逗号分隔 |
+| `excludeColumns` | 否 | 空 | 排除指定字段，多个字段用英文逗号分隔 |
+| `sensitiveColumns` | 否 | 空 | 敏感字段标记。当前检测明细按原值展示，不再输出脱敏展示值 |
+| `publishZip` | 否 | `true` | 是否生成 ZIP 并输出 URL |
+| `caller` | 否 | 空 | 调用方标识 |
+| `requestId` | 否 | 自动生成 | 请求标识，便于日志排查 |
 
-## 配置
+## 公共出参
 
-默认配置位于：
+三个函数均以二维表形式返回结果。公共字段如下：
+
+| 字段 | 说明 |
+| --- | --- |
+| `status` | 执行状态，成功为 `SUCCESS`，失败为 `FAILED` |
+| `errorCode` | 错误码，成功为空 |
+| `errorMessage` | 错误说明，成功为空 |
+| `datasetId` | 数据集标识 |
+| `snapshotId` | 快照标识 |
+| `sourceType` | 数据来源类型 |
+| `inputReference` | 输入引用，表名或 SQL 摘要 |
+| `createdAt` | 结果生成时间 |
+
+## F_DW_DETCOLLECT
+
+### 功能
+
+采集函数用于读取表或 SQL 数据，生成检测样本批次、字段统计、聚类信息和待标注 Excel，并将待标注文件和辅助文件打包成 ZIP。
+
+ZIP 文件中包含待标注 `xls` 文件和相关元数据文件。待标注文件名包含 `sampleBatchId`，标注上传后可根据文件名定位样本批次。
+
+### 入参
+
+| 参数 | 是否必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| 公共入参 | 按公共规则 | 按公共规则 | 表或 SQL 来源配置 |
+| `labelingBudget` | 否 | 系统默认 | 待标注样本预算 |
+| `samplingRound` | 否 | `1` | 采样轮次 |
+| `artifactBaseDir` | 否 | 系统默认 | 本次产物基础目录 |
+
+### 出参
+
+| 字段 | 说明 |
+| --- | --- |
+| 公共出参 | 公共返回字段 |
+| `sourceVersion` | 来源数据版本 |
+| `schemaHash` | 字段结构哈希 |
+| `rowCount` | 采集数据量 |
+| `fieldCount` | 字段数 |
+| `validFieldCount` | 有效字段数 |
+| `sampleBatchId` | 样本批次标识 |
+| `sampleRecordCount` | 样本记录数 |
+| `annotationTaskCount` | 待标注数量 |
+| `clusterCount` | 聚类数量 |
+| `clusteredFieldCount` | 已聚类字段数 |
+| `annotationExcelName` | 待标注 Excel 文件名 |
+| `annotationZipName` | 待标注 ZIP 文件名 |
+| `annotationZipUrl` | 待标注 ZIP 下载地址 |
+| `partitionMonth` | 分区月份 |
+
+### 调用示例
+
+```sql
+SELECT *
+FROM F_DW_DETCOLLECT(
+  'sourceType=TABLE&tableName=dw.customer&rowKeyColumns=id&publishZip=true'
+);
+```
+
+```sql
+SELECT *
+FROM F_DW_DETCOLLECT(
+  '{"sourceType":"SQL","datasetId":"customer_query","sqlText":"select * from dw.customer where dt=''20260720''","rowKeyColumns":"id"}'
+);
+```
+
+### 文件命名
+
+待标注 Excel 文件名采用可定位样本批次的命名方式：
 
 ```text
-src/main/resources/raha-defaults.properties
+raha_annotation_<datasetId>_<sampleBatchId>.xls
 ```
 
-常用配置前缀如下：
+待标注 ZIP 文件名采用：
 
-| 前缀 | 用途 |
-| --- | --- |
-| `raha.job.*` | 任务行为和随机种子 |
-| `raha.strategy.*` | 策略范围、优先级、数量和超时 |
-| `raha.feature.*` | 特征归一化、上下文特征和特征规模 |
-| `raha.model.*` | 分类器、阈值、训练参数和质量门禁 |
-| `raha.clustering.*` | 聚类算法参数 |
-| `raha.sampling.*` | 主动采样预算和任务有效期 |
-| `raha.label.*` | 标签传播权重和多数比例 |
-| `raha.resource.*` | 并行度、广播、缓存和阶段超时 |
-| `raha.failure.*` | 失败容忍和重试次数 |
-
-## 运行要求
-
-- JDK 8
-- Maven 3.8 或更高版本
-- Spark 3.3.1
-- Scala 2.12 对应的 Spark 依赖
-
-编译、测试和打包命令：
-
-```powershell
-mvn clean compile
-mvn clean test
-mvn clean package
+```text
+raha_annotation_<datasetId>_<sampleBatchId>.zip
 ```
 
-Spark 依赖使用 `provided` 范围，实际运行环境需要提供对应 Spark 运行时。生产调用方需要负责创建和关闭 `SparkSession`，并注入仓储、FMDB 网关、模型发布服务及各领域服务实现。
+## F_DW_DETTRAIN
 
-## 当前边界
+### 功能
 
-- 工程不是 Spring Boot 应用，不提供默认 `Application` 启动类。
-- 工程不包含常驻 Worker，不创建定时器，也不轮询文件目录。
-- 统一入口是同步执行接口；需要异步执行时，应在工程外部使用已有调度系统调用该入口，并由外部系统管理重试、超时和并发。
-- `EVALUATION`、`STRATEGY_ANALYSIS` 等类型暂未接入统一入口，需要先定义对应工作流后再注册。
+训练函数根据 `sampleBatchId` 定位样本批次和人工标注文件，导入标注结果并训练模型，返回模型版本、训练状态和质量指标。
 
-## 相关文档
+训练时优先从默认 HDFS 标注上传目录查找最新文件：
 
-| 文档 | 用途 |
+```text
+/fmdb/detection/annotation/
+```
+
+如果默认目录找不到最新文件，则从已导入的标注结果记录中获取。仍获取不到时返回 `MANUAL_ANNOTATION_NOT_FOUND`，错误信息会提示将人工标注文件上传到 `/fmdb/detection/annotation/`。
+
+模型默认写入：
+
+```text
+/fmdb/detection/model/
+```
+
+### 入参
+
+| 参数 | 是否必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `sampleBatchId` | 是 | 无 | 样本批次标识 |
+| `annotationDir` | 否 | `/fmdb/detection/annotation/` | 人工标注文件上传目录 |
+| `allowPartialAnnotation` | 否 | `false` | 是否允许部分标注训练 |
+| `modelNamePrefix` | 否 | `raha` | 模型名称前缀 |
+| `modelBasePath` | 否 | `/fmdb/detection/model/` | 模型存储基础路径 |
+| `publishZip` | 否 | `true` | 是否生成训练报告 ZIP |
+| 公共入参 | 否 | 按公共规则 | 可用于覆盖训练输入来源 |
+
+### 出参
+
+| 字段 | 说明 |
 | --- | --- |
-| `doc/20260718/Raha任务编排与训练预测统一入口分析-202607181400.md` | 统一入口、训练预测工作流和边界分析 |
-| `doc/20260718/Raha统一任务编排入口代码落地报告-202607181450.md` | 本轮代码落地范围、验证结果和后续边界 |
+| 公共出参 | 公共返回字段 |
+| `sampleBatchId` | 样本批次标识 |
+| `annotationBatchId` | 标注批次标识 |
+| `annotationFileName` | 使用的标注文件名 |
+| `annotationStatus` | 标注状态 |
+| `annotationRecordCount` | 标注记录数 |
+| `validAnnotationCount` | 有效标注数 |
+| `invalidAnnotationCount` | 无效标注数 |
+| `modelSetVersion` | 模型集合版本 |
+| `columnName` | 字段名 |
+| `modelVersion` | 字段模型版本 |
+| `modelStatus` | 模型状态 |
+| `classifierType` | 分类器类型 |
+| `featureDictionaryVersion` | 特征字典版本 |
+| `strategyPlanVersion` | 策略计划版本 |
+| `threshold` | 检测阈值 |
+| `metricJson` | 训练指标 JSON |
+| `reportZipName` | 训练报告 ZIP 文件名 |
+| `reportZipUrl` | 训练报告 ZIP 下载地址 |
+
+### 调用示例
+
+```sql
+SELECT *
+FROM F_DW_DETTRAIN(
+  'sampleBatchId=sample_20260720143000_customer&allowPartialAnnotation=false'
+);
+```
+
+```sql
+SELECT *
+FROM F_DW_DETTRAIN(
+  '{"sampleBatchId":"sample_20260720143000_customer","annotationDir":"/fmdb/detection/annotation/","modelBasePath":"/fmdb/detection/model/"}'
+);
+```
+
+## F_DW_DETRUN
+
+### 功能
+
+检测函数使用指定 `modelSetVersion` 对表或 SQL 数据执行检测，输出检测数据基本信息、预测错误量和明细 ZIP 地址。
+
+检测明细以 Excel 输出。字段值按原值展示，当前不再输出 `masked_value` 脱敏展示值。
+
+### 入参
+
+| 参数 | 是否必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| 公共入参 | 按公共规则 | 按公共规则 | 表或 SQL 来源配置 |
+| `modelSetVersion` | 是 | 无 | 模型集合版本 |
+| `missingModelPolicy` | 否 | `PARTIAL` | 字段模型缺失策略，支持 `FAIL`、`PARTIAL` |
+| `detailFormat` | 否 | `xls` | 明细文件格式，当前固定为 `xls` |
+| `publishZip` | 否 | `true` | 是否生成检测明细 ZIP |
+
+### 出参
+
+| 字段 | 说明 |
+| --- | --- |
+| 公共出参 | 公共返回字段 |
+| `modelSetVersion` | 使用的模型集合版本 |
+| `schemaHash` | 字段结构哈希 |
+| `rowCount` | 检测数据量 |
+| `fieldCount` | 字段数 |
+| `validFieldCount` | 有效字段数 |
+| `modelFieldCount` | 命中模型的字段数 |
+| `failedFieldCount` | 检测失败字段数 |
+| `detectedCellCount` | 参与检测单元格数 |
+| `detectedErrorCount` | 预测错误量 |
+| `resultTable` | 检测结果表或结果引用 |
+| `detailZipName` | 检测明细 ZIP 文件名 |
+| `detailZipUrl` | 检测明细 ZIP 下载地址 |
+
+### 检测明细字段
+
+| 字段 | 说明 |
+| --- | --- |
+| `dataset_id` | 数据集标识 |
+| `snapshot_id` | 快照标识 |
+| `row_id` | 行标识 |
+| `column_name` | 字段名 |
+| `original_value` | 原始字段值 |
+| `score` | 异常分数 |
+| `threshold` | 阈值 |
+| `detected_as_error` | 是否预测为错误 |
+| `model_name` | 模型名称 |
+| `model_version` | 模型版本 |
+| `feature_dictionary_version` | 特征字典版本 |
+| `strategy_ids` | 命中策略列表 |
+| `reasons_json` | 预测原因 JSON |
+
+### 调用示例
+
+```sql
+SELECT *
+FROM F_DW_DETRUN(
+  'sourceType=TABLE&tableName=dw.customer&rowKeyColumns=id&modelSetVersion=model-set-20260720150000&missingModelPolicy=PARTIAL'
+);
+```
+
+```sql
+SELECT *
+FROM F_DW_DETRUN(
+  '{"sourceType":"SQL","datasetId":"customer_query","sqlText":"select * from dw.customer where dt=''20260720''","modelSetVersion":"model-set-20260720150000"}'
+);
+```
+
+## 默认配置
+
+默认配置位于 `src/main/resources/raha-defaults.properties`。
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `raha.output.work-dir` | `/tmp/raha-udf-output` | 本地临时产物目录 |
+| `raha.output.local-web-root` | `/tmp/raha-udf-web` | 本地 Web 发布目录 |
+| `raha.output.hdfs-export-path` | `/fmdb/detection/output/` | HDFS 产物导出目录 |
+| `raha.output.web-base-url` | 空 | ZIP 下载地址前缀，为空时按运行环境生成 |
+| `raha.annotation.upload-dir` | `/fmdb/detection/annotation/` | 人工标注上传默认 HDFS 路径 |
+| `raha.model.base-path` | `/fmdb/detection/model/` | 模型默认存储路径 |
+| `raha.runtime.storage-mode` | `FMDB` | 运行时存储模式 |
+
+## 返回状态与错误码
+
+| 错误码 | 说明 |
+| --- | --- |
+| `INVALID_ARGUMENT` | 入参错误或必填参数缺失 |
+| `DATA_LOAD_FAILED` | 数据加载失败 |
+| `SAMPLE_NOT_FOUND` | 样本批次不存在 |
+| `SAMPLE_OUTPUT_NOT_FOUND` | 样本采集产物不存在 |
+| `ANNOTATION_FILE_NOT_FOUND` | 标注文件不存在 |
+| `MANUAL_ANNOTATION_NOT_FOUND` | 未找到人工标注数据 |
+| `ANNOTATION_FILE_INVALID` | 标注文件格式错误或内容无效 |
+| `ANNOTATION_BATCH_MISMATCH` | 标注文件与样本批次不匹配 |
+| `ANNOTATION_IMPORT_FAILED` | 标注导入失败 |
+| `TRAINING_FAILED` | 模型训练失败 |
+| `TRAIN_OUTPUT_NOT_FOUND` | 训练产物不存在 |
+| `MODEL_SET_NOT_FOUND` | 模型集合版本不存在 |
+| `MODEL_SET_NOT_PUBLISHED` | 模型集合未发布或不可用 |
+| `DETECTION_RUN_FAILED` | 检测执行失败 |
+| `DETECT_OUTPUT_NOT_FOUND` | 检测产物不存在 |
+| `PUBLISH_FAILED` | ZIP 或 URL 发布失败 |
+| `UNEXPECTED_ERROR` | 未预期异常 |
+
+## 相关实现
+
+| 类型 | 路径 |
+| --- | --- |
+| UDF 函数 | `src/main/java/com/fiberhome/ml/raha/udf/` |
+| UDF 服务 | `src/main/java/com/fiberhome/ml/raha/udf/service/` |
+| 标注文件定位 | `src/main/java/com/fiberhome/ml/raha/annotation/service/` |
+| ZIP 和 Excel 发布 | `src/main/java/com/fiberhome/ml/raha/output/publish/` |
+| 默认配置 | `src/main/resources/raha-defaults.properties` |
+| 契约与方案文档 | `doc/20260720/Raha三函数UDF契约与实现方案-202607201450.md` |

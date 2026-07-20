@@ -67,6 +67,40 @@ public final class RahaTaskRequestFactory {
     }
 
     /**
+     * 获取与任务工厂共享的采样记录仓储。
+     *
+     * <p>UDF 外层在生成待标注 Excel 时必须读取采样明细，直接复用该仓储可以确保导出内容与训练解析使用同一份
+     * c1 批次数据。</p>
+     *
+     * @return 采样记录仓储
+     */
+    public SampleRecordRepository getSampleRepository() {
+        return sampleRepository;
+    }
+
+    /**
+     * 获取与任务工厂共享的标注记录仓储。
+     *
+     * <p>训练 UDF 在 HDFS 未找到上传 Excel 时，会通过该仓储查找已导入的最新可训练人工标注。</p>
+     *
+     * @return 标注记录仓储
+     */
+    public AnnotationRecordRepository getAnnotationRepository() {
+        return annotationRepository;
+    }
+
+    /**
+     * 获取与任务工厂共享的模型集合仓储。
+     *
+     * <p>检测 UDF 的请求工厂会在内部校验模型集合状态，该访问器用于外层报告或诊断场景读取同一份模型集合数据。</p>
+     *
+     * @return 模型集合仓储
+     */
+    public ModelSetRepository getModelSetRepository() {
+        return modelSetRepository;
+    }
+
+    /**
      * 使用完整 FMDB 表名创建默认首轮采样请求。
      *
      * @param tableName FMDB 完整表名
