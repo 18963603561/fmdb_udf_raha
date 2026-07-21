@@ -6,12 +6,14 @@ import com.fiberhome.ml.raha.udf.F_DW_DETRUN;
 import com.fiberhome.ml.raha.udf.F_DW_DETTRAIN;
 import com.fiberhome.ml.raha.udf.RahaUdfField;
 import com.fiberhome.ml.raha.udf.RahaUdfFields;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -22,7 +24,11 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 import org.apache.spark.sql.SparkSession;
 
 /**
- * 在 Spark 驱动侧直接执行 Raha 三个 GenericUDF，适合函数内部需要再次发起 Spark 作业的场景。
+ * 在 Spark Driver 侧直接执行 Raha 三个 GenericUDF 的本地调试入口。
+ *
+ * <p>该入口绕过 spark-sql 命令，直接实例化 UDF 并调用
+ * {@link GenericUDF#evaluate(GenericUDF.DeferredObject[])}，适合在 IDE 中单步调试
+ * 采样、训练和检测函数。</p>
  */
 public final class RahaUdfDriverApp {
 
@@ -35,12 +41,23 @@ public final class RahaUdfDriverApp {
     /** 默认调试函数配置项，用于 main 无参数时选择 COLLECT、TRAIN 或 DETECT。 */
     private static final String DEBUG_FUNCTION_PROPERTY =
             "raha.udf.debug.function";
-    /** 默认调试运行目录配置项，用于 main 无参数时覆盖请求和输出文件根目录。 */
-    private static final String DEBUG_RUN_ROOT_PROPERTY =
-            "raha.udf.debug.run-root";
-    /** 默认调试运行目录，保存本地三函数请求文件和结果文件。 */
-    private static final String DEFAULT_DEBUG_RUN_ROOT =
-            "doc/20260721/notes/local-udf-run-202607211230";
+    /** 默认调试函数值，未配置系统属性时使用该函数。 */
+    private static final String DEFAULT_DEBUG_FUNCTION = "TRAIN";
+    /** 默认调试数据根目录配置项，用于覆盖 datasets 下的默认 person_info 目录。 */
+    private static final String DEBUG_DATASET_ROOT_PROPERTY =
+            "raha.udf.debug.dataset-root";
+    /** 默认调试数据根目录，统一维护 person_info 的 SQL、请求、标注和输出。 */
+    private static final String DEFAULT_DATASET_ROOT =
+            "datasets/person_info";
+    /** 本地 Hadoop 根目录配置项，Windows 调试时用于定位 winutils.exe 和 hadoop.dll。 */
+    private static final String HADOOP_HOME_PROPERTY = "hadoop.home.dir";
+    /** 本机默认 Hadoop 根目录。 */
+    private static final String DEFAULT_LOCAL_HADOOP_HOME =
+            "C:/hadoop/hadoop-3.2.2";
+    /** Windows Hadoop Native 动态库文件名。 */
+    private static final String HADOOP_DLL_NAME = "hadoop.dll";
+    /** Windows Hadoop 辅助程序文件名。 */
+    private static final String WINUTILS_NAME = "winutils.exe";
 
     private RahaUdfDriverApp() {
     }
@@ -60,44 +77,44 @@ public final class RahaUdfDriverApp {
      * outputJsonPath  可选，传入后会把 UDF 二维表返回值转换为 JSON 并写入该文件。
      * </pre>
      *
-     * <p>Windows 本地执行前建议先准备环境：</p>
+     * <p>无参数运行时会进入默认调试模式，默认读取
+     * {@code datasets/person_info/requests} 下的请求文件，结果写入
+     * {@code datasets/person_info/out}。默认函数为 COLLECT，可通过 VM 参数切换：</p>
      * <pre>
-     * $env:HADOOP_HOME='C:\hadoop\hadoop-3.2.2'
-     * $env:Path='C:\hadoop\hadoop-3.2.2\bin;' + $env:Path
-     * $env:SPARK_LOCAL_IP='127.0.0.1'
-     * $env:JAVA_TOOL_OPTIONS='--add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED'
+     * -Draha.udf.debug.function=TRAIN
+     * -Draha.udf.debug.function=DETECT
+     * -Draha.udf.debug.dataset-root=datasets/person_info
      * </pre>
      *
-     * <p>使用 Maven 在本地调用采样函数：</p>
+     * <p>Windows 本地 JDK 17 调试建议保留以下 VM 参数：</p>
      * <pre>
-     * mvn -q "-Denforcer.skip=true" "-DskipTests" exec:java "-Dexec.mainClass=com.fiberhome.ml.raha.app.RahaUdfDriverApp" "-Dexec.classpathScope=test" "-Dexec.args=COLLECT @doc\20260721\notes\local-udf-run-202607211230\requests\collect-local.json doc\20260721\notes\local-udf-run-202607211230\outputs\collect-local-result.json" "-Dexec.jvmArgs=-Djava.library.path=C:\hadoop\hadoop-3.2.2\bin -Dhadoop.home.dir=C:\hadoop\hadoop-3.2.2 -Dspark.master=local[*]"
+     * --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED
      * </pre>
      *
-     * <p>使用 Maven 在本地调用训练函数：</p>
+     * <p>本地 Maven 调用示例：</p>
      * <pre>
-     * mvn -q "-Denforcer.skip=true" "-DskipTests" exec:java "-Dexec.mainClass=com.fiberhome.ml.raha.app.RahaUdfDriverApp" "-Dexec.classpathScope=test" "-Dexec.args=TRAIN @doc\20260721\notes\local-udf-run-202607211230\requests\train-local.json doc\20260721\notes\local-udf-run-202607211230\outputs\train-local-result.json" "-Dexec.jvmArgs=-Djava.library.path=C:\hadoop\hadoop-3.2.2\bin -Dhadoop.home.dir=C:\hadoop\hadoop-3.2.2 -Dspark.master=local[*]"
+     * mvn -q "-DskipTests" exec:java "-Dexec.mainClass=com.fiberhome.ml.raha.app.RahaUdfDriverApp" "-Dexec.classpathScope=test" "-Dexec.args=COLLECT @datasets/person_info/requests/collect-local.json datasets/person_info/out/collect-local-result.json"
+     * mvn -q "-DskipTests" exec:java "-Dexec.mainClass=com.fiberhome.ml.raha.app.RahaUdfDriverApp" "-Dexec.classpathScope=test" "-Dexec.args=TRAIN @datasets/person_info/requests/train-local.json datasets/person_info/out/train-local-result.json"
+     * mvn -q "-DskipTests" exec:java "-Dexec.mainClass=com.fiberhome.ml.raha.app.RahaUdfDriverApp" "-Dexec.classpathScope=test" "-Dexec.args=DETECT @datasets/person_info/requests/detect-local-limit450.json datasets/person_info/out/detect-local-limit450-result.json"
      * </pre>
      *
-     * <p>使用 Maven 在本地调用检测函数，检测 SQL 使用 {@code select * from dw.person_info limit 450}：</p>
-     * <pre>
-     * mvn -q "-Denforcer.skip=true" "-DskipTests" exec:java "-Dexec.mainClass=com.fiberhome.ml.raha.app.RahaUdfDriverApp" "-Dexec.classpathScope=test" "-Dexec.args=DETECT @doc\20260721\notes\local-udf-run-202607211230\requests\detect-local-limit450.json doc\20260721\notes\local-udf-run-202607211230\outputs\detect-local-limit450-result.json" "-Dexec.jvmArgs=-Djava.library.path=C:\hadoop\hadoop-3.2.2\bin -Dhadoop.home.dir=C:\hadoop\hadoop-3.2.2 -Dspark.master=local[*]"
-     * </pre>
-     *
-     * @param args 命令行参数
+     * @param args 命令行参数；为空时使用默认调试参数
      * @throws Exception UDF 初始化、执行或结果写出失败时抛出
      */
     public static void main(String[] args) throws Exception {
+        prepareLocalWindowsHadoopNative();
+        String[] resolvedArgs = args == null || args.length == 0
+                ? defaultDebugArgs() : args;
         if (args == null || args.length == 0) {
-            args = defaultDebugArgs();
             System.out.println("RAHA_UDF_DEFAULT_ARGS="
-                    + java.util.Arrays.toString(args));
+                    + Arrays.toString(resolvedArgs));
         }
-        if (args == null || args.length < 2) {
+        if (resolvedArgs.length < 2) {
             throw new IllegalArgumentException(
                     "用法：RahaUdfDriverApp <functionName> <request|@requestFile> [outputJsonPath]");
         }
-        String functionName = args[FUNCTION_ARG_INDEX];
-        String request = readRequest(args[REQUEST_ARG_INDEX]);
+        String functionName = resolvedArgs[FUNCTION_ARG_INDEX];
+        String request = readRequest(resolvedArgs[REQUEST_ARG_INDEX]);
         SparkSession spark = SparkSession.builder()
                 .appName("RahaUdfDriverApp-" + functionName)
                 .master(System.getProperty("raha.spark.master", "local[*]"))
@@ -109,15 +126,16 @@ public final class RahaUdfDriverApp {
             spark.sparkContext().setLogLevel("WARN");
             List<Map<String, Object>> rows = execute(functionName, request);
             String json = FmdbJsonCodec.write(rows);
-            if (args.length > OUTPUT_ARG_INDEX
-                    && args[OUTPUT_ARG_INDEX] != null
-                    && !args[OUTPUT_ARG_INDEX].trim().isEmpty()) {
-                Path outputPath = Paths.get(args[OUTPUT_ARG_INDEX]);
+            if (resolvedArgs.length > OUTPUT_ARG_INDEX
+                    && resolvedArgs[OUTPUT_ARG_INDEX] != null
+                    && !resolvedArgs[OUTPUT_ARG_INDEX].trim().isEmpty()) {
+                Path outputPath = Paths.get(resolvedArgs[OUTPUT_ARG_INDEX]);
                 if (outputPath.getParent() != null) {
                     Files.createDirectories(outputPath.getParent());
                 }
                 Files.write(outputPath, json.getBytes(StandardCharsets.UTF_8));
-                System.out.println("RAHA_UDF_RESULT_JSON=" + outputPath);
+                System.out.println("RAHA_UDF_RESULT_JSON="
+                        + outputPath.toAbsolutePath().normalize());
             }
             System.out.println(json);
         } finally {
@@ -164,11 +182,11 @@ public final class RahaUdfDriverApp {
      * @return 可直接传给 {@link #main(String[])} 的采样参数
      */
     public static String[] defaultCollectArgs() {
-        Path runRoot = defaultDebugRunRoot();
+        Path datasetRoot = defaultDatasetRoot();
         return new String[] {
                 "COLLECT",
-                "@" + runRoot.resolve("requests/collect-local.json"),
-                runRoot.resolve("outputs/collect-local-result.json").toString()
+                "@" + datasetRoot.resolve("requests/collect-local.json"),
+                datasetRoot.resolve("out/collect-local-result.json").toString()
         };
     }
 
@@ -178,11 +196,11 @@ public final class RahaUdfDriverApp {
      * @return 可直接传给 {@link #main(String[])} 的训练参数
      */
     public static String[] defaultTrainArgs() {
-        Path runRoot = defaultDebugRunRoot();
+        Path datasetRoot = defaultDatasetRoot();
         return new String[] {
                 "TRAIN",
-                "@" + runRoot.resolve("requests/train-local.json"),
-                runRoot.resolve("outputs/train-local-result.json").toString()
+                "@" + datasetRoot.resolve("requests/train-local.json"),
+                datasetRoot.resolve("out/train-local-result.json").toString()
         };
     }
 
@@ -192,19 +210,65 @@ public final class RahaUdfDriverApp {
      * @return 可直接传给 {@link #main(String[])} 的检测参数
      */
     public static String[] defaultDetectArgs() {
-        Path runRoot = defaultDebugRunRoot();
+        Path datasetRoot = defaultDatasetRoot();
         return new String[] {
                 "DETECT",
-                "@" + runRoot.resolve("requests/detect-local-limit450.json"),
-                runRoot.resolve("outputs/detect-local-limit450-result.json")
+                "@" + datasetRoot.resolve("requests/detect-local-limit450.json"),
+                datasetRoot.resolve("out/detect-local-limit450-result.json")
                         .toString()
         };
     }
 
+    /**
+     * 准备 Windows 本地 Hadoop Native 环境。
+     *
+     * <p>IDE 直接运行 main 时通常不会携带 {@code -Dhadoop.home.dir} 和
+     * {@code -Djava.library.path}。该方法在 Spark 初始化前设置默认 Hadoop 目录，并显式加载
+     * {@code hadoop.dll}，避免本地调试因 {@code NativeIO$Windows.access0} 缺失失败。</p>
+     */
+    public static void prepareLocalWindowsHadoopNative() {
+        if (!isWindows()) {
+            return;
+        }
+        String hadoopHome = trimToNull(System.getProperty(HADOOP_HOME_PROPERTY));
+        if (hadoopHome == null) {
+            hadoopHome = trimToNull(System.getenv("HADOOP_HOME"));
+        }
+        if (hadoopHome == null) {
+            hadoopHome = DEFAULT_LOCAL_HADOOP_HOME;
+        }
+        Path hadoopHomePath = Paths.get(hadoopHome).toAbsolutePath().normalize();
+        Path hadoopBinPath = hadoopHomePath.resolve("bin");
+        Path hadoopDllPath = hadoopBinPath.resolve(HADOOP_DLL_NAME);
+        Path winutilsPath = hadoopBinPath.resolve(WINUTILS_NAME);
+        if (!Files.isRegularFile(hadoopDllPath)
+                || !Files.isRegularFile(winutilsPath)) {
+            throw new IllegalStateException(
+                    "Windows 本地 Hadoop 依赖不存在，请确认目录包含 hadoop.dll 和 winutils.exe："
+                            + hadoopBinPath);
+        }
+        System.setProperty(HADOOP_HOME_PROPERTY, hadoopHomePath.toString());
+        appendJavaLibraryPath(hadoopBinPath);
+        try {
+            System.load(hadoopDllPath.toString());
+            System.out.println("RAHA_HADOOP_NATIVE_LOADED=" + hadoopDllPath);
+        } catch (UnsatisfiedLinkError error) {
+            String message = error.getMessage();
+            if (message != null && message.contains("already loaded")) {
+                return;
+            }
+            throw new IllegalStateException(
+                    "加载 Windows Hadoop Native 库失败，请检查 hadoop.dll 是否与 JVM 位数匹配："
+                            + hadoopDllPath,
+                    error);
+        }
+    }
+
     private static String[] defaultDebugArgs() {
         String functionName = System.getProperty(DEBUG_FUNCTION_PROPERTY,
-                "COLLECT");
+                DEFAULT_DEBUG_FUNCTION);
         String normalized = normalize(functionName);
+        System.out.println("============RAHA_UDF_DEBUG_FUNCTION==============" + normalized);
         // 空参数调试时根据系统属性选择默认函数，避免每次修改命令行参数。
         if ("F_DW_DETCOLLECT".equals(normalized) || "COLLECT".equals(normalized)) {
             return defaultCollectArgs();
@@ -220,9 +284,9 @@ public final class RahaUdfDriverApp {
                 + functionName);
     }
 
-    private static Path defaultDebugRunRoot() {
-        String configured = System.getProperty(DEBUG_RUN_ROOT_PROPERTY,
-                DEFAULT_DEBUG_RUN_ROOT);
+    private static Path defaultDatasetRoot() {
+        String configured = System.getProperty(DEBUG_DATASET_ROOT_PROPERTY,
+                DEFAULT_DATASET_ROOT);
         return Paths.get(configured);
     }
 
@@ -251,7 +315,8 @@ public final class RahaUdfDriverApp {
                 || "RUN".equals(normalized)) {
             return new F_DW_DETRUN();
         }
-        throw new IllegalArgumentException("不支持的 Raha UDF 函数：" + functionName);
+        throw new IllegalArgumentException("不支持的 Raha UDF 函数："
+                + functionName);
     }
 
     private static List<RahaUdfField> fields(String functionName) {
@@ -266,7 +331,8 @@ public final class RahaUdfDriverApp {
                 || "RUN".equals(normalized)) {
             return RahaUdfFields.DETECT;
         }
-        throw new IllegalArgumentException("不支持的 Raha UDF 函数：" + functionName);
+        throw new IllegalArgumentException("不支持的 Raha UDF 函数："
+                + functionName);
     }
 
     private static List<Map<String, Object>> rows(String functionName,
@@ -297,6 +363,42 @@ public final class RahaUdfDriverApp {
             return new String(bytes, StandardCharsets.UTF_8).trim();
         }
         return argument;
+    }
+
+    private static void appendJavaLibraryPath(Path expectedPath) {
+        String libraryPath = System.getProperty("java.library.path", "");
+        if (!containsPath(libraryPath, expectedPath)) {
+            System.setProperty("java.library.path", expectedPath
+                    + File.pathSeparator + libraryPath);
+        }
+    }
+
+    private static boolean isWindows() {
+        String osName = System.getProperty("os.name", "");
+        return osName.toLowerCase(Locale.ROOT).contains("win");
+    }
+
+    private static boolean containsPath(String libraryPath, Path expectedPath) {
+        if (libraryPath == null || libraryPath.trim().isEmpty()) {
+            return false;
+        }
+        String expected = expectedPath.toAbsolutePath().normalize().toString();
+        String[] parts = libraryPath.split(java.util.regex.Pattern.quote(
+                File.pathSeparator), -1);
+        for (String part : parts) {
+            if (part == null || part.trim().isEmpty()) {
+                continue;
+            }
+            if (expected.equalsIgnoreCase(Paths.get(part).toAbsolutePath()
+                    .normalize().toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 
     private static String normalize(String functionName) {

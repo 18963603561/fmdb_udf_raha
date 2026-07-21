@@ -28,12 +28,14 @@ import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.PaneInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 验证 Excel 模板往返、标签展开、篡改拒绝和重复文件防重。 */
@@ -46,6 +48,33 @@ class AnnotationImportServiceIntegrationTest {
     @AfterAll
     static void stopSpark() {
         SparkTestSession.stop();
+    }
+
+    @Test
+    void shouldPlaceAnnotationColumnsAfterDisplayNoAndFreezeThroughComment()
+            throws Exception {
+        AnnotationWorkbookAdapter adapter = new AnnotationWorkbookAdapter(
+                AnnotationExcelConfig.defaults());
+        Path source = temporaryDirectory.resolve("ordered-template.xls");
+        adapter.exportTemplate(source, "dataset-1", "2026-07", "sample-1",
+                sampleRows(), 1700000000000L);
+
+        try (java.io.InputStream input = java.nio.file.Files.newInputStream(source);
+             Workbook workbook = new HSSFWorkbook(input)) {
+            Sheet sheet = workbook.getSheet(AnnotationWorkbookAdapter.DATA_SHEET);
+            Row header = sheet.getRow(0);
+            assertEquals("_display_row_no", header.getCell(3).getStringCellValue());
+            assertEquals("_row_label", header.getCell(4).getStringCellValue());
+            assertEquals("_error_columns", header.getCell(5).getStringCellValue());
+            assertEquals("_comment", header.getCell(6).getStringCellValue());
+            assertEquals("id", header.getCell(7).getStringCellValue());
+            assertEquals("value", header.getCell(8).getStringCellValue());
+            PaneInformation pane = sheet.getPaneInformation();
+            assertNotNull(pane);
+            assertTrue(pane.isFreezePane());
+            assertEquals(7, pane.getVerticalSplitPosition());
+            assertEquals(1, pane.getHorizontalSplitPosition());
+        }
     }
 
     @Test
@@ -87,7 +116,9 @@ class AnnotationImportServiceIntegrationTest {
              java.io.ByteArrayOutputStream output =
                      new java.io.ByteArrayOutputStream()) {
             Sheet sheet = workbook.getSheet(AnnotationWorkbookAdapter.DATA_SHEET);
-            sheet.getRow(1).getCell(5).setCellValue("changed");
+            Row header = sheet.getRow(0);
+            sheet.getRow(1).getCell(findColumn(header, "value"))
+                    .setCellValue("changed");
             workbook.write(output);
             tamperedBytes = output.toByteArray();
         }

@@ -7,15 +7,19 @@
     <groupId>com.fiberhome.ml</groupId>
     <artifactId>fmdb-udf-raha</artifactId>
     <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
     <name>fmdb-udf-raha</name>
     <description>面向 FMDB 和 Spark 的 Raha 单元格级数据错误检测工程</description>
 
     <properties>
+        <maven.build.timestamp.format>yyyyMMdd</maven.build.timestamp.format>
+        <install.finalName>${project.artifactId}-install-${project.version}-${maven.build.timestamp}</install.finalName>
+
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <maven.compiler.parameters>true</maven.compiler.parameters>
         <spark.version>3.3.1</spark.version>
         <scala.binary.version>2.12</scala.binary.version>
         <slf4j.version>1.7.36</slf4j.version>
@@ -24,8 +28,6 @@
         <zip4j.version>2.11.5</zip4j.version>
         <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>2.22.2</maven.surefire.plugin.version>
-        <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
-        <animal.sniffer.plugin.version>1.23</animal.sniffer.plugin.version>
     </properties>
 
     <dependencies>
@@ -53,7 +55,7 @@
             <version>${slf4j.version}</version>
             <scope>provided</scope>
         </dependency>
-                <dependency>
+        <dependency>
             <groupId>net.lingala.zip4j</groupId>
             <artifactId>zip4j</artifactId>
             <version>${zip4j.version}</version>
@@ -79,6 +81,13 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -93,11 +102,9 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven.compiler.plugin.version}</version>
                 <configuration>
+                    <encoding>${project.build.sourceEncoding}</encoding>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
-                    <encoding>${project.build.sourceEncoding}</encoding>
-                    <parameters>${maven.compiler.parameters}</parameters>
-                    <showWarnings>true</showWarnings>
                 </configuration>
             </plugin>
             <plugin>
@@ -106,7 +113,6 @@
                 <version>${maven.surefire.plugin.version}</version>
                 <configuration>
                     <encoding>${project.build.sourceEncoding}</encoding>
-                    <argLine>-Dfile.encoding=UTF-8</argLine>
                 </configuration>
             </plugin>
             <!-- 生成完整交付 Jar，Spark 依赖由实际运行环境提供，非 Spark 运行依赖随 all 包发布。 -->
@@ -124,17 +130,6 @@
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>all</shadedClassifierName>
-                            <!-- Maven 运行期解析出的非 Spark 发布依赖；slf4j-api 由集群提供，JUnit 仅用于测试。 -->
-                            <artifactSet>
-                                <includes>
-                                    <include>org.apache.poi:poi</include>
-                                    <include>com.zaxxer:SparseBitSet</include>
-                                    <include>org.apache.commons:commons-collections4</include>
-                                    <include>org.apache.commons:commons-math3</include>
-                                    <include>commons-codec:commons-codec</include>
-                                    <include>commons-io:commons-io</include>
-                                </includes>
-                            </artifactSet>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -168,9 +163,9 @@
                                     <pattern>org.apache.commons.codec</pattern>
                                     <shadedPattern>raha.org.apache.commons.codec</shadedPattern>
                                 </relocation>
-                                                                <relocation>
+                                <relocation>
                                     <pattern>net.lingala.zip4j</pattern>
-                                    <shadedPattern>schemamatch.net.lingala.zip4j</shadedPattern>
+                                    <shadedPattern>raha.net.lingala.zip4j</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.commons.io</pattern>
@@ -183,55 +178,28 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-enforcer-plugin</artifactId>
-                <version>${maven.enforcer.plugin.version}</version>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.6.0</version>
+                <configuration>
+                    <finalName>${install.finalName}</finalName>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <runOnlyAtExecutionRoot>false</runOnlyAtExecutionRoot>
+                    <descriptors>
+                        <descriptor>scripts/package.xml</descriptor>
+                    </descriptors>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
                 <executions>
                     <execution>
-                        <id>enforce-build-baseline</id>
+                        <id>make-install-package</id>
+                        <phase>package</phase>
                         <goals>
-                            <goal>enforce</goal>
+                            <goal>single</goal>
                         </goals>
-                        <configuration>
-                            <rules>
-                                <requireJavaVersion>
-                                    <version>[1.8,1.9)</version>
-                                    <message>本工程必须使用 JDK 8 构建。</message>
-                                </requireJavaVersion>
-                                <requireMavenVersion>
-                                    <version>[3.8,)</version>
-                                </requireMavenVersion>
-                                <banDuplicatePomDependencyVersions/>
-                                <bannedDependencies>
-                                    <searchTransitive>true</searchTransitive>
-                                    <excludes>
-                                        <exclude>org.apache.spark:*_2.13</exclude>
-                                        <exclude>org.apache.spark:*:4.*</exclude>
-                                    </excludes>
-                                    <message>禁止引入 Spark 4 或 Scala 2.13 对应的 Spark 依赖。</message>
-                                </bannedDependencies>
-                            </rules>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>animal-sniffer-maven-plugin</artifactId>
-                <version>${animal.sniffer.plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>check-java-8-api</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                        <configuration>
-                            <signature>
-                                <groupId>org.codehaus.mojo.signature</groupId>
-                                <artifactId>java18</artifactId>
-                                <version>1.0</version>
-                            </signature>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>

@@ -7,3 +7,6 @@ target/
 .settings/
 /datasets/
 /metastore_db/
+/spark-warehouse/
+/.mvn/
+/.vscode/

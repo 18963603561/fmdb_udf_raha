@@ -220,8 +220,8 @@ public final class AnnotationWorkbookAdapter {
         List<String> headers = new ArrayList<String>();
         headers.addAll(SYSTEM_COLUMNS);
         headers.add("_display_row_no");
-        headers.addAll(columns.businessColumns);
         headers.addAll(ANNOTATION_COLUMNS);
+        headers.addAll(columns.businessColumns);
         writeRow(sheet.createRow(0), headers, headerStyle);
         int rowIndex = 1;
         for (SampleAnnotationRow sample : rows) {
@@ -233,23 +233,23 @@ public final class AnnotationWorkbookAdapter {
             Cell display = row.createCell(column++);
             display.setCellValue(rowIndex);
             display.setCellStyle(lockedStyle);
+            for (int index = 0; index < ANNOTATION_COLUMNS.size(); index++) {
+                setText(row.createCell(column++), "", unlockedStyle);
+            }
             for (String businessColumn : columns.businessColumns) {
                 setText(row.createCell(column++), stringValue(
                         sample.getRowData().get(businessColumn)), lockedStyle);
-            }
-            for (int index = 0; index < ANNOTATION_COLUMNS.size(); index++) {
-                setText(row.createCell(column++), "", unlockedStyle);
             }
             rowIndex++;
         }
         for (int index = 0; index < SYSTEM_COLUMNS.size(); index++) {
             sheet.setColumnHidden(index, true);
         }
-        int rowLabelColumn = 4 + columns.businessColumns.size();
+        int rowLabelColumn = SYSTEM_COLUMNS.size() + 1;
         addLabelValidation(sheet, rowLabelColumn, rows.size());
         addErrorConditionalFormatting(sheet, rowLabelColumn,
                 headers.size() - 1, rows.size());
-        sheet.createFreezePane(0, 1);
+        sheet.createFreezePane(rowLabelColumn + ANNOTATION_COLUMNS.size(), 1);
         sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, headers.size() - 1));
         setWidths(sheet, headers, columns.businessColumns.size());
         sheet.protectSheet(PROTECTION_PASSWORD);
@@ -348,8 +348,8 @@ public final class AnnotationWorkbookAdapter {
         List<String> required = new ArrayList<String>();
         required.addAll(SYSTEM_COLUMNS);
         required.add("_display_row_no");
-        required.addAll(businessColumns);
         required.addAll(ANNOTATION_COLUMNS);
+        required.addAll(businessColumns);
         for (String column : required) {
             if (!indexes.containsKey(column)) {
                 throw new IllegalArgumentException("标注数据缺少字段：" + column);
@@ -521,11 +521,16 @@ public final class AnnotationWorkbookAdapter {
     private static void setWidths(Sheet sheet,
                                   List<String> headers,
                                   int businessColumnCount) {
+        int businessStart = SYSTEM_COLUMNS.size() + 1 + ANNOTATION_COLUMNS.size();
+        int businessEnd = businessStart + businessColumnCount;
         for (int index = 0; index < headers.size(); index++) {
-            int width = index >= 4 && index < 4 + businessColumnCount ? 24 : 18;
+            int width = index >= businessStart && index < businessEnd ? 24 : 18;
             sheet.setColumnWidth(index, width * 256);
         }
-        sheet.setColumnWidth(headers.size() - 1, 36 * 256);
+        int commentColumn = headers.indexOf("_comment");
+        if (commentColumn >= 0) {
+            sheet.setColumnWidth(commentColumn, 36 * 256);
+        }
     }
 
     private static Map<String, Integer> headerIndexes(Row row) {

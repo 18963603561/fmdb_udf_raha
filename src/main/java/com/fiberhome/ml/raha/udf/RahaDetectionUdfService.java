@@ -39,6 +39,7 @@ import com.fiberhome.ml.raha.service.detect.RahaDetectOutput;
 import com.fiberhome.ml.raha.service.sample.RahaSampleOutput;
 import com.fiberhome.ml.raha.service.task.DetectionRequestOptions;
 import com.fiberhome.ml.raha.service.task.FmdbInputSpec;
+import com.fiberhome.ml.raha.service.task.FmdbSqlSourceTableResolver;
 import com.fiberhome.ml.raha.service.task.MissingModelPolicy;
 import com.fiberhome.ml.raha.service.task.RahaTaskApplicationService;
 import com.fiberhome.ml.raha.service.task.RahaTaskApplicationServiceFactory;
@@ -48,6 +49,7 @@ import com.fiberhome.ml.raha.service.task.RahaTaskRequestFactory;
 import com.fiberhome.ml.raha.service.task.SamplingRequestOptions;
 import com.fiberhome.ml.raha.service.task.TrainingRequestOptions;
 import com.fiberhome.ml.raha.service.train.RahaTrainOutput;
+import com.fiberhome.ml.raha.util.ReadableIdUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -178,8 +180,10 @@ public final class RahaDetectionUdfService {
         }
         DatasetSnapshot snapshot = snapshot(taskResult);
         String fileTime = fileTime();
-        String excelName = "raha-annotation_" + safeFileToken(
-                sampleBatch.getSampleBatchId()) + "_" + fileTime + ".xls";
+        String sourceToken = outputSourceToken(input, snapshot, null,
+                sampleBatch, sampleBatch.getSampleBatchId());
+        String excelName = "raha-annotation_" + sourceToken + "_"
+                + fileTime + ".xls";
         Path excelPath = workDir.resolve(excelName);
         annotationTemplateService.exportTemplate(new AnnotationTemplateRequest(
                 sampleBatch.getDatasetId(), sampleBatch.getPartitionMonth(),
@@ -210,8 +214,7 @@ public final class RahaDetectionUdfService {
         String zipName = null;
         String zipUrl = null;
         if (parser.bool("publishZip", true)) {
-            zipName = "raha-collect_" + safeFileToken(
-                    sampleBatch.getSampleBatchId()) + "_" + fileTime + ".zip";
+            zipName = "raha-collect_" + sourceToken + "_" + fileTime + ".zip";
             List<RahaZipEntrySource> files = collectPackageFiles(workDir,
                     excelPath, row, sampleBatch, output);
             try {
@@ -289,7 +292,8 @@ public final class RahaDetectionUdfService {
                 annotationBatch, annotationFileName, output, snapshot,
                 taskResult);
         if (parser.bool("publishZip", true)) {
-            publishTrainReport(parser, publishConfig, workDir, rows, output);
+            publishTrainReport(parser, publishConfig, workDir, rows, output,
+                    inputOverride, snapshot, sampleBatch);
         }
         return new RahaUdfRows(rows);
     }
@@ -337,9 +341,11 @@ public final class RahaDetectionUdfService {
             RahaPublishConfig publishConfig = RahaPublishConfig.from(parser.values());
             Path workDir = runWorkDir(publishConfig, "detect");
             String fileTime = fileTime();
-            String detailName = "raha-detrun-detail_"
-                    + safeFileToken(resolvedModelSetVersion) + "_" + fileTime + ".xls";
-            String zipName = "raha-detrun_" + safeFileToken(resolvedModelSetVersion)
+            String sourceToken = outputSourceToken(input, snapshot, dataset,
+                    null, resolvedModelSetVersion);
+            String detailName = "raha-detrun-detail_" + sourceToken
+                    + "_" + fileTime + ".xls";
+            String zipName = "raha-detrun_" + sourceToken
                     + "_" + fileTime + ".zip";
             List<Map<String, Object>> detailRows =
                     detectionDetailRows(taskResult, output);
@@ -469,15 +475,20 @@ public final class RahaDetectionUdfService {
 
     private void publishTrainReport(RahaUdfRequestParser parser,
                                     RahaPublishConfig publishConfig,
-                                    Path workDir,
-                                    List<Map<String, Object>> rows,
-                                    RahaTrainOutput output) {
+                                     Path workDir,
+                                     List<Map<String, Object>> rows,
+                                     RahaTrainOutput output,
+                                     FmdbInputSpec input,
+                                     DatasetSnapshot snapshot,
+                                     SampleBatch sampleBatch) {
         String version = output.getModelSetVersion() == null
                 ? "unknown" : output.getModelSetVersion();
         String fileTime = fileTime();
-        String reportName = "raha-dettrain_" + safeFileToken(version)
+        String sourceToken = outputSourceToken(input, snapshot, null,
+                sampleBatch, version);
+        String reportName = "raha-dettrain_" + sourceToken
                 + "_" + fileTime + ".xls";
-        String zipName = "raha-dettrain_" + safeFileToken(version)
+        String zipName = "raha-dettrain_" + sourceToken
                 + "_" + fileTime + ".zip";
         Path reportPath = xlsReportWriter.write(workDir.resolve(reportName),
                 "train_report", trainReportHeaders(), rows);
@@ -899,6 +910,110 @@ public final class RahaDetectionUdfService {
         return FILE_TIME_FORMAT.format(Instant.ofEpochMilli(clock.millis()));
     }
 
+    private static String outputSourceToken(FmdbInputSpec input,
+                                            DatasetSnapshot snapshot,
+                                            RahaDataset dataset,
+                                            SampleBatch sampleBatch,
+                                            String fallback) {
+        // 发布文件名优先使用库表名，避免采样批次、模型版本里的哈希泄漏到用户可见文件。
+        String sourceName = snapshot == null ? null : snapshot.getTableName();
+        if (isBlank(sourceName) && dataset != null) {
+            sourceName = dataset.getTableName();
+        }
+        if (isBlank(sourceName) && input != null) {
+            sourceName = input.getTableName();
+        }
+        if (isBlank(sourceName)) {
+            sourceName = sourceNameFromSample(sampleBatch);
+        }
+        if (isBlank(sourceName)) {
+            sourceName = sourceNameFromVersion(fallback);
+        }
+        return sourceFileToken(sourceName);
+    }
+
+    private static String sourceNameFromSample(SampleBatch sampleBatch) {
+        if (sampleBatch == null || sampleBatch.getRecords().isEmpty()) {
+            return sampleBatch == null ? null : sampleBatch.getDatasetId();
+        }
+        SampleRecord record = firstRecord(sampleBatch);
+        // 兼容旧采样批次：优先使用已持久化的输入来源，旧 SQL 哈希引用再尝试从上下文 SQL 解析。
+        String sourceName = sourceNameFromReference(record.getInputReference());
+        if (!isBlank(sourceName)) {
+            return sourceName;
+        }
+        Map<String, Object> context = record.getSamplingContext();
+        Object readReference = context.get(
+                SampleRecord.READ_INPUT_REFERENCE_CONTEXT_KEY);
+        Object sourceType = context.get(SampleRecord.SOURCE_TYPE_CONTEXT_KEY);
+        String type = sourceType == null ? "" : String.valueOf(sourceType);
+        sourceName = sourceNameFromReadReference(
+                readReference == null ? null : String.valueOf(readReference),
+                type);
+        return isBlank(sourceName) ? sampleBatch.getDatasetId() : sourceName;
+    }
+
+    private static String sourceNameFromReadReference(String reference,
+                                                      String sourceType) {
+        if (isBlank(reference)) {
+            return null;
+        }
+        String type = sourceType == null ? "" : sourceType.trim()
+                .toUpperCase(Locale.ROOT);
+        if ("SQL".equals(type)) {
+            // SQL 来源按首个真实表命名，保证文件名落到库名和表名。
+            return sourceNameFromSql(reference);
+        }
+        return sourceNameFromReference(reference);
+    }
+
+    private static String sourceNameFromReference(String reference) {
+        if (isBlank(reference)) {
+            return null;
+        }
+        String text = reference.trim();
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("select ") || lower.startsWith("with ")) {
+            return sourceNameFromSql(text);
+        }
+        if (lower.startsWith("sql:")) {
+            return null;
+        }
+        return text;
+    }
+
+    private static String sourceNameFromSql(String sqlText) {
+        try {
+            return FmdbSqlSourceTableResolver.firstSourceTable(sqlText);
+        } catch (RuntimeException exception) {
+            LOGGER.debug("解析 SQL 来源表失败，降级使用后续命名来源，sqlLength={}",
+                    sqlText == null ? 0 : sqlText.length(), exception);
+            return null;
+        }
+    }
+
+    private static String sourceNameFromVersion(String version) {
+        if (isBlank(version)) {
+            return null;
+        }
+        String text = version.trim();
+        int at = text.indexOf('@');
+        return at > 0 ? text.substring(0, at) : text;
+    }
+
+    private static String sourceFileToken(String sourceName) {
+        if (isBlank(sourceName)) {
+            return "unknown";
+        }
+        try {
+            return safeFileToken(ReadableIdUtils.normalizeSourceName(sourceName));
+        } catch (IllegalArgumentException exception) {
+            LOGGER.debug("规范化来源名失败，降级使用安全文件片段，sourceName={}",
+                    sourceName, exception);
+            return safeFileToken(sourceName);
+        }
+    }
+
     private static String safeFileToken(String value) {
         String text = value == null || value.trim().isEmpty()
                 ? "unknown" : value.trim();
@@ -906,6 +1021,10 @@ public final class RahaDetectionUdfService {
         text = text.replaceAll("_+", "_");
         text = text.replaceAll("[^a-zA-Z0-9._\\-]", "_");
         return text.isEmpty() ? "unknown" : text;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private static String firstNonBlank(String first, String second) {

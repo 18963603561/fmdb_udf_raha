@@ -12,16 +12,10 @@
 
 ## 构建
 
-工程要求使用 JDK 8 构建。若本地不是 JDK 8，可在验证时临时跳过 enforcer。
+工程推荐使用 JDK 8 构建，当前 Maven 配置不再强制拦截非 JDK 8 环境；编译目标仍保持 Java 8。
 
 ```bash
 mvn -q -DskipTests package
-```
-
-非 JDK 8 环境临时验证：
-
-```bash
-mvn -q -DskipTests "-Denforcer.skip=true" package
 ```
 
 构建完成后，将生成的包含依赖包上传到 Hive 或 Spark SQL 可访问的位置。

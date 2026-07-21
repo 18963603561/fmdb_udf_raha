@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.1.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.1.0 https://maven.apache.org/xsd/assembly-2.1.0.xsd">
+    <id>install</id>
+    <formats>
+        <format>tar.gz</format>
+    </formats>
+
+    <baseDirectory>${project.artifactId}</baseDirectory>
+
+    <fileSets>
+        <fileSet>
+            <directory>${project.build.directory}</directory>
+            <includes>
+                <include>${project.build.finalName}-all.jar</include>
+            </includes>
+            <outputDirectory>lib</outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>${project.basedir}</directory>
+            <includes>
+                <include>README.md</include>
+            </includes>
+            <outputDirectory>.</outputDirectory>
+        </fileSet>
+    </fileSets>
+</assembly>
