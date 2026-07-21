@@ -152,6 +152,16 @@ public abstract class AbstractRahaGenericUdf extends GenericUDF {
             // Spark SQL 可能在执行线程中初始化常量 UDF，此时只有默认会话可用。
             return defaultSession.get().sqlContext();
         }
+        try {
+            SparkSession session = SparkSession.builder().getOrCreate();
+            if (session != null) {
+                // Spark SQL CLI 可能在任务线程初始化 GenericUDF，兜底复用当前 JVM 的 Spark 会话。
+                LOGGER.warn("当前线程没有活动或默认 SparkSession，已通过 SparkSession.builder().getOrCreate() 获取会话");
+                return session.sqlContext();
+            }
+        } catch (Exception exception) {
+            LOGGER.error("Raha UDF 获取 SparkSession 失败", exception);
+        }
         throw new IllegalStateException(
                 "Raha UDF 需要当前线程存在活动 SparkSession");
     }

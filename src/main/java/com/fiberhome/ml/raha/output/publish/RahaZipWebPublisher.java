@@ -2,12 +2,15 @@ package com.fiberhome.ml.raha.output.publish;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -17,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 负责生成 Raha UDF ZIP，并发布到 HDFS 或本地 Web 降级目录。
+ * 负责生成 Raha UDF ZIP，并发布到 HDFS、远端 Web 或本地 Web 降级目录。
  */
 public final class RahaZipWebPublisher {
 
@@ -38,7 +41,7 @@ public final class RahaZipWebPublisher {
         Path zipPath = workDir.resolve(zipFileName).toAbsolutePath().normalize();
         zip(zipPath, files);
         uploadHdfs(sqlContext, zipPath, config);
-        String url = publishLocal(zipPath, config);
+        String url = publishWeb(sqlContext, zipPath, config);
         LOGGER.info("Raha UDF ZIP 发布完成，zipPath={}，url={}",
                 zipPath, url);
         return url;
@@ -106,6 +109,57 @@ public final class RahaZipWebPublisher {
         }
     }
 
+    private String publishWeb(SQLContext sqlContext,
+                              Path zipPath,
+                              RahaPublishConfig config) throws IOException {
+        try {
+            String remoteUrl = tryRemoteWeb(sqlContext, zipPath);
+            if (!isBlank(remoteUrl)) {
+                return remoteUrl;
+            }
+        } catch (Exception exception) {
+            // 异常处理：远端 Web 发布依赖集群 SSH/SCP，失败后降级到本地 Web 目录。
+            LOGGER.warn("Raha UDF 远端 Web 发布失败，降级到本地 Web 目录，zipPath={}",
+                    zipPath.toAbsolutePath(), exception);
+        }
+        return publishLocal(zipPath, config);
+    }
+
+    private String tryRemoteWeb(SQLContext sqlContext, Path zipPath)
+            throws Exception {
+        if (sqlContext == null) {
+            return "";
+        }
+        String hostConf = sqlContext.getConf("spark.driver.host");
+        if (isBlank(hostConf) || isLocalHost(hostConf)) {
+            LOGGER.debug("Raha UDF 当前环境跳过远端 Web 发布，sparkDriverHost={}",
+                    hostConf);
+            return "";
+        }
+        LocalDate today = LocalDate.now();
+        String fmdbManagerPod = hostConf.replaceFirst(
+                "sql-(analysis|query)-([0-9]*)", "fmdbmanager-master-0");
+        if (!isSafeRemoteHost(fmdbManagerPod)) {
+            LOGGER.warn("Raha UDF 远端 Web 主机名包含非法字符，跳过远端发布，host={}",
+                    fmdbManagerPod);
+            return "";
+        }
+        String webPath = "/opt/software/fmdb/manager/web/jetty/webapps/fmdb_report/"
+                + today.getYear() + "/" + today.getMonthValue()
+                + "/" + today.getDayOfMonth();
+        LOGGER.info("Raha UDF 开始远端 Web 发布，host={}，webPath={}，zipPath={}",
+                fmdbManagerPod, webPath, zipPath.toAbsolutePath());
+        runCommand("ssh", "-p", "22034", fmdbManagerPod,
+                "mkdir", "-p", webPath);
+        runCommand("scp", "-P", "22034",
+                zipPath.toAbsolutePath().toString(),
+                fmdbManagerPod + ":" + webPath);
+        return "http://" + fmdbManagerPod + ":10030/fmdb_report/"
+                + today.getYear() + "/" + today.getMonthValue()
+                + "/" + today.getDayOfMonth() + "/"
+                + zipPath.getFileName();
+    }
+
     private String publishLocal(Path zipPath,
                                 RahaPublishConfig config) throws IOException {
         LocalDate today = LocalDate.now();
@@ -151,5 +205,43 @@ public final class RahaZipWebPublisher {
 
     private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private void runCommand(String... command)
+            throws IOException, InterruptedException {
+        Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true).start();
+        try (InputStream inputStream = process.getInputStream()) {
+            while (inputStream.read() >= 0) {
+                // 外部命令输出不进入返回结果，仅用于避免缓冲区阻塞。
+            }
+        }
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new IOException("命令执行失败 exitCode=" + exitCode
+                    + " command=" + Arrays.toString(command));
+        }
+    }
+
+    private boolean isSafeRemoteHost(String host) {
+        return !isBlank(host) && host.matches("[A-Za-z0-9._-]+");
+    }
+
+    private boolean isLocalHost(String host) {
+        if (isBlank(host)) {
+            return true;
+        }
+        String normalized = host.trim().toLowerCase(Locale.ROOT);
+        if ("localhost".equals(normalized)
+                || "127.0.0.1".equals(normalized)
+                || "0.0.0.0".equals(normalized)) {
+            return true;
+        }
+        try {
+            String localHostName = InetAddress.getLocalHost().getHostName();
+            return normalized.equalsIgnoreCase(localHostName);
+        } catch (Exception exception) {
+            return false;
+        }
     }
 }

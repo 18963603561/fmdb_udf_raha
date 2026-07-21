@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS dw.raha_detection_result;
+DROP TABLE IF EXISTS dw.raha_model_artifact;
+DROP TABLE IF EXISTS dw.raha_training_example;
+DROP TABLE IF EXISTS dw.raha_training_cell;
+DROP TABLE IF EXISTS dw.raha_training_column_artifact;
+DROP TABLE IF EXISTS dw.raha_annotation_record;
+DROP TABLE IF EXISTS dw.raha_sample_record;
+DROP TABLE IF EXISTS dw.raha_job_stage_attempt;
+DROP TABLE IF EXISTS dw.raha_job_run;

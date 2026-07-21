@@ -1,0 +1,26 @@
+﻿[
+    {
+        "Url":  "http://fmdbmanager-master-0:10030/fmdb_report/2026/7/21/raha-collect_sample-15d1d5b6681c79f83f4adef1_20260721034603.zip",
+        "LocalCheckUrl":  "http://127.0.0.1:10030/fmdb_report/2026/7/21/raha-collect_sample-15d1d5b6681c79f83f4adef1_20260721034603.zip",
+        "Status":  200,
+        "HttpLength":  54863,
+        "File":  "F:\\ai-code\\fmdb_udf_raha\\doc\\20260721\\raha-remote-publish-validation-202607211058\\zips\\raha-collect_sample-15d1d5b6681c79f83f4adef1_20260721034603.zip",
+        "FileLength":  54863
+    },
+    {
+        "Url":  "http://fmdbmanager-master-0:10030/fmdb_report/2026/7/21/raha-dettrain_0fbd791a27e88a02931d4da990a9dfc371da5c73c6fe465f19cbaa2c6a711390_20260721035238.zip",
+        "LocalCheckUrl":  "http://127.0.0.1:10030/fmdb_report/2026/7/21/raha-dettrain_0fbd791a27e88a02931d4da990a9dfc371da5c73c6fe465f19cbaa2c6a711390_20260721035238.zip",
+        "Status":  200,
+        "HttpLength":  3642,
+        "File":  "F:\\ai-code\\fmdb_udf_raha\\doc\\20260721\\raha-remote-publish-validation-202607211058\\zips\\raha-dettrain_0fbd791a27e88a02931d4da990a9dfc371da5c73c6fe465f19cbaa2c6a711390_20260721035238.zip",
+        "FileLength":  3642
+    },
+    {
+        "Url":  "http://fmdbmanager-master-0:10030/fmdb_report/2026/7/21/raha-detrun_0fbd791a27e88a02931d4da990a9dfc371da5c73c6fe465f19cbaa2c6a711390_20260721035600.zip",
+        "LocalCheckUrl":  "http://127.0.0.1:10030/fmdb_report/2026/7/21/raha-detrun_0fbd791a27e88a02931d4da990a9dfc371da5c73c6fe465f19cbaa2c6a711390_20260721035600.zip",
+        "Status":  200,
+        "HttpLength":  40107,
+        "File":  "F:\\ai-code\\fmdb_udf_raha\\doc\\20260721\\raha-remote-publish-validation-202607211058\\zips\\raha-detrun_0fbd791a27e88a02931d4da990a9dfc371da5c73c6fe465f19cbaa2c6a711390_20260721035600.zip",
+        "FileLength":  40107
+    }
+]
