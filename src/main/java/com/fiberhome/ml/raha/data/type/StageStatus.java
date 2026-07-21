@@ -33,10 +33,11 @@ public enum StageStatus {
         if (this == PENDING) {
             return target == RUNNING || target == SKIPPED || target == FAILED || target == CANCELLED;
         }
-        // 运行阶段只能进入执行终态。
+        // 运行阶段允许由处理器返回跳过结果，例如当前没有可用标签或策略。
         if (this == RUNNING) {
             return target == SUCCEEDED || target == PARTIAL_SUCCESS
-                    || target == FAILED || target == CANCELLED;
+                    || target == FAILED || target == SKIPPED
+                    || target == CANCELLED;
         }
         return false;
     }

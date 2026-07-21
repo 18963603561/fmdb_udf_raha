@@ -192,7 +192,8 @@ public final class RahaDetectService {
                 request.getDataset().getDatasetId(), columnName,
                 request.getDataset().getSchemaHash(), dictionary.getVersion(),
                 request.getStrategyPlanVersion());
-        List<SparseFeatureRow> rows = request.getFeatures().getRowsByColumn(columnName);
+        List<SparseFeatureRow> rows = adaptRowsToModelDictionary(
+                dictionary, model, request.getFeatures().getRowsByColumn(columnName));
         List<ColumnPrediction> predictions = predictor.predict(model, rows);
         List<DetectionResult> results = new ArrayList<DetectionResult>(rows.size());
         for (int index = 0; index < rows.size(); index++) {
@@ -200,6 +201,28 @@ public final class RahaDetectService {
                     predictions.get(index), model, clock.millis()));
         }
         return new DetectColumnOutcome(results, model.getModelVersion());
+    }
+
+    private static List<SparseFeatureRow> adaptRowsToModelDictionary(
+            FeatureDictionary dictionary,
+            ColumnModelArtifact model,
+            List<SparseFeatureRow> rows) {
+        if (dictionary.getDefinitions().size() != model.getFeatureDimension()) {
+            throw new IllegalStateException("模型与当前特征维度不兼容");
+        }
+        if (model.getFeatureDictionaryVersion().equals(dictionary.getVersion())) {
+            return rows;
+        }
+        List<SparseFeatureRow> remapped =
+                new ArrayList<SparseFeatureRow>(rows.size());
+        for (SparseFeatureRow row : rows) {
+            // 训练闭环冻结字典版本不同，但相同策略计划下的特征编号可直接复用。
+            remapped.add(new SparseFeatureRow(row.getCellId(), row.getColumnName(),
+                    row.getCoordinate(), row.getValueHash(), row.getMaskedValue(),
+                    model.getFeatureDictionaryVersion(), row.getValues(),
+                    row.getSummary()));
+        }
+        return remapped;
     }
 
     private static DetectionResult toDetectionResult(RahaDetectRequest request,

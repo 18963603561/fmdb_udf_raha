@@ -479,7 +479,11 @@ public final class RahaTrainService {
                 request.getConfig().getRowIdentityConfig());
         RahaColumnModel candidate = releaseManager.markCandidate(
                 draft, request.getArtifactVersion());
-        return new ColumnTrainingOutcome(trainingResult, candidate);
+        // 三函数训练入口要求训练成功后自动发布，检测函数只加载已发布模型集合。
+        RahaColumnModel published = releaseManager.publish(
+                candidate.getDatasetId(), candidate.getColumnName(),
+                candidate.getModelVersion(), request.getArtifactVersion());
+        return new ColumnTrainingOutcome(trainingResult, published);
     }
 
     private ColumnTrainingDataset buildTrainingDataset(RahaTrainRequest request,

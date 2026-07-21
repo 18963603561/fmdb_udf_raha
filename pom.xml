@@ -21,6 +21,7 @@
         <slf4j.version>1.7.36</slf4j.version>
         <junit.version>5.10.2</junit.version>
         <poi.version>5.2.5</poi.version>
+        <zip4j.version>2.11.5</zip4j.version>
         <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>2.22.2</maven.surefire.plugin.version>
         <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
@@ -51,6 +52,11 @@
             <artifactId>slf4j-api</artifactId>
             <version>${slf4j.version}</version>
             <scope>provided</scope>
+        </dependency>
+                <dependency>
+            <groupId>net.lingala.zip4j</groupId>
+            <artifactId>zip4j</artifactId>
+            <version>${zip4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.poi</groupId>
@@ -103,7 +109,7 @@
                     <argLine>-Dfile.encoding=UTF-8</argLine>
                 </configuration>
             </plugin>
-            <!-- 生成完整交付 Jar，Spark 依赖由实际运行环境提供。 -->
+            <!-- 生成完整交付 Jar，Spark 依赖由实际运行环境提供，非 Spark 运行依赖随 all 包发布。 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -118,11 +124,13 @@
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>all</shadedClassifierName>
+                            <!-- Maven 运行期解析出的非 Spark 发布依赖；slf4j-api 由集群提供，JUnit 仅用于测试。 -->
                             <artifactSet>
                                 <includes>
                                     <include>org.apache.poi:poi</include>
                                     <include>com.zaxxer:SparseBitSet</include>
                                     <include>org.apache.commons:commons-collections4</include>
+                                    <include>org.apache.commons:commons-math3</include>
                                     <include>commons-codec:commons-codec</include>
                                     <include>commons-io:commons-io</include>
                                 </includes>
@@ -138,6 +146,37 @@
                                     </excludes>
                                 </filter>
                             </filters>
+                            <!-- 对随包发布的工具依赖做隔离，降低与 Spark/FMDB 集群依赖冲突的概率。 -->
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.poi</pattern>
+                                    <shadedPattern>raha.org.apache.poi</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.zaxxer.sparsebits</pattern>
+                                    <shadedPattern>raha.com.zaxxer.sparsebits</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.collections4</pattern>
+                                    <shadedPattern>raha.org.apache.commons.collections4</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.math3</pattern>
+                                    <shadedPattern>raha.org.apache.commons.math3</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.codec</pattern>
+                                    <shadedPattern>raha.org.apache.commons.codec</shadedPattern>
+                                </relocation>
+                                                                <relocation>
+                                    <pattern>net.lingala.zip4j</pattern>
+                                    <shadedPattern>schemamatch.net.lingala.zip4j</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.io</pattern>
+                                    <shadedPattern>raha.org.apache.commons.io</shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>

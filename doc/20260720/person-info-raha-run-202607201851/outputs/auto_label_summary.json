@@ -1,0 +1,8 @@
+{
+  "input": "doc\\20260720\\person-info-raha-run-202607201851\\outputs\\raha-annotation_sample-15d1d5b6681c79f83f4adef1_20260720122210.raw.xls",
+  "output": "doc\\20260720\\person-info-raha-run-202607201851\\outputs\\raha-annotation_sample-15d1d5b6681c79f83f4adef1_20260720122210_labeled.xls",
+  "labeledCount": 300,
+  "errorRowCount": 81,
+  "correctRowCount": 219,
+  "unmatchedRows": []
+}

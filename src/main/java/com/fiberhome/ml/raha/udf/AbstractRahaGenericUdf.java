@@ -144,10 +144,15 @@ public abstract class AbstractRahaGenericUdf extends GenericUDF {
 
     private static SQLContext resolveSqlContext() {
         Option<SparkSession> active = SparkSession.getActiveSession();
-        if (active == null || active.isEmpty()) {
-            throw new IllegalStateException(
-                    "Raha UDF 需要当前线程存在活动 SparkSession");
+        if (active != null && active.isDefined()) {
+            return active.get().sqlContext();
         }
-        return active.get().sqlContext();
+        Option<SparkSession> defaultSession = SparkSession.getDefaultSession();
+        if (defaultSession != null && defaultSession.isDefined()) {
+            // Spark SQL 可能在执行线程中初始化常量 UDF，此时只有默认会话可用。
+            return defaultSession.get().sqlContext();
+        }
+        throw new IllegalStateException(
+                "Raha UDF 需要当前线程存在活动 SparkSession");
     }
 }

@@ -143,8 +143,13 @@ public final class TrainingArtifactMaterializationService {
             String summaryJson = FmdbJsonCodec.write(row.getSummary());
             String source = direct != null ? direct.getLabelSource().name()
                     : propagated == null ? null : propagated.getLabelSource().name();
-            Double weight = direct != null ? direct.getSampleWeight()
-                    : propagated == null ? null : propagated.getSampleWeight();
+            Double weight = null;
+            // 未获得任何标签的单元格允许保留空权重，避免三元表达式触发 double 拆箱空指针。
+            if (direct != null) {
+                weight = Double.valueOf(direct.getSampleWeight());
+            } else if (propagated != null) {
+                weight = Double.valueOf(propagated.getSampleWeight());
+            }
             FmdbTrainingCellRecord cell = new FmdbTrainingCellRecord(
                     merge.getTrainingBatchId(), merge.getDataset().getDatasetId(),
                     merge.getTrainingSnapshotId(), coordinate.getRowId(),
