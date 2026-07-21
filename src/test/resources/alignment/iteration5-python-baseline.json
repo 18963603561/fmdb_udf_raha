@@ -116,9 +116,9 @@
       "PVD",
       "RVD"
     ],
-    "clean_sha256": "4234359d12a43fa8ccdf38b8d53184b41d4951fc19c689c02671736f2e2ab813",
+    "clean_md5": "766500db732a34a27a1f91cf5e830cc4",
     "detection_source": "F:\\ai-code\\raha\\raha-master\\raha\\detection.py",
-    "dirty_sha256": "57b9ee3335a855dc564887ac75e63a2f728ebb84e5cfc843f4a154e312be7069",
+    "dirty_md5": "c0abb215625f2628c79d181a3b2dad0f",
     "labeling_budget": 5,
     "python_demo_revision": "c24abd8a9c8effaf2bc29e88bb769c781ceb0d8e",
     "python_demo_root": "F:\\ai-code\\raha\\raha-master",

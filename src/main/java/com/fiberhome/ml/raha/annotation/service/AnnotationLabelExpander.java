@@ -68,7 +68,7 @@ public final class AnnotationLabelExpander {
             int value = errorColumns.contains(name) ? 1 : 0;
             String cellId = new CellCoordinate(dataset, snapshot, row, name)
                     .toCellId();
-            String labelId = HashUtils.sha256Hex(prefix + "|" + cellId + "|"
+            String labelId = HashUtils.md5Hex(prefix + "|" + cellId + "|"
                     + value);
             labels.add(new CellLabel(labelId, cellId, value, LabelSource.HUMAN,
                     1.0d, null, null, null, null, 1.0d, 0, null,

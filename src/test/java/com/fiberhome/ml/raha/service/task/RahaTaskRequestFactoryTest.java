@@ -388,7 +388,7 @@ class RahaTaskRequestFactoryTest {
                 inputReference, "source-v1",
                 RowIdentityConfig.sourceKey("id").getMode(),
                 Collections.singletonList("id"),
-                RowFingerprintAlgorithm.SHA_256,
+                RowFingerprintAlgorithm.MD5,
                 RowIdentityConfig.NORMALIZATION_VERSION, rowId,
                 "content-" + rowId, "schema-v1", schema, rowData, 1L,
                 "sampling-v1", context, 1000L, "2026-07");

@@ -52,8 +52,8 @@ public final class SparseFeatureRow {
                     || !coordinate.getColumnName().equals(this.columnName)) {
                 throw new IllegalArgumentException("特征单元格坐标与标识不一致");
             }
-            if (valueHash == null || !valueHash.matches("[0-9a-f]{64}")) {
-                throw new IllegalArgumentException("特征值必须使用 SHA-256 哈希");
+            if (valueHash == null || !valueHash.matches("[0-9a-f]{32}")) {
+                throw new IllegalArgumentException("特征值必须使用 MD5 哈希");
             }
         } else if (valueHash != null || maskedValue != null) {
             throw new IllegalArgumentException("缺少单元格坐标时不能保存值信息");

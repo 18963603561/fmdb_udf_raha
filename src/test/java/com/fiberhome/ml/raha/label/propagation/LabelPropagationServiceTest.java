@@ -65,7 +65,7 @@ class LabelPropagationServiceTest {
         assertEquals("cluster-v1", propagated.getClusterVersion());
         assertEquals(1.0d, propagated.getConfidence(), 0.000001d);
         assertTrue(propagated.getSampleWeight() < direct.getSampleWeight());
-        assertTrue(propagated.getSourceLabelId().matches("[0-9a-f]{64}"));
+        assertTrue(propagated.getSourceLabelId().matches("[0-9a-f]{32}"));
 
         List<StoredCellLabel> stored = repository.findByCell(
                 "job-homogeneous", assignments.get(1).getCellId());

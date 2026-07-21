@@ -21,7 +21,7 @@ public final class ClusterVersioner {
      * @param randomSeed 随机种子
      * @param status 聚类结果状态
      * @param memberships 单元格到聚类的成员关系
-     * @return SHA-256 聚类版本
+     * @return MD5 聚类版本
      */
     public String versionOf(String columnName,
                             String dictionaryVersion,
@@ -43,6 +43,6 @@ public final class ClusterVersioner {
                 : new TreeMap<String, String>(memberships).entrySet()) {
             canonical.append('|').append(entry.getKey()).append('=').append(entry.getValue());
         }
-        return HashUtils.sha256Hex(canonical.toString());
+        return HashUtils.md5Hex(canonical.toString());
     }
 }

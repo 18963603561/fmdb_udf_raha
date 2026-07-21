@@ -18,9 +18,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def sha256_lines(values):
+def md5_lines(values):
     """对排序后的坐标文本生成稳定摘要。"""
-    return hashlib.sha256("\n".join(values).encode("utf-8")).hexdigest()
+    return hashlib.md5("\n".join(values).encode("utf-8")).hexdigest()
 
 
 def load_table(path):
@@ -72,13 +72,13 @@ def main():
         artifacts.append({
             "source": "PYTHON",
             "family": algorithm,
-            "strategyId": hashlib.sha256(name.encode("utf-8")).hexdigest(),
+            "strategyId": hashlib.md5(name.encode("utf-8")).hexdigest(),
             "strategyType": algorithm,
             "canonicalConfiguration": canonical_key(name),
-            "configurationHash": hashlib.sha256(name.encode("utf-8")).hexdigest(),
+            "configurationHash": hashlib.md5(name.encode("utf-8")).hexdigest(),
             "status": "SUCCEEDED",
             "candidateCount": len(coordinates),
-            "coordinateHash": sha256_lines(coordinates),
+            "coordinateHash": md5_lines(coordinates),
             "runtimeMillis": int(round(float(profile.get("runtime", 0.0)) * 1000.0)),
             "coordinates": coordinates,
             "pythonName": name,

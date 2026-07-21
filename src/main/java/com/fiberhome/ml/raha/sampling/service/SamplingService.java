@@ -99,7 +99,7 @@ public final class SamplingService {
         long expiresAt = safeAdd(createdAt, config.getTaskTtlMillis());
         List<AnnotationTask> tasks = new ArrayList<AnnotationTask>(selected.size());
         for (TupleSamplingScore score : selected) {
-            String taskId = HashUtils.sha256Hex(jobId + "|" + samplingRound + "|"
+            String taskId = HashUtils.md5Hex(jobId + "|" + samplingRound + "|"
                     + score.getRowId() + "|" + samplingVersion);
             tasks.add(new AnnotationTask(taskId, jobId, score.getRowId(), samplingRound,
                     score.getScore(), score.getCoveredClusters(), samplingVersion,

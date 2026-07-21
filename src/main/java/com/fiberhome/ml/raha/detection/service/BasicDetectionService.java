@@ -129,7 +129,7 @@ public final class BasicDetectionService {
         for (Map.Entry<String, Double> entry : weights.entrySet()) {
             canonical.append('|').append(entry.getKey()).append('=').append(entry.getValue());
         }
-        return HashUtils.sha256Hex(canonical.toString());
+        return HashUtils.md5Hex(canonical.toString());
     }
 
     private static Map<String, List<StrategyHit>> indexHits(String jobId, List<StrategyHit> hits) {

@@ -49,7 +49,7 @@ public final class EvaluationSplitService {
             if (directCellIds.contains(label.getCellId())) {
                 continue;
             }
-            String hash = HashUtils.sha256Hex(validatedSalt + "|" + label.getCellId());
+            String hash = HashUtils.md5Hex(validatedSalt + "|" + label.getCellId());
             long bucketValue = Long.parseLong(hash.substring(0, 8), 16);
             if (bucketValue % validationModulo == validationBucket) {
                 validation.add(label);

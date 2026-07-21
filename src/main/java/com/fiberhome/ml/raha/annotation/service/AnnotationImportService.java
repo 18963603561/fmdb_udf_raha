@@ -528,7 +528,7 @@ public final class AnnotationImportService {
 
     private static String fileFingerprint(Path inputPath) {
         try (InputStream stream = Files.newInputStream(inputPath)) {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance("MD5");
             byte[] buffer = new byte[8192];
             int read;
             while ((read = stream.read(buffer)) >= 0) {
@@ -536,7 +536,7 @@ public final class AnnotationImportService {
                     digest.update(buffer, 0, read);
                 }
             }
-            StringBuilder value = new StringBuilder(64);
+            StringBuilder value = new StringBuilder(32);
             for (byte current : digest.digest()) {
                 value.append(String.format(Locale.ROOT, "%02x", current & 0xff));
             }
@@ -544,7 +544,7 @@ public final class AnnotationImportService {
         } catch (IOException exception) {
             throw new IllegalArgumentException("无法读取标注文件指纹", exception);
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("当前 Java 环境不支持 SHA-256", exception);
+            throw new IllegalStateException("当前 Java 环境不支持 MD5", exception);
         }
     }
 

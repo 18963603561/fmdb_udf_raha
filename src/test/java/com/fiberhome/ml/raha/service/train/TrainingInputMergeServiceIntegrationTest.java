@@ -157,7 +157,7 @@ class TrainingInputMergeServiceIntegrationTest {
         return new SampleRecord(sampleBatchId, "dataset-1", "orders",
                 "source-v1", RowIdentityConfig.sourceKey("id").getMode(),
                 Collections.singletonList("id"),
-                com.fiberhome.ml.raha.data.loader.identity.RowFingerprintAlgorithm.SHA_256,
+                com.fiberhome.ml.raha.data.loader.identity.RowFingerprintAlgorithm.MD5,
                 RowIdentityConfig.NORMALIZATION_VERSION,
                 identified.getAs(RowIdentityColumns.ROW_ID),
                 identified.getAs(RowIdentityColumns.ROW_CONTENT_HASH), schemaHash,

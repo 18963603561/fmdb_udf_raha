@@ -40,7 +40,7 @@ public interface AnnotationRecordRepository {
      *
      * @param datasetId 数据集标识
      * @param sampleBatchId 采样批次标识
-     * @param importFingerprint 上传文件 SHA-256 指纹
+     * @param importFingerprint 上传文件 MD5 指纹
      * @return 已存在时返回真
      */
     boolean existsImportFingerprint(String datasetId,

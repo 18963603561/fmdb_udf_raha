@@ -169,7 +169,7 @@ class ModelLifecycleIntegrationTest {
     private static ColumnModelArtifact artifact(String suffix,
                                                 double intercept,
                                                 double coefficient) {
-        String version = HashUtils.sha256Hex("model-" + suffix);
+        String version = HashUtils.md5Hex("model-" + suffix);
         Map<Integer, Double> coefficients = new LinkedHashMap<Integer, Double>();
         coefficients.put(0, coefficient);
         return new ColumnModelArtifact("raha-code", version, "code",
@@ -188,7 +188,7 @@ class ModelLifecycleIntegrationTest {
     }
 
     private static ModelPersistenceContext persistenceContext() {
-        return new ModelPersistenceContext(HashUtils.sha256Hex("model-set-v1"),
+        return new ModelPersistenceContext(HashUtils.md5Hex("model-set-v1"),
                 "dataset", "training-batch-v1", ModelStatus.CANDIDATE,
                 "plan-v1", "merge-v1",
                 Collections.<String, Double>emptyMap(), 1000L, null);

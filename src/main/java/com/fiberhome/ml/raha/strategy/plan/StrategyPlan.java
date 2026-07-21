@@ -91,7 +91,7 @@ public final class StrategyPlan {
     /**
      * 返回策略配置哈希，用于策略计划和结果去重。
      *
-     * @return 配置 SHA-256 哈希
+     * @return 配置 MD5 哈希
      */
     public String getConfigurationHash() {
         return configurationHash;

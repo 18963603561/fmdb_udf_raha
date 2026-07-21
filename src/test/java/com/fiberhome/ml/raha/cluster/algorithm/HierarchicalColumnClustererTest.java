@@ -177,7 +177,7 @@ class HierarchicalColumnClustererTest {
         CellCoordinate coordinate = new CellCoordinate(
                 "dataset", "snapshot", rowId, "code");
         return new SparseFeatureRow(coordinate.toCellId(), "code", coordinate,
-                HashUtils.sha256Hex("value-" + rowId), null,
+                HashUtils.md5Hex("value-" + rowId), null,
                 dictionary.getVersion(), values, Collections.<String, String>emptyMap());
     }
 

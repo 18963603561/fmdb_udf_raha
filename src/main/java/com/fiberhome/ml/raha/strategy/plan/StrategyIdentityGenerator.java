@@ -18,7 +18,7 @@ public final class StrategyIdentityGenerator {
      * 计算策略配置哈希，配置键按字典序编码。
      *
      * @param configuration 策略配置
-     * @return SHA-256 配置哈希
+     * @return MD5 配置哈希
      */
     public static String configurationHash(Map<String, String> configuration) {
         TreeMap<String, String> sorted = new TreeMap<String, String>();
@@ -30,7 +30,7 @@ public final class StrategyIdentityGenerator {
             appendToken(canonical, entry.getKey());
             appendToken(canonical, entry.getValue());
         }
-        return HashUtils.sha256Hex(canonical.toString());
+        return HashUtils.md5Hex(canonical.toString());
     }
 
     /**
@@ -53,7 +53,7 @@ public final class StrategyIdentityGenerator {
             appendToken(canonical, targetColumn);
         }
         appendToken(canonical, configurationHash(configuration));
-        return HashUtils.sha256Hex(canonical.toString());
+        return HashUtils.md5Hex(canonical.toString());
     }
 
     private static void appendToken(StringBuilder builder, String value) {

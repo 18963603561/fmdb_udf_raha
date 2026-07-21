@@ -39,8 +39,8 @@ class StrategyPlanGeneratorTest {
             assertEquals(first.get(index).getStrategyId(), second.get(index).getStrategyId());
             assertEquals(first.get(index).getConfigurationHash(),
                     second.get(index).getConfigurationHash());
-            assertEquals(64, first.get(index).getStrategyId().length());
-            assertEquals(64, first.get(index).getConfigurationHash().length());
+            assertEquals(32, first.get(index).getStrategyId().length());
+            assertEquals(32, first.get(index).getConfigurationHash().length());
         }
         assertTrue(types(first).contains(StrategyTypes.OD_LOW_FREQUENCY));
         assertTrue(types(first).contains(StrategyTypes.OD_NUMERIC_DISTANCE));
@@ -148,8 +148,8 @@ class StrategyPlanGeneratorTest {
         Map<String, Long> typeCounts = new LinkedHashMap<String, Long>();
         typeCounts.put("INTEGER", 100L);
         Map<String, Long> frequencies = new LinkedHashMap<String, Long>();
-        frequencies.put(HashUtils.sha256Hex("10"), 50L);
-        frequencies.put(HashUtils.sha256Hex("20"), 50L);
+        frequencies.put(HashUtils.md5Hex("10"), 50L);
+        frequencies.put(HashUtils.md5Hex("20"), 50L);
         return new ColumnProfile("amount", 100L, 0L, 0L, 2L,
                 2, 2, 2.0d, 100L, 1.0d,
                 10.0d, 20.0d, 15.0d, 5.0d,
@@ -161,7 +161,7 @@ class StrategyPlanGeneratorTest {
                 2, 12, 5.0d, 0L, 0.0d,
                 null, null, null, null, null, null, null,
                 Collections.singletonMap("LETTER", 100L),
-                Collections.singletonMap(HashUtils.sha256Hex("Alice"), 10L));
+                Collections.singletonMap(HashUtils.md5Hex("Alice"), 10L));
     }
 
     private static java.util.Set<String> types(List<StrategyPlan> plans) {

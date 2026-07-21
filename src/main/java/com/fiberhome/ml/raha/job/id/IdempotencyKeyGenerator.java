@@ -20,7 +20,7 @@ public final class IdempotencyKeyGenerator {
                 + config.getInputReference().length() + ":" + config.getInputReference() + "|"
                 + snapshotId.length() + ":" + snapshotId + "|"
                 + validatedVersion;
-        return HashUtils.sha256Hex(source);
+        return HashUtils.md5Hex(source);
     }
 }
 

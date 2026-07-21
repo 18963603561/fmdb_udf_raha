@@ -20,7 +20,7 @@ public final class SamplingVersioner {
      * @param samplingRound 采样轮次
      * @param randomSeed 随机种子
      * @param excludedRowIds 已标注或已有任务的排除行
-     * @return SHA-256 采样版本
+     * @return MD5 采样版本
      */
     public String versionOf(ClusteringBatchResult clustering,
                             SamplingConfig config,
@@ -44,6 +44,6 @@ public final class SamplingVersioner {
         for (String rowId : new TreeSet<String>(excludedRowIds)) {
             canonical.append("|excluded=").append(rowId);
         }
-        return HashUtils.sha256Hex(canonical.toString());
+        return HashUtils.md5Hex(canonical.toString());
     }
 }

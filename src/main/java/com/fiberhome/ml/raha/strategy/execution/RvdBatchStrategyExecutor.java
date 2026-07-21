@@ -40,7 +40,7 @@ import static org.apache.spark.sql.functions.count;
 import static org.apache.spark.sql.functions.countDistinct;
 import static org.apache.spark.sql.functions.explode;
 import static org.apache.spark.sql.functions.lit;
-import static org.apache.spark.sql.functions.sha2;
+import static org.apache.spark.sql.functions.md5;
 import static org.apache.spark.sql.functions.trim;
 
 /**
@@ -260,7 +260,7 @@ public final class RvdBatchStrategyExecutor {
                         col("entry.value_text").alias("value_text"))
                 .filter(col("value_text").isNotNull()
                         .and(trim(col("value_text")).notEqual("")))
-                .withColumn("value_hash", sha2(col("value_text"), 256))
+                .withColumn("value_hash", md5(col("value_text")))
                 .select("row_id", "column_name", "value_hash");
     }
 

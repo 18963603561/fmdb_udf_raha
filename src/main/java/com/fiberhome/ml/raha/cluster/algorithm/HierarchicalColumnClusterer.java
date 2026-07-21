@@ -262,7 +262,7 @@ public final class HierarchicalColumnClusterer implements ColumnClusterer {
                                  long randomSeed) {
         String first = left.signature(rows);
         String second = right.signature(rows);
-        return HashUtils.sha256Hex(randomSeed + "|" + first + "|" + second);
+        return HashUtils.md5Hex(randomSeed + "|" + first + "|" + second);
     }
 
     private static final class WorkingCluster {

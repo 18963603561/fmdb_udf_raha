@@ -68,7 +68,7 @@ class DetectionEvaluationServiceTest {
 
     @Test
     void shouldSelectThresholdPersistMetricsAndUseItAfterPublish() {
-        String modelVersion = HashUtils.sha256Hex("threshold-model");
+        String modelVersion = HashUtils.md5Hex("threshold-model");
         Map<Integer, Double> coefficients = new LinkedHashMap<Integer, Double>();
         coefficients.put(0, 1.0d);
         ColumnModelArtifact artifact = new ColumnModelArtifact("raha-code",
@@ -143,7 +143,7 @@ class DetectionEvaluationServiceTest {
                                              double score,
                                              boolean error) {
         CellCoordinate coordinate = coordinate(cellId);
-        return new DetectionResult("job", coordinate, HashUtils.sha256Hex(cellId),
+        return new DetectionResult("job", coordinate, HashUtils.md5Hex(cellId),
                 null, error, score, 0.5d, Collections.<String>emptyList(),
                 Collections.<String, String>emptyMap(), "model", "model-v1",
                 "dictionary-v1", 1000L);
@@ -162,7 +162,7 @@ class DetectionEvaluationServiceTest {
     }
 
     private static ModelPersistenceContext persistenceContext() {
-        return new ModelPersistenceContext(HashUtils.sha256Hex("model-set-v1"),
+        return new ModelPersistenceContext(HashUtils.md5Hex("model-set-v1"),
                 "dataset", "training-batch-v1", ModelStatus.CANDIDATE,
                 "plan-v1", "merge-v1",
                 Collections.<String, Double>emptyMap(), 1000L, null);

@@ -21,8 +21,8 @@ class PythonBaselineArtifactTest {
         String dirty = resourceText("alignment/iteration5-dirty.csv");
         String clean = resourceText("alignment/iteration5-clean.csv");
 
-        assertEquals(baseline.getProperty("dirty.sha256"), HashUtils.sha256Hex(dirty));
-        assertEquals(baseline.getProperty("clean.sha256"), HashUtils.sha256Hex(clean));
+        assertEquals(baseline.getProperty("dirty.md5"), HashUtils.md5Hex(dirty));
+        assertEquals(baseline.getProperty("clean.md5"), HashUtils.md5Hex(clean));
         assertEquals("102", baseline.getProperty("strategy.profile.count"));
         assertEquals("3:code,3:city,4:code,4:city",
                 baseline.getProperty("rvd.code.city.cells"));

@@ -82,7 +82,7 @@ class StrategyExecutorTest {
         });
         DetectionStrategy successfulStrategy = strategy("SUCCESS_TEST", context ->
                 Collections.singletonList(new StrategyCandidate(
-                        "1", "value", HashUtils.sha256Hex("value"),
+                        "1", "value", HashUtils.md5Hex("value"),
                         "TEST_CANDIDATE", Collections.singletonMap("source", "test"), 1.0d)));
         Clock clock = Clock.fixed(Instant.ofEpochMilli(1000L), ZoneOffset.UTC);
         InMemoryRahaRepository storage = new InMemoryRahaRepository();

@@ -604,7 +604,7 @@ public final class RahaTrainService {
         Map<String, String> versions = new LinkedHashMap<String, String>();
         for (Map.Entry<String, FeatureDictionary> entry
                 : source.getDictionaries().entrySet()) {
-            String version = HashUtils.sha256Hex("training-feature-v1|"
+            String version = HashUtils.md5Hex("training-feature-v1|"
                     + trainingBatchId + "|" + planVersion + "|"
                     + executionConfigFingerprint + "|" + entry.getKey() + "|"
                     + entry.getValue().getVersion());

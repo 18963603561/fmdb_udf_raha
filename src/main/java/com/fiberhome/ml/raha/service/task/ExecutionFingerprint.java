@@ -56,7 +56,7 @@ public final class ExecutionFingerprint {
     public static ExecutionFingerprint fromStableSource(
             String stableSource,
             ExecutionOverrideOptions options) {
-        String base = HashUtils.sha256Hex(
+        String base = HashUtils.md5Hex(
                 ValueUtils.requireNotBlank(stableSource, "稳定输入源"));
         ExecutionOverrideOptions effective = options == null
                 ? ExecutionOverrideOptions.DEFAULT : options;
@@ -69,7 +69,7 @@ public final class ExecutionFingerprint {
         appendToken(source, base);
         appendToken(source, "forceRun");
         appendToken(source, nonce);
-        return new ExecutionFingerprint(base, HashUtils.sha256Hex(
+        return new ExecutionFingerprint(base, HashUtils.md5Hex(
                 source.toString()), true, effective.getForceRunId(), nonce);
     }
 

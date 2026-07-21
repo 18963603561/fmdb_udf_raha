@@ -32,8 +32,8 @@ public final class StrategyCandidate {
         this.rowId = ValueUtils.requireNotBlank(rowId, "行标识");
         this.columnName = ValueUtils.requireNotBlank(columnName, "字段名称");
         this.valueHash = ValueUtils.requireNotBlank(valueHash, "值哈希");
-        if (!valueHash.matches("[0-9a-f]{64}")) {
-            throw new IllegalArgumentException("候选值必须使用 SHA-256 哈希");
+        if (!valueHash.matches("[0-9a-f]{32}")) {
+            throw new IllegalArgumentException("候选值必须使用 MD5 哈希");
         }
         this.reasonCode = ValueUtils.requireNotBlank(reasonCode, "原因编码");
         this.reasonDetails = reasonDetails == null

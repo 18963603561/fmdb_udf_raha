@@ -12,7 +12,7 @@ import org.apache.spark.sql.functions;
 /**
  * 对已经生成稳定行身份的逻辑数据集计算确定性内容指纹。
  *
- * <p>实现按行内容哈希和物理重复计数稳定排序，并通过本地迭代器流式更新 SHA-256，
+ * <p>实现按行内容哈希和物理重复计数稳定排序，并通过本地迭代器流式更新 MD5，
  * 避免一次性把全部业务行收集到驱动端内存。</p>
  */
 public final class DatasetContentFingerprinter {
@@ -21,7 +21,7 @@ public final class DatasetContentFingerprinter {
      * 计算包含重复行数量语义的稳定内容指纹。
      *
      * @param dataFrame 已包含 Raha 行身份技术字段的逻辑数据集
-     * @return 小写十六进制 SHA-256
+     * @return 小写十六进制 MD5
      */
     public String fingerprint(Dataset<Row> dataFrame) {
         if (dataFrame == null
@@ -29,7 +29,7 @@ public final class DatasetContentFingerprinter {
                 || !hasColumn(dataFrame, RowIdentityColumns.DUPLICATE_COUNT)) {
             throw new IllegalArgumentException("内容指纹输入缺少行哈希或重复计数字段");
         }
-        MessageDigest digest = sha256();
+        MessageDigest digest = md5();
         Iterator<Row> rows = dataFrame.select(
                         functions.col(RowIdentityColumns.ROW_CONTENT_HASH),
                         functions.col(RowIdentityColumns.DUPLICATE_COUNT))
@@ -57,11 +57,11 @@ public final class DatasetContentFingerprinter {
         return false;
     }
 
-    private static MessageDigest sha256() {
+    private static MessageDigest md5() {
         try {
-            return MessageDigest.getInstance("SHA-256");
+            return MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("当前 JVM 不支持 SHA-256", exception);
+            throw new IllegalStateException("当前 JVM 不支持 MD5", exception);
         }
     }
 

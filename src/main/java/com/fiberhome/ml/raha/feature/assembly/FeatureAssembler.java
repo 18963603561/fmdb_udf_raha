@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.count;
 import static org.apache.spark.sql.functions.lit;
-import static org.apache.spark.sql.functions.sha2;
+import static org.apache.spark.sql.functions.md5;
 import static org.apache.spark.sql.functions.when;
 
 /**
@@ -228,8 +228,8 @@ public final class FeatureAssembler {
         Dataset<Row> values = dataset.getDataFrame().selectExpr(
                 "cast(" + quoted(dataset.getRowIdColumn()) + " as string) as row_id",
                 stack.toString())
-                .withColumn("value_hash", sha2(when(col("text_value").isNull(),
-                        lit("<null>")).otherwise(col("text_value")), 256));
+                .withColumn("value_hash", md5(when(col("text_value").isNull(),
+                        lit("<null>")).otherwise(col("text_value"))));
         Dataset<Row> frequencies = values.groupBy("column_name", "value_hash").agg(
                 count(lit(1)).alias("value_frequency"));
         Dataset<Row> valueRows = values.alias("v");

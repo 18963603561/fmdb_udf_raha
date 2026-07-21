@@ -29,9 +29,9 @@ def coordinate(dataset, cell):
     }
 
 
-def file_sha256(path):
+def file_md5(path):
     """计算输入文件哈希，防止基线与测试数据静默错配。"""
-    digest = hashlib.sha256()
+    digest = hashlib.md5()
     with open(path, "rb") as stream:
         for block in iter(lambda: stream.read(8192), b""):
             digest.update(block)
@@ -160,8 +160,8 @@ def run(demo_root, dirty_path, clean_path):
             ],
             "random_seed": SEED,
             "labeling_budget": LABELING_BUDGET,
-            "dirty_sha256": file_sha256(dirty_path),
-            "clean_sha256": file_sha256(clean_path),
+            "dirty_md5": file_md5(dirty_path),
+            "clean_md5": file_md5(clean_path),
         },
         "strategy": {
             "profile_count": len(strategies),
@@ -207,8 +207,8 @@ def write_properties(path, baseline):
 
     values = {
         "python.demo.revision": baseline["metadata"]["python_demo_revision"],
-        "dirty.sha256": baseline["metadata"]["dirty_sha256"],
-        "clean.sha256": baseline["metadata"]["clean_sha256"],
+        "dirty.md5": baseline["metadata"]["dirty_md5"],
+        "clean.md5": baseline["metadata"]["clean_md5"],
         "strategy.profile.count": str(baseline["strategy"]["profile_count"]),
         "feature.counts": ",".join(
             item["column_name"] + ":" + str(item["feature_count"])

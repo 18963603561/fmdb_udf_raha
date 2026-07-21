@@ -160,7 +160,7 @@ class BasicDetectionServiceTest {
             CellCoordinate normal = new CellCoordinate("dataset", "snapshot", "1", "code");
             CellCoordinate candidate = new CellCoordinate("dataset", "snapshot", "2", "code");
             this.hit = new StrategyHit("job", "strategy-stage", plan.getStrategyId(),
-                    StrategyFamily.PVD, candidate, HashUtils.sha256Hex("A1#"),
+                    StrategyFamily.PVD, candidate, HashUtils.md5Hex("A1#"),
                     "PVD_TYPE_MISMATCH", Collections.singletonMap("actualType", "MIXED"),
                     1.0d, 1L, StrategyStatus.SUCCEEDED);
             Map<Integer, FeatureDefinition> definitions = new LinkedHashMap<Integer, FeatureDefinition>();
@@ -173,11 +173,11 @@ class BasicDetectionServiceTest {
                     "dictionary", "code", definitions, 1L);
             this.rows = Arrays.asList(
                     new SparseFeatureRow(normal.toCellId(), "code", normal,
-                            HashUtils.sha256Hex("ABC"), null, "dictionary",
+                            HashUtils.md5Hex("ABC"), null, "dictionary",
                             Collections.<Integer, Double>emptyMap(),
                             Collections.singletonMap("valueType", "LETTER")),
                     new SparseFeatureRow(candidate.toCellId(), "code", candidate,
-                            HashUtils.sha256Hex("A1#"), null, "dictionary",
+                            HashUtils.md5Hex("A1#"), null, "dictionary",
                             map(0, 1.0d, 1, 1.0d),
                             Collections.singletonMap("valueType", "MIXED")));
             this.features = new FeatureAssemblyResult(

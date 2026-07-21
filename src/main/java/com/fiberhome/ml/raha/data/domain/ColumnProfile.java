@@ -50,7 +50,7 @@ public final class ColumnProfile {
     private final Double numericQ3;
     /** 字符或值类型到出现数量的统计。 */
     private final Map<String, Long> typeCounts;
-    /** 高频非空值的 SHA-256 哈希到出现数量的统计。 */
+    /** 高频非空值的 MD5 哈希到出现数量的统计。 */
     private final Map<String, Long> valueHashFrequencies;
 
     public ColumnProfile(String columnName,
@@ -192,9 +192,9 @@ public final class ColumnProfile {
         }
         for (Map.Entry<String, Long> entry : this.valueHashFrequencies.entrySet()) {
             // 频率摘要只能保存值哈希，禁止原始敏感值进入画像对象。
-            if (entry.getKey() == null || !entry.getKey().matches("[0-9a-f]{64}")
+            if (entry.getKey() == null || !entry.getKey().matches("[0-9a-f]{32}")
                     || entry.getValue() == null || entry.getValue() <= 0L) {
-                throw new IllegalArgumentException("列画像值频率必须使用 SHA-256 哈希和正数数量");
+                throw new IllegalArgumentException("列画像值频率必须使用 MD5 哈希和正数数量");
             }
         }
     }

@@ -88,7 +88,7 @@ class StrategyRepositoryTest {
     private static StrategyExecutionResult execution(StrategyPlan plan) {
         CellCoordinate coordinate = new CellCoordinate("dataset", "snapshot", "1", "status");
         StrategyHit hit = new StrategyHit("job", "stage", plan.getStrategyId(),
-                StrategyFamily.PVD, coordinate, HashUtils.sha256Hex("N/A"),
+                StrategyFamily.PVD, coordinate, HashUtils.md5Hex("N/A"),
                 "PVD_PLACEHOLDER_VALUE", Collections.singletonMap("valueCategory", "placeholder"),
                 1.0d, 10L, StrategyStatus.SUCCEEDED);
         StrategyRunSummary summary = new StrategyRunSummary(

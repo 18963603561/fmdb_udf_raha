@@ -501,7 +501,7 @@ public final class RahaTaskExecutionRequest {
         String fingerprint = trimToNull(config.getExecutionInputFingerprint());
         if (fingerprint == null) {
             // 老入口可能没有显式执行输入指纹，兜底指纹仅用于观测，不写回配置。
-            fingerprint = HashUtils.sha256Hex(config.toCanonicalString());
+            fingerprint = HashUtils.md5Hex(config.toCanonicalString());
         }
         return ExecutionFingerprint.fromConfig(fingerprint);
     }

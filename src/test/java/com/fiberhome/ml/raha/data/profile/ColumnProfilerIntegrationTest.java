@@ -79,7 +79,7 @@ class ColumnProfilerIntegrationTest {
         assertEquals(1L, code.getTypeCounts().get("ALPHANUMERIC"));
         assertEquals(1L, code.getTypeCounts().get("HAS_SYMBOL"));
         assertEquals(3, code.getValueHashFrequencies().size());
-        assertEquals(2L, code.getValueHashFrequencies().get(HashUtils.sha256Hex("ABC")));
+        assertEquals(2L, code.getValueHashFrequencies().get(HashUtils.md5Hex("ABC")));
 
         ColumnProfile note = profiled.getProfiles().get("note");
         assertEquals(1L, note.getNullCount());

@@ -17,7 +17,7 @@ import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.count;
 import static org.apache.spark.sql.functions.countDistinct;
 import static org.apache.spark.sql.functions.lit;
-import static org.apache.spark.sql.functions.sha2;
+import static org.apache.spark.sql.functions.md5;
 import static org.apache.spark.sql.functions.trim;
 
 /**
@@ -55,8 +55,8 @@ public final class OneToManyConflictStrategy implements DetectionStrategy {
                         .cast("string").alias("row_id"),
                 leftRaw.alias("left_raw"), rightRaw.alias("right_raw"),
                 leftText.alias("left_text"), rightText.alias("right_text"),
-                sha2(leftText, 256).alias("left_hash"),
-                sha2(rightText, 256).alias("right_hash"))
+                md5(leftText).alias("left_hash"),
+                md5(rightText).alias("right_hash"))
                 .filter(col("left_raw").isNotNull().and(col("right_raw").isNotNull())
                         .and(trim(col("left_text")).notEqual(""))
                         .and(trim(col("right_text")).notEqual("")));

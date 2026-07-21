@@ -250,7 +250,7 @@ public final class RahaDetectService {
         Set<String> ids = new LinkedHashSet<String>();
         for (Integer index : row.getValues().keySet()) {
             FeatureDefinition definition = dictionary.getDefinitions().get(index);
-            if (definition != null && definition.getSource().matches("[0-9a-f]{64}")) {
+            if (definition != null && definition.getSource().matches("[0-9a-f]{32}")) {
                 ids.add(definition.getSource());
             }
         }

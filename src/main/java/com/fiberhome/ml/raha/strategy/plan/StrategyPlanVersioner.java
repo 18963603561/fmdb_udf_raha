@@ -31,6 +31,6 @@ public final class StrategyPlanVersioner {
             signatures.add(plan.getStrategyId() + ":" + plan.getConfigurationHash());
         }
         Collections.sort(signatures);
-        return HashUtils.sha256Hex(String.join("|", signatures));
+        return HashUtils.md5Hex(String.join("|", signatures));
     }
 }

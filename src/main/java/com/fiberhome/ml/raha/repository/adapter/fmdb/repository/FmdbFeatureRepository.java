@@ -145,7 +145,7 @@ public final class FmdbFeatureRepository implements FeatureRepository {
                     (String) row.getAs("training_snapshot_id"),
                     (String) row.getAs("row_id"),
                     (String) row.getAs("column_name"));
-            String valueHash = HashUtils.sha256Hex(value == null ? "<null>" : value);
+            String valueHash = HashUtils.md5Hex(value == null ? "<null>" : value);
             result.add(new SparseFeatureRow((String) row.getAs("cell_id"),
                     coordinate.getColumnName(), coordinate, valueHash, null,
                     (String) row.getAs("feature_dictionary_version"),

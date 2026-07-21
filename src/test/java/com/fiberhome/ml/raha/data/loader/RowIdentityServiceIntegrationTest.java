@@ -85,8 +85,8 @@ class RowIdentityServiceIntegrationTest {
         assertEquals(0L, result.getMetrics().getKeyConflictCount());
         for (Row row : rows) {
             String rowId = row.getAs(RowIdentityColumns.ROW_ID);
-            assertEquals(64, rowId.length());
-            assertTrue(rowId.matches("[0-9a-f]{64}"));
+            assertEquals(32, rowId.length());
+            assertTrue(rowId.matches("[0-9a-f]{32}"));
             assertEquals(rowId,
                     row.getAs(RowIdentityColumns.ROW_CONTENT_HASH));
         }

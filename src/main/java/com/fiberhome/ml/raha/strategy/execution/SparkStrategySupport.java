@@ -10,7 +10,7 @@ import org.apache.spark.sql.Row;
 
 import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.lit;
-import static org.apache.spark.sql.functions.sha2;
+import static org.apache.spark.sql.functions.md5;
 import static org.apache.spark.sql.functions.when;
 
 /**
@@ -38,7 +38,7 @@ public final class SparkStrategySupport {
                 quotedColumn(context.getDataset().getRowIdColumn()).cast("string").alias("row_id"),
                 raw.alias("raw_value"),
                 text.alias("text_value"),
-                sha2(hashInput, 256).alias("value_hash"));
+                md5(hashInput).alias("value_hash"));
     }
 
     public static Column quotedColumn(String columnName) {

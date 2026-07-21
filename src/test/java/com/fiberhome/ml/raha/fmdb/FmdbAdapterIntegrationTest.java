@@ -306,19 +306,19 @@ class FmdbAdapterIntegrationTest {
                                              double score) {
         return new DetectionResult("job-1", "config-v1", "detect-stage",
                 new CellCoordinate("dataset", "snapshot-v1", rowId, "code"),
-                HashUtils.sha256Hex("value-" + rowId), "***", error, score, 0.5d,
-                Collections.singletonList(HashUtils.sha256Hex("strategy")),
+                HashUtils.md5Hex("value-" + rowId), "***", error, score, 0.5d,
+                Collections.singletonList(HashUtils.md5Hex("strategy")),
                 Collections.singletonMap("reason", "test"), "raha-code",
-                HashUtils.sha256Hex("model"), HashUtils.sha256Hex("dictionary"), 1000L);
+                HashUtils.md5Hex("model"), HashUtils.md5Hex("dictionary"), 1000L);
     }
 
     private static ColumnModelArtifact artifact(double intercept) {
         Map<Integer, Double> coefficients = new LinkedHashMap<Integer, Double>();
         coefficients.put(0, 1.5d);
         coefficients.put(1, -0.5d);
-        return new ColumnModelArtifact("raha-code", HashUtils.sha256Hex("model-v1"),
+        return new ColumnModelArtifact("raha-code", HashUtils.md5Hex("model-v1"),
                 "code", ClassifierType.LOGISTIC_REGRESSION,
-                HashUtils.sha256Hex("dictionary-v1"), 2, 0.5d, intercept,
+                HashUtils.md5Hex("dictionary-v1"), 2, 0.5d, intercept,
                 coefficients, "fmdb-test");
     }
 
@@ -329,14 +329,14 @@ class FmdbAdapterIntegrationTest {
                 0, "strategy-hit", FeatureType.BINARY, "strategy", 0.0d));
         definitions.put(1, new FeatureDefinition(
                 1, "value-frequency", FeatureType.NUMERIC, "context", 0.0d));
-        return new FeatureDictionary(HashUtils.sha256Hex("dictionary-v1"),
+        return new FeatureDictionary(HashUtils.md5Hex("dictionary-v1"),
                 "code", definitions, 1000L);
     }
 
     private static ModelPersistenceContext modelContext() {
-        return new ModelPersistenceContext(HashUtils.sha256Hex("model-set-v1"),
+        return new ModelPersistenceContext(HashUtils.md5Hex("model-set-v1"),
                 "dataset", "training-batch-v1", ModelStatus.CANDIDATE,
-                HashUtils.sha256Hex("strategy-plan-v1"), "merge-v1",
+                HashUtils.md5Hex("strategy-plan-v1"), "merge-v1",
                 Collections.singletonMap("f1", 1.0d), 2000L, null);
     }
 
@@ -350,7 +350,7 @@ class FmdbAdapterIntegrationTest {
             rows.put(rowId, row);
         }
         return new FmdbDetectionWriteContext("detect-batch-v1", INPUT_VIEW,
-                HashUtils.sha256Hex("model-set-v1"), rows);
+                HashUtils.md5Hex("model-set-v1"), rows);
     }
 
     private void appendDictionary(SparkSession spark,
@@ -359,13 +359,13 @@ class FmdbAdapterIntegrationTest {
         values.put("training_batch_id", "training-batch-v1");
         values.put("dataset_id", "dataset");
         values.put("source_version", "source-v1");
-        values.put("schema_hash", HashUtils.sha256Hex("schema-v1"));
+        values.put("schema_hash", HashUtils.md5Hex("schema-v1"));
         values.put("merge_algorithm_version", "merge-v1");
         values.put("training_context_json", "{}");
         values.put("column_name", dictionary.getColumnName());
         values.put("profile_version", null);
         values.put("profile_json", null);
-        values.put("strategy_plan_version", HashUtils.sha256Hex("strategy-plan-v1"));
+        values.put("strategy_plan_version", HashUtils.md5Hex("strategy-plan-v1"));
         values.put("strategy_plan_json", "{}");
         values.put("feature_dictionary_version", dictionary.getVersion());
         values.put("feature_dictionary_json",

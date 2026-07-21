@@ -19,7 +19,7 @@ public final class SchemaHasher {
             append(builder, field.dataType().catalogString());
             append(builder, String.valueOf(field.nullable()));
         }
-        return HashUtils.sha256Hex(builder.toString());
+        return HashUtils.md5Hex(builder.toString());
     }
 
     private static void append(StringBuilder builder, String value) {

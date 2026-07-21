@@ -127,7 +127,7 @@ public final class CellLabel {
                                          int label,
                                          LabelSource source,
                                          long createdAt) {
-        return HashUtils.sha256Hex(String.valueOf(cellId) + "|" + label + "|"
+        return HashUtils.md5Hex(String.valueOf(cellId) + "|" + label + "|"
                 + String.valueOf(source) + "|" + createdAt);
     }
 

@@ -122,7 +122,7 @@ class FmdbTrainingArtifactRepositoryTest {
         CellCoordinate coordinate = new CellCoordinate("dataset-1",
                 "training-snapshot", "row-1", "value");
         SparseFeatureRow feature = new SparseFeatureRow(coordinate.toCellId(),
-                "value", coordinate, HashUtils.sha256Hex("bad"), "bad",
+                "value", coordinate, HashUtils.md5Hex("bad"), "bad",
                 "dict-v1", Collections.singletonMap(0, 1.0d),
                 Collections.singletonMap("hit", "1"));
         Map<Integer, FeatureDefinition> definitions = new LinkedHashMap<Integer,

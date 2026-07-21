@@ -26,11 +26,11 @@ public final class ConfigVersioner {
      * 生成任务配置版本。
      *
      * @param config 已完整填写的任务配置
-     * @return SHA-256 配置版本
+     * @return MD5 配置版本
      */
     public String versionOf(RahaJobConfig config) {
         // 只有校验通过的配置才允许进入任务幂等和阶段复用逻辑。
         validator.validate(config);
-        return HashUtils.sha256Hex(config.toCanonicalString());
+        return HashUtils.md5Hex(config.toCanonicalString());
     }
 }

@@ -74,7 +74,7 @@ public final class StrategyAlignmentArtifactWriter {
                     .append(execution.getSummary().getStatus().name()).append("\",")
                     .append("\"candidateCount\":").append(coordinates.size()).append(',')
                     .append("\"coordinateHash\":\"")
-                    .append(HashUtils.sha256Hex(String.join("\n", coordinates)))
+                    .append(HashUtils.md5Hex(String.join("\n", coordinates)))
                     .append("\",")
                     .append("\"runtimeMillis\":")
                     .append(execution.getSummary().getRuntimeMillis()).append(',')

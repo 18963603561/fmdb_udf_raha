@@ -134,7 +134,7 @@ public final class ColumnProfiler {
 
         List<Row> frequencyRows = values
                 .filter(col("raw_value").isNotNull())
-                .groupBy(org.apache.spark.sql.functions.sha2(col("text_value"), 256)
+                .groupBy(org.apache.spark.sql.functions.md5(col("text_value"))
                         .alias("value_hash"))
                 .count()
                 .orderBy(col("count").desc(), col("value_hash").asc())

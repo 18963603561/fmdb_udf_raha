@@ -138,7 +138,7 @@ public final class ScalableColumnClusterer implements ColumnClusterer {
             long randomSeed) {
         List<SparseFeatureRow> ordered = new ArrayList<SparseFeatureRow>(rows);
         Collections.sort(ordered, Comparator.comparing(row ->
-                HashUtils.sha256Hex(randomSeed + "|" + row.getCellId())));
+                HashUtils.md5Hex(randomSeed + "|" + row.getCellId())));
         List<Map<Integer, Double>> centroids =
                 new ArrayList<Map<Integer, Double>>(target);
         for (int index = 0; index < target; index++) {
@@ -160,7 +160,7 @@ public final class ScalableColumnClusterer implements ColumnClusterer {
             for (int clusterIndex = 0; clusterIndex < centroids.size(); clusterIndex++) {
                 double distance = cosineDistance(row.getValues(),
                         centroids.get(clusterIndex));
-                String tie = HashUtils.sha256Hex(randomSeed + "|"
+                String tie = HashUtils.md5Hex(randomSeed + "|"
                         + row.getCellId() + "|" + clusterIndex);
                 if (distance < bestDistance
                         || (Double.compare(distance, bestDistance) == 0

@@ -39,7 +39,7 @@ public final class CellValue {
      */
     public static CellValue of(CellCoordinate coordinate, String rawValue, String maskedValue) {
         String hashSource = rawValue == null ? "<null>" : rawValue;
-        return new CellValue(coordinate, rawValue, HashUtils.sha256Hex(hashSource), maskedValue);
+        return new CellValue(coordinate, rawValue, HashUtils.md5Hex(hashSource), maskedValue);
     }
 
     public CellCoordinate getCoordinate() {

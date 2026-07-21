@@ -209,7 +209,7 @@ public final class LabelPropagationService {
             sourceIds.add(source.getLabelId());
         }
         Collections.sort(sourceIds);
-        String sourceFingerprint = HashUtils.sha256Hex(String.join("|", sourceIds));
+        String sourceFingerprint = HashUtils.md5Hex(String.join("|", sourceIds));
         List<CellLabel> propagated = new ArrayList<CellLabel>();
         for (ClusterAssignment member : members) {
             // 直接标签优先，传播只补充当前簇中尚未直接标注的单元格。
@@ -220,7 +220,7 @@ public final class LabelPropagationService {
                     ? 1.0d : decision.majorityRatio;
             double weight = Math.min(config.getPropagatedWeight() * confidence,
                     decision.minDirectWeight * config.getMaxDirectWeightRatio());
-            String labelId = HashUtils.sha256Hex(member.getCellId() + "|"
+            String labelId = HashUtils.md5Hex(member.getCellId() + "|"
                     + member.getClusterVersion() + "|" + member.getClusterId()
                     + "|" + method.name() + "|" + sourceFingerprint);
             propagated.add(new CellLabel(labelId, member.getCellId(), decision.label,

@@ -236,7 +236,7 @@ class FmdbSixRepositoryIntegrationTest {
         return new ColumnProfile("value", 1L, 0L, 0L, 1L,
                 3, 3, 3.0d, 0L, 0.0d, null, null, null, null,
                 null, null, Collections.singletonMap("TEXT", 1L),
-                Collections.singletonMap(HashUtils.sha256Hex("bad"), 1L));
+                Collections.singletonMap(HashUtils.md5Hex("bad"), 1L));
     }
 
     private static StrategyPlan plan() {
@@ -279,7 +279,7 @@ class FmdbSixRepositoryIntegrationTest {
                                              boolean error,
                                              double score) {
         return new DetectionResult(jobId, "config-v1", "stage-detect", coordinate,
-                HashUtils.sha256Hex("bad"), "***", error, score, 0.5d,
+                HashUtils.md5Hex("bad"), "***", error, score, 0.5d,
                 Collections.singletonList("strategy-1"),
                 Collections.singletonMap("reason", "score"), "model", "model-v1",
                 "dict-v1", 5000L);

@@ -50,7 +50,7 @@ class ActiveSamplingOrchestratorTest {
         CellCoordinate coordinate = new CellCoordinate(
                 "dataset", "snapshot", rowId, columnName);
         return new SparseFeatureRow(coordinate.toCellId(), columnName,
-                coordinate, HashUtils.sha256Hex(rowId + "|" + columnName),
+                coordinate, HashUtils.md5Hex(rowId + "|" + columnName),
                 null, "dictionary-version", Collections.emptyMap(),
                 Collections.emptyMap());
     }

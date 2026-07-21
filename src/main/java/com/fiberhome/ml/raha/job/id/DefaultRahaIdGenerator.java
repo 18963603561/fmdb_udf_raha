@@ -24,7 +24,7 @@ public final class DefaultRahaIdGenerator implements RahaIdGenerator {
         }
         String source = validatedJobId + "|" + stageType.name() + "|" + attemptId;
         return stageType.name().toLowerCase(Locale.ROOT)
-                + "-" + HashUtils.sha256Hex(source).substring(0, 16);
+                + "-" + HashUtils.md5Hex(source).substring(0, 16);
     }
 }
 

@@ -35,7 +35,7 @@ class ObservabilityFoundationTest {
         assertThrows(IllegalArgumentException.class, () ->
                 SensitiveLogGuard.requireSafe("phone=" + sensitiveValue,
                         Collections.singletonList(sensitiveValue)));
-        SensitiveLogGuard.requireSafe("phoneHash=" + HashUtils.sha256Hex(sensitiveValue),
+        SensitiveLogGuard.requireSafe("phoneHash=" + HashUtils.md5Hex(sensitiveValue),
                 Collections.singletonList(sensitiveValue));
     }
 }

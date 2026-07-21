@@ -378,7 +378,7 @@ public final class TrainingInputMergeService {
                     String cellId = new CellCoordinate(datasetId,
                             trainingSnapshotId, annotation.getRowId(), column)
                             .toCellId();
-                    String labelId = HashUtils.sha256Hex(source.getLabelId() + "|"
+                    String labelId = HashUtils.md5Hex(source.getLabelId() + "|"
                             + trainingSnapshotId);
                     labels.add(new CellLabel(labelId, cellId, source.getLabel(),
                             source.getLabelSource(), source.getConfidence(), null,

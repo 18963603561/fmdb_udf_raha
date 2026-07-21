@@ -152,7 +152,7 @@ public final class RowIdentityService {
 
             @Override
             public String call(Row row) {
-                return HashUtils.sha256Hex(serializer.serialize(row));
+                return HashUtils.md5Hex(serializer.serialize(row));
             }
         };
         Column[] columns = new Column[schema.fields().length];

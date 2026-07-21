@@ -679,7 +679,7 @@ public final class RahaTaskRequestFactory {
      * 任一关键输入变化都会生成不同指纹，避免错误复用旧训练结果。</p>
      *
      * <p>示例：同一组批次使用 {@code MAJORITY_VOTE} 与 {@code WEIGHTED_VOTE}
-     * 两种传播方法时，会得到两个不同的 SHA-256 指纹。</p>
+     * 两种传播方法时，会得到两个不同的 MD5 指纹。</p>
      *
      * @param references 训练依赖的采样批次和标注批次引用
      * @param input 训练数据输入规格

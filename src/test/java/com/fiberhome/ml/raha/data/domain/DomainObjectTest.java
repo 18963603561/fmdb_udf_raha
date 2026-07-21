@@ -44,7 +44,7 @@ class DomainObjectTest {
 
         assertEquals(first.toCellId(), second.toCellId());
         assertNotEquals(first.toCellId(), otherColumn.toCellId());
-        assertEquals(64, first.toCellId().length());
+        assertEquals(32, first.toCellId().length());
     }
 
     @Test
@@ -117,7 +117,7 @@ class DomainObjectTest {
     void shouldRejectRawOrOversizedValueFrequencySummary() {
         Map<String, Long> oversizedFrequencies = new LinkedHashMap<String, Long>();
         for (int index = 0; index < 21; index++) {
-            oversizedFrequencies.put(HashUtils.sha256Hex("value-" + index), 1L);
+            oversizedFrequencies.put(HashUtils.md5Hex("value-" + index), 1L);
         }
 
         assertThrows(IllegalArgumentException.class,

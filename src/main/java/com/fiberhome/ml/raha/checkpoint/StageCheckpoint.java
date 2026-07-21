@@ -83,7 +83,7 @@ public final class StageCheckpoint {
         this.errorMessage = errorMessage;
         this.startedAt = startedAt;
         this.completedAt = completedAt;
-        this.checkpointId = HashUtils.sha256Hex(this.jobId + "|" + stageType.name()
+        this.checkpointId = HashUtils.md5Hex(this.jobId + "|" + stageType.name()
                 + "|" + attemptId + "|" + inputFingerprint);
     }
 

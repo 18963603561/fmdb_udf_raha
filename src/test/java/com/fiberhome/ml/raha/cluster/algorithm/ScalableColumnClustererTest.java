@@ -71,7 +71,7 @@ class ScalableColumnClustererTest {
             Map<Integer, Double> values = new LinkedHashMap<Integer, Double>();
             values.put(index % 2, 1.0d + index % 3);
             rows.add(new SparseFeatureRow(coordinate.toCellId(), "code",
-                    coordinate, HashUtils.sha256Hex("value-" + index), null,
+                    coordinate, HashUtils.md5Hex("value-" + index), null,
                     "dictionary-v1", values,
                     Collections.<String, String>emptyMap()));
         }

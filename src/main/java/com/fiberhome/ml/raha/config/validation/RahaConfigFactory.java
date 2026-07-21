@@ -254,7 +254,7 @@ public final class RahaConfigFactory {
             canonical.append(ConfigTextUtils.token(entry.getKey()))
                     .append(ConfigTextUtils.token(entry.getValue()));
         }
-        return HashUtils.sha256Hex(canonical.toString());
+        return HashUtils.md5Hex(canonical.toString());
     }
 
     private int positiveInt(String key) {

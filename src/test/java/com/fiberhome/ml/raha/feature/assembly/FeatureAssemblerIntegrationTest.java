@@ -78,7 +78,7 @@ class FeatureAssemblerIntegrationTest {
         SparseFeatureRow secretHit = find(first, "3", "secret");
         assertFalse(codeHit.getValues().isEmpty());
         assertNull(secretHit.getMaskedValue());
-        assertEquals(HashUtils.sha256Hex("13800000003"), secretHit.getValueHash());
+        assertEquals(HashUtils.md5Hex("13800000003"), secretHit.getValueHash());
 
         InMemoryRahaRepository storage = new InMemoryRahaRepository();
         FeatureRepository repository = new DefaultFeatureRepository(storage);
@@ -172,7 +172,7 @@ class FeatureAssemblerIntegrationTest {
                                    String reason,
                                    double score) {
         return new StrategyHit("job", "stage", plan.getStrategyId(),
-                plan.getStrategyFamily(), coordinate, HashUtils.sha256Hex(value), reason,
+                plan.getStrategyFamily(), coordinate, HashUtils.md5Hex(value), reason,
                 Collections.singletonMap("test", "true"), score, 1L,
                 StrategyStatus.SUCCEEDED);
     }

@@ -31,7 +31,7 @@ public final class FeatureDictionaryVersioner {
             append(canonical, definition.getSource());
             append(canonical, definition.getDefaultValue());
         }
-        return HashUtils.sha256Hex(canonical.toString());
+        return HashUtils.md5Hex(canonical.toString());
     }
 
     private static void append(StringBuilder builder, Object value) {

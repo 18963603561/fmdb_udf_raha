@@ -16,22 +16,22 @@ public final class HashUtils {
     }
 
     /**
-     * 计算 UTF-8 文本的 SHA-256 十六进制摘要。
+     * 计算 UTF-8 文本的 MD5 十六进制摘要。
      *
      * @param value 待计算文本，不允许为空
      * @return 长度固定的十六进制摘要
      */
-    public static String sha256Hex(String value) {
+    public static String md5Hex(String value) {
         if (value == null) {
             throw new IllegalArgumentException("待计算哈希的文本不能为空");
         }
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance("MD5");
             byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
             return toHex(bytes);
         } catch (NoSuchAlgorithmException exception) {
-            // JDK 8 必须提供 SHA-256；若环境缺失则属于不可恢复的运行时异常。
-            throw new IllegalStateException("当前 Java 环境不支持 SHA-256", exception);
+            // JDK 8 必须提供 MD5；若环境缺失则属于不可恢复的运行时异常。
+            throw new IllegalStateException("当前 Java 环境不支持 MD5", exception);
         }
     }
 

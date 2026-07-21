@@ -55,24 +55,24 @@ public final class RowIdentityConfig {
      * 创建单字段或联合键行身份配置。
      *
      * @param keyColumns 按业务约定顺序提供的唯一键字段
-     * @return 使用 SHA-256 和当前规范版本的配置
+     * @return 使用 MD5 和当前规范版本的配置
      */
     public static RowIdentityConfig sourceKey(String... keyColumns) {
         return new RowIdentityConfig(RowIdentityMode.SOURCE_KEY,
                 keyColumns == null ? Collections.<String>emptyList()
                         : Arrays.asList(keyColumns),
-                RowFingerprintAlgorithm.SHA_256, NORMALIZATION_VERSION);
+                RowFingerprintAlgorithm.MD5, NORMALIZATION_VERSION);
     }
 
     /**
      * 创建全部业务字段内容哈希行身份配置。
      *
-     * @return 使用 SHA-256 和当前规范版本的配置
+     * @return 使用 MD5 和当前规范版本的配置
      */
     public static RowIdentityConfig contentHash() {
         return new RowIdentityConfig(RowIdentityMode.CONTENT_HASH,
                 Collections.<String>emptyList(),
-                RowFingerprintAlgorithm.SHA_256, NORMALIZATION_VERSION);
+                RowFingerprintAlgorithm.MD5, NORMALIZATION_VERSION);
     }
 
     public RowIdentityMode getMode() {

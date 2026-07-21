@@ -63,7 +63,7 @@ public final class ClusterPropagationSummary {
         this.conflictCount = conflictCount;
         this.majorityRatio = majorityRatio;
         this.propagatedLabelCount = propagatedLabelCount;
-        this.summaryId = HashUtils.sha256Hex(columnName + "|" + clusterVersion + "|"
+        this.summaryId = HashUtils.md5Hex(columnName + "|" + clusterVersion + "|"
                 + clusterId + "|" + method.name());
     }
 

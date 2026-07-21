@@ -28,10 +28,10 @@ public final class CellCoordinate {
     /**
      * 生成不依赖 Spark 分区和物理行号的稳定单元格标识。
      *
-     * @return 单元格 SHA-256 标识
+     * @return 单元格 MD5 标识
      */
     public String toCellId() {
-        return HashUtils.sha256Hex(datasetId.length() + ":" + datasetId
+        return HashUtils.md5Hex(datasetId.length() + ":" + datasetId
                 + snapshotId.length() + ":" + snapshotId
                 + rowId.length() + ":" + rowId
                 + columnName.length() + ":" + columnName);
