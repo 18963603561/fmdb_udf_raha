@@ -191,7 +191,7 @@ public final class FmdbModelStore implements ColumnModelStore {
             throw new IllegalStateException("FMDB 中不存在特征字典版本：" + version);
         }
         FeatureDictionary dictionary = FmdbFeatureDictionaryCodec.read(
-                rows.get(0).getAs("feature_dictionary_json"));
+                (String) rows.get(0).getAs("feature_dictionary_json"));
         if (!version.equals(dictionary.getVersion())) {
             throw new IllegalStateException("FMDB 特征字典版本与 JSON 内容不一致："
                     + version);

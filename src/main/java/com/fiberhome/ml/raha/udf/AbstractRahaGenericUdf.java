@@ -4,12 +4,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentLengthException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
+import org.apache.spark.TaskContext;
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -56,9 +60,7 @@ public abstract class AbstractRahaGenericUdf extends GenericUDF {
                 throw new RahaUdfException("INVALID_ARGUMENT",
                         functionName() + " 入参不能为空");
             }
-            RahaDetectionUdfService service =
-                    RahaUdfRuntime.service(sqlContext);
-            RahaUdfRows rows = doEvaluate(String.valueOf(raw), service);
+            RahaUdfRows rows = evaluateOnDriverThread(String.valueOf(raw));
             LOGGER.info("{} 执行完成，rowCount={}，costMillis={}",
                     functionName(), rows.getRows().size(),
                     System.currentTimeMillis() - startedAt);
@@ -86,6 +88,42 @@ public abstract class AbstractRahaGenericUdf extends GenericUDF {
 
     protected abstract RahaUdfRows doEvaluate(String argument,
                                               RahaDetectionUdfService service);
+
+    private RahaUdfRows evaluateOnDriverThread(final String argument)
+            throws Exception {
+        if (TaskContext.get() == null) {
+            RahaDetectionUdfService service =
+                    RahaUdfRuntime.service(sqlContext);
+            return doEvaluate(argument, service);
+        }
+        FutureTask<RahaUdfRows> task = new FutureTask<RahaUdfRows>(
+                new Callable<RahaUdfRows>() {
+                    @Override
+                    public RahaUdfRows call() {
+                        // UDF 的完整工作流会再次发起 Spark SQL 查询；
+                        // 独立线程没有 TaskContext，可避免在 executor task 内嵌套驱动 Spark。
+                        RahaDetectionUdfService service =
+                                RahaUdfRuntime.service(sqlContext);
+                        return doEvaluate(argument, service);
+                    }
+                });
+        Thread thread = new Thread(task,
+                "raha-udf-driver-thread-" + functionName());
+        thread.setDaemon(true);
+        thread.start();
+        try {
+            return task.get();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw exception;
+        } catch (ExecutionException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
+            }
+            throw new RuntimeException(cause);
+        }
+    }
 
     private List<Object[]> toStructRows(RahaUdfRows result) {
         List<Object[]> rows = new ArrayList<Object[]>();
@@ -161,8 +199,50 @@ public abstract class AbstractRahaGenericUdf extends GenericUDF {
             }
         } catch (Exception exception) {
             LOGGER.error("Raha UDF 获取 SparkSession 失败", exception);
+            SQLContext taskLocalContext = resolveSqlContextFromLocalTask(exception);
+            if (taskLocalContext != null) {
+                return taskLocalContext;
+            }
         }
         throw new IllegalStateException(
                 "Raha UDF 需要当前线程存在活动 SparkSession");
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static SQLContext resolveSqlContextFromLocalTask(Exception cause) {
+        TaskContext currentTask = TaskContext.get();
+        if (currentTask == null) {
+            return null;
+        }
+        try {
+            Class<?> moduleClass = Class.forName("org.apache.spark.TaskContext$");
+            Object module = moduleClass.getField("MODULE$").get(null);
+            java.lang.reflect.Field field =
+                    moduleClass.getDeclaredField("taskContext");
+            field.setAccessible(true);
+            ThreadLocal taskContextThreadLocal =
+                    (ThreadLocal) field.get(module);
+            Object previous = taskContextThreadLocal.get();
+            try {
+                // Spark SQL 无来源 SELECT 会在本地 task 线程初始化 UDF；
+                // 这里短暂清除 TaskContext，仅用于本地验证时复用 driver 会话。
+                taskContextThreadLocal.remove();
+                SparkSession session = SparkSession.builder().getOrCreate();
+                if (session == null) {
+                    return null;
+                }
+                LOGGER.warn("Raha UDF 已通过本地 task 线程兼容逻辑复用 SparkSession，仅适用于 spark-sql 本地执行验证", cause);
+                return session.sqlContext();
+            } finally {
+                if (previous == null) {
+                    taskContextThreadLocal.remove();
+                } else {
+                    taskContextThreadLocal.set(previous);
+                }
+            }
+        } catch (Exception reflectionException) {
+            LOGGER.warn("Raha UDF 本地 task 线程兼容逻辑未生效", reflectionException);
+            return null;
+        }
     }
 }
