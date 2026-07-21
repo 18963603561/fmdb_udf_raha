@@ -37,7 +37,7 @@ public final class RahaSqlScriptRunnerApp {
             "datasets/person_info";
     /** 默认建表插数脚本文件名。 */
     private static final String DEFAULT_LOAD_SQL_FILE =
-            "person_info_create_insert_202607201851.sql";
+            "person_info1_create_insert.sql";
 
     private RahaSqlScriptRunnerApp() {
     }

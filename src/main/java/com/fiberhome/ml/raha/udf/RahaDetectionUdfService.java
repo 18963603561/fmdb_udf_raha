@@ -180,10 +180,8 @@ public final class RahaDetectionUdfService {
         }
         DatasetSnapshot snapshot = snapshot(taskResult);
         String fileTime = fileTime();
-        String sourceToken = outputSourceToken(input, snapshot, null,
-                sampleBatch, sampleBatch.getSampleBatchId());
-        String excelName = "raha-annotation_" + sourceToken + "_"
-                + fileTime + ".xls";
+        String excelName = AnnotationUploadFileLocator.annotationExcelName(
+                sampleBatch.getSampleBatchId(), fileTime);
         Path excelPath = workDir.resolve(excelName);
         annotationTemplateService.exportTemplate(new AnnotationTemplateRequest(
                 sampleBatch.getDatasetId(), sampleBatch.getPartitionMonth(),
@@ -214,7 +212,8 @@ public final class RahaDetectionUdfService {
         String zipName = null;
         String zipUrl = null;
         if (parser.bool("publishZip", true)) {
-            zipName = "raha-collect_" + sourceToken + "_" + fileTime + ".zip";
+            zipName = AnnotationUploadFileLocator.collectZipName(
+                    sampleBatch.getSampleBatchId(), fileTime);
             List<RahaZipEntrySource> files = collectPackageFiles(workDir,
                     excelPath, row, sampleBatch, output);
             try {
