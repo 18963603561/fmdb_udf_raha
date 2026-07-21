@@ -16,11 +16,22 @@ public final class TrainingRequestOptions {
     private final LabelPropagationMethod propagationMethod;
     /** 可选受控输入覆盖，为空时从采样批次还原。 */
     private final FmdbInputSpec inputOverride;
+    /** 执行覆盖选项，用于控制强制运行和请求级幂等。 */
+    private final ExecutionOverrideOptions executionOverrideOptions;
 
     public TrainingRequestOptions(boolean allowPartialAnnotation,
                                   String modelNamePrefix,
                                   LabelPropagationMethod propagationMethod,
                                   FmdbInputSpec inputOverride) {
+        this(allowPartialAnnotation, modelNamePrefix, propagationMethod,
+                inputOverride, ExecutionOverrideOptions.DEFAULT);
+    }
+
+    public TrainingRequestOptions(boolean allowPartialAnnotation,
+                                  String modelNamePrefix,
+                                  LabelPropagationMethod propagationMethod,
+                                  FmdbInputSpec inputOverride,
+                                  ExecutionOverrideOptions executionOverrideOptions) {
         this.allowPartialAnnotation = allowPartialAnnotation;
         this.modelNamePrefix = ValueUtils.requireNotBlank(
                 modelNamePrefix, "训练模型名称前缀");
@@ -29,6 +40,8 @@ public final class TrainingRequestOptions {
         }
         this.propagationMethod = propagationMethod;
         this.inputOverride = inputOverride;
+        this.executionOverrideOptions = executionOverrideOptions == null
+                ? ExecutionOverrideOptions.DEFAULT : executionOverrideOptions;
     }
 
     /**
@@ -45,4 +58,7 @@ public final class TrainingRequestOptions {
     public String getModelNamePrefix() { return modelNamePrefix; }
     public LabelPropagationMethod getPropagationMethod() { return propagationMethod; }
     public FmdbInputSpec getInputOverride() { return inputOverride; }
+    public ExecutionOverrideOptions getExecutionOverrideOptions() {
+        return executionOverrideOptions;
+    }
 }

@@ -3,6 +3,7 @@ package com.fiberhome.ml.raha.udf;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
+import com.fiberhome.ml.raha.service.task.ExecutionOverrideOptions;
 import com.fiberhome.ml.raha.service.task.FmdbInputSpec;
 import com.fiberhome.ml.raha.util.FormDataCodec;
 import java.util.ArrayList;
@@ -159,6 +160,11 @@ public final class RahaUdfRequestParser {
 
     public String caller() {
         return optional("caller");
+    }
+
+    public ExecutionOverrideOptions executionOverrideOptions() {
+        return new ExecutionOverrideOptions(bool("forceRun", false),
+                optional("forceRunId"));
     }
 
     private FmdbInputSpec withCommonInputOptions(FmdbInputSpec input) {

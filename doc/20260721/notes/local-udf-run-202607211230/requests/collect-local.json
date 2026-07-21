@@ -1,0 +1,16 @@
+{
+  "sourceType": "SQL",
+  "datasetId": "person_info",
+  "sqlText": "select * from dw.person_info limit 450",
+  "labelingBudget": "300",
+  "samplingRound": "4",
+  "publishZip": "true",
+  "artifactBaseDir": "F:\\ai-code\\fmdb_udf_raha\\doc\\20260721\\notes\\local-udf-run-202607211230\\udf-work",
+  "localWebRoot": "F:\\ai-code\\fmdb_udf_raha\\doc\\20260721\\notes\\local-udf-run-202607211230\\web",
+  "hdfsExportPath": "/fmdb/detection/output/person-info-raha-run-202607201851/",
+  "caller": "codex",
+  "requestId": "person-info-collect-202607201851-r4",
+  "webBaseUrl": "http://127.0.0.1:18080",
+  "forceRun": true,
+  "forceRunId": "local-collect-20260721-1"
+}

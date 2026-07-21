@@ -16,10 +16,20 @@ public final class SamplingRequestOptions {
     private final int samplingRound;
     /** 已经持有的直接标签，用于排除或复用已标注单元格。 */
     private final List<CellLabel> existingLabels;
+    /** 执行覆盖选项，用于控制强制运行和请求级幂等。 */
+    private final ExecutionOverrideOptions executionOverrideOptions;
 
     public SamplingRequestOptions(Integer labelingBudget,
                                   int samplingRound,
                                   List<CellLabel> existingLabels) {
+        this(labelingBudget, samplingRound, existingLabels,
+                ExecutionOverrideOptions.DEFAULT);
+    }
+
+    public SamplingRequestOptions(Integer labelingBudget,
+                                  int samplingRound,
+                                  List<CellLabel> existingLabels,
+                                  ExecutionOverrideOptions executionOverrideOptions) {
         if (labelingBudget != null && labelingBudget <= 0) {
             throw new IllegalArgumentException("采样标注预算必须大于零");
         }
@@ -29,6 +39,8 @@ public final class SamplingRequestOptions {
         this.labelingBudget = labelingBudget;
         this.samplingRound = samplingRound;
         this.existingLabels = immutableLabels(existingLabels);
+        this.executionOverrideOptions = executionOverrideOptions == null
+                ? ExecutionOverrideOptions.DEFAULT : executionOverrideOptions;
     }
 
     /**
@@ -44,6 +56,9 @@ public final class SamplingRequestOptions {
     public Integer getLabelingBudget() { return labelingBudget; }
     public int getSamplingRound() { return samplingRound; }
     public List<CellLabel> getExistingLabels() { return existingLabels; }
+    public ExecutionOverrideOptions getExecutionOverrideOptions() {
+        return executionOverrideOptions;
+    }
 
     private static List<CellLabel> immutableLabels(List<CellLabel> values) {
         if (values == null || values.isEmpty()) {

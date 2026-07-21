@@ -17,7 +17,6 @@ import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
 import com.fiberhome.ml.raha.sampling.domain.SampleBatch;
 import com.fiberhome.ml.raha.sampling.domain.SampleRecord;
 import com.fiberhome.ml.raha.service.train.TrainingBatchReference;
-import com.fiberhome.ml.raha.util.HashUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -150,10 +149,13 @@ public final class RahaTaskRequestFactory {
                 ? RowIdentityConfig.contentHash()
                 : input.getRowIdentityConfig();
         DataLoadRequest loadRequest = input.toDataLoadRequest(identity);
+        ExecutionFingerprint fingerprint = inputFingerprint(
+                "sampling", input, samplingDiscriminator(options),
+                options.getExecutionOverrideOptions());
         RahaJobConfig config = configFactory.jobConfig(JobType.SAMPLING,
                 input.getDatasetId(), input.getInputReference(), identity)
-                .withExecutionInputFingerprint(inputFingerprint(
-                        "sampling", input, samplingDiscriminator(options)));
+                .withExecutionInputFingerprint(
+                        fingerprint.getExecutionInputFingerprint());
         if (input.getSnapshotId() != null) {
             config = config.withSnapshotId(input.getSnapshotId());
         }
@@ -168,7 +170,8 @@ public final class RahaTaskRequestFactory {
                 options.getSamplingRound(),
                 config.getSamplingConfig().getLabelingBudget());
         return RahaTaskExecutionRequest.sampling(config, loadRequest,
-                options.getExistingLabels(), options.getSamplingRound());
+                options.getExistingLabels(), options.getSamplingRound())
+                .withExecutionFingerprint(fingerprint);
     }
 
     /**
@@ -232,12 +235,13 @@ public final class RahaTaskRequestFactory {
                     item.annotation.getAnnotationBatchId(),
                     item.annotation.getPartitionMonth()));
         }
-        String batchFingerprint = trainingFingerprint(references,
+        ExecutionFingerprint batchFingerprint = trainingFingerprint(references,
                 trainingInput.spec, options);
         RahaJobConfig config = configFactory.jobConfig(JobType.TRAINING,
                 trainingInput.spec.getDatasetId(),
                 trainingInput.spec.getInputReference(), trainingInput.identity)
-                .withExecutionInputFingerprint(batchFingerprint);
+                .withExecutionInputFingerprint(
+                        batchFingerprint.getExecutionInputFingerprint());
         if (trainingInput.spec.getSnapshotId() != null) {
             config = config.withSnapshotId(trainingInput.spec.getSnapshotId());
         }
@@ -248,7 +252,8 @@ public final class RahaTaskRequestFactory {
                 configFactory.labelPropagationConfig(),
                 configFactory.logisticRegressionTrainingConfig(),
                 options.getModelNamePrefix(), references,
-                trainingInput.identity);
+                trainingInput.identity)
+                .withExecutionFingerprint(batchFingerprint);
         LOGGER.info("最小训练请求解析完成，datasetId={}，batchCount={}，"
                         + "inputReference={}，identityMode={}",
                 trainingInput.spec.getDatasetId(), references.size(),
@@ -411,11 +416,14 @@ public final class RahaTaskRequestFactory {
             throw new IllegalArgumentException("检测行身份覆盖与模型集合不兼容");
         }
         DataLoadRequest loadRequest = input.toDataLoadRequest(identity);
+        ExecutionFingerprint fingerprint = inputFingerprint(
+                "detection", input, modelSetVersion + "|"
+                        + options.getMissingModelPolicy(),
+                options.getExecutionOverrideOptions());
         RahaJobConfig config = configFactory.jobConfig(JobType.DETECTION,
                 manifest.getDatasetId(), input.getInputReference(), identity)
-                .withExecutionInputFingerprint(inputFingerprint(
-                        "detection", input, modelSetVersion + "|"
-                                + options.getMissingModelPolicy()));
+                .withExecutionInputFingerprint(
+                        fingerprint.getExecutionInputFingerprint());
         if (input.getSnapshotId() != null) {
             config = config.withSnapshotId(input.getSnapshotId());
         }
@@ -424,7 +432,8 @@ public final class RahaTaskRequestFactory {
                 manifest.getDatasetId(), modelSetVersion, input.getFormat(),
                 options.getMissingModelPolicy());
         return RahaTaskExecutionRequest.detection(config, loadRequest,
-                modelSetVersion, options.getMissingModelPolicy());
+                modelSetVersion, options.getMissingModelPolicy())
+                .withExecutionFingerprint(fingerprint);
     }
 
     /**
@@ -675,9 +684,9 @@ public final class RahaTaskRequestFactory {
      * @param references 训练依赖的采样批次和标注批次引用
      * @param input 训练数据输入规格
      * @param options 训练行为选项
-     * @return SHA-256 十六进制输入指纹
+     * @return 包含基础指纹和最终指纹的执行指纹
      */
-    private static String trainingFingerprint(
+    private static ExecutionFingerprint trainingFingerprint(
             List<TrainingBatchReference> references,
             FmdbInputSpec input,
             TrainingRequestOptions options) {
@@ -688,7 +697,8 @@ public final class RahaTaskRequestFactory {
         appendToken(source, canonicalInput(input));
         appendToken(source, options.getPropagationMethod());
         appendToken(source, options.getModelNamePrefix());
-        return HashUtils.sha256Hex(source.toString());
+        return ExecutionFingerprint.fromStableSource(source.toString(),
+                options.getExecutionOverrideOptions());
     }
 
     /**
@@ -703,16 +713,20 @@ public final class RahaTaskRequestFactory {
      * @param task 任务类型标识，例如 {@code sampling} 或 {@code detection}
      * @param input FMDB 输入规格
      * @param discriminator 任务特有的区分因子
-     * @return SHA-256 十六进制输入指纹
+     * @param executionOverrideOptions 执行覆盖选项
+     * @return 包含基础指纹和最终指纹的执行指纹
      */
-    private static String inputFingerprint(String task,
-                                           FmdbInputSpec input,
-                                           String discriminator) {
+    private static ExecutionFingerprint inputFingerprint(
+            String task,
+            FmdbInputSpec input,
+            String discriminator,
+            ExecutionOverrideOptions executionOverrideOptions) {
         StringBuilder source = new StringBuilder();
         appendToken(source, task);
         appendToken(source, canonicalInput(input));
         appendToken(source, discriminator);
-        return HashUtils.sha256Hex(source.toString());
+        return ExecutionFingerprint.fromStableSource(source.toString(),
+                executionOverrideOptions);
     }
 
     /**

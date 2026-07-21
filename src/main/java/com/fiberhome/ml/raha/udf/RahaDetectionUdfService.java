@@ -20,6 +20,7 @@ import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
 import com.fiberhome.ml.raha.data.domain.DetectionResult;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
+import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
 import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
@@ -161,11 +162,15 @@ public final class RahaDetectionUdfService {
         RahaTaskExecutionRequest taskRequest = requestFactory.sampling(input,
                 new SamplingRequestOptions(parser.intOptional("labelingBudget"),
                         parser.intValue("samplingRound", 1),
-                        Collections.emptyList()));
+                        Collections.emptyList(),
+                        parser.executionOverrideOptions()));
         RahaTaskExecutionResult taskResult = taskService.execute(taskRequest);
-        RahaSampleOutput output =
-                requirePayload(taskResult, RahaSampleOutput.class,
-                        "SAMPLE_OUTPUT_NOT_FOUND", "采集任务没有返回采样输出");
+        RahaSampleOutput output = taskResult.getPayload(RahaSampleOutput.class);
+        if (output == null && taskResult.isReused()) {
+            return RahaUdfRows.single(summaryOnlyRow(parser, input, taskResult));
+        }
+        output = requirePayload(taskResult, RahaSampleOutput.class,
+                "SAMPLE_OUTPUT_NOT_FOUND", "采集任务没有返回采样输出");
         SampleBatch sampleBatch = output.getSampleBatch();
         if (sampleBatch == null) {
             throw new RahaUdfException("SAMPLE_NOT_FOUND",
@@ -181,6 +186,7 @@ public final class RahaDetectionUdfService {
                 sampleBatch.getSampleBatchId(), excelPath));
 
         Map<String, Object> row = successBase(parser, input, snapshot);
+        enrichExecutionMetadata(row, taskResult);
         row.put("sourceVersion", firstNonBlank(sampleBatch.getSourceVersion(),
                 snapshot == null ? null : snapshot.getSourceVersion()));
         row.put("schemaHash", schemaHash(sampleBatch, snapshot));
@@ -267,15 +273,21 @@ public final class RahaDetectionUdfService {
         FmdbInputSpec inputOverride = parser.inputSpec(false);
         TrainingRequestOptions options = new TrainingRequestOptions(
                 allowPartial, parser.optional("modelNamePrefix", "raha"),
-                LabelPropagationMethod.HOMOGENEITY, inputOverride);
+                LabelPropagationMethod.HOMOGENEITY, inputOverride,
+                parser.executionOverrideOptions());
         RahaTaskExecutionRequest taskRequest = requestFactory.training(
                 Collections.singletonList(sampleBatchId), options);
         RahaTaskExecutionResult taskResult = taskService.execute(taskRequest);
-        RahaTrainOutput output = requirePayload(taskResult, RahaTrainOutput.class,
+        RahaTrainOutput output = taskResult.getPayload(RahaTrainOutput.class);
+        if (output == null && taskResult.isReused()) {
+            return RahaUdfRows.single(summaryOnlyRow(parser, null, taskResult));
+        }
+        output = requirePayload(taskResult, RahaTrainOutput.class,
                 "TRAIN_OUTPUT_NOT_FOUND", "训练任务没有返回模型输出");
         DatasetSnapshot snapshot = snapshot(taskResult);
         List<Map<String, Object>> rows = trainRows(parser, sampleBatch,
-                annotationBatch, annotationFileName, output, snapshot);
+                annotationBatch, annotationFileName, output, snapshot,
+                taskResult);
         if (parser.bool("publishZip", true)) {
             publishTrainReport(parser, publishConfig, workDir, rows, output);
         }
@@ -290,14 +302,20 @@ public final class RahaDetectionUdfService {
         LOGGER.info("开始执行检测 UDF，datasetId={}，modelSetVersion={}，missingModelPolicy={}",
                 input.getDatasetId(), modelSetVersion, policy);
         RahaTaskExecutionRequest taskRequest = requestFactory.detection(
-                input, modelSetVersion, new DetectionRequestOptions(policy));
+                input, modelSetVersion, new DetectionRequestOptions(policy,
+                        parser.executionOverrideOptions()));
         String resolvedModelSetVersion = taskRequest.getModelSetVersion();
         RahaTaskExecutionResult taskResult = taskService.execute(taskRequest);
-        RahaDetectOutput output = requirePayload(taskResult, RahaDetectOutput.class,
+        RahaDetectOutput output = taskResult.getPayload(RahaDetectOutput.class);
+        if (output == null && taskResult.isReused()) {
+            return RahaUdfRows.single(summaryOnlyRow(parser, input, taskResult));
+        }
+        output = requirePayload(taskResult, RahaDetectOutput.class,
                 "DETECT_OUTPUT_NOT_FOUND", "检测任务没有返回检测输出");
         DatasetSnapshot snapshot = snapshot(taskResult);
         RahaDataset dataset = dataset(taskResult);
         Map<String, Object> row = successBase(parser, input, snapshot);
+        enrichExecutionMetadata(row, taskResult);
         row.put("modelSetVersion", resolvedModelSetVersion);
         row.put("schemaHash", snapshot == null ? null : snapshot.getSchemaHash());
         row.put("rowCount", snapshot == null ? null
@@ -395,10 +413,11 @@ public final class RahaDetectionUdfService {
 
     private List<Map<String, Object>> trainRows(RahaUdfRequestParser parser,
                                                 SampleBatch sampleBatch,
-                                                AnnotationBatch annotationBatch,
-                                                String annotationFileName,
-                                                RahaTrainOutput output,
-                                                DatasetSnapshot snapshot) {
+                                                 AnnotationBatch annotationBatch,
+                                                 String annotationFileName,
+                                                 RahaTrainOutput output,
+                                                 DatasetSnapshot snapshot,
+                                                 RahaTaskExecutionResult taskResult) {
         List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
         Set<String> columns = new LinkedHashSet<String>();
         columns.addAll(output.getTrainingResults().keySet());
@@ -408,6 +427,7 @@ public final class RahaDetectionUdfService {
         }
         for (String column : columns) {
             Map<String, Object> row = successBase(parser, null, snapshot);
+            enrichExecutionMetadata(row, taskResult);
             row.put("datasetId", sampleBatch.getDatasetId());
             row.put("sampleBatchId", sampleBatch.getSampleBatchId());
             row.put("annotationBatchId",
@@ -599,6 +619,52 @@ public final class RahaDetectionUdfService {
         row.put("errorMessage", message);
         row.put("sampleBatchId", sampleBatchId);
         return row;
+    }
+
+    private Map<String, Object> summaryOnlyRow(RahaUdfRequestParser parser,
+                                               FmdbInputSpec input,
+                                               RahaTaskExecutionResult result) {
+        Map<String, Object> row = successBase(parser, input, null);
+        row.putAll(result.getResultSummary());
+        row.put("status", udfStatus(result.getJob().getStatus()));
+        row.put("errorCode", result.getJob().getErrorCode());
+        row.put("errorMessage", result.getJob().getErrorMessage());
+        enrichExecutionMetadata(row, result);
+        return row;
+    }
+
+    private void enrichExecutionMetadata(Map<String, Object> row,
+                                         RahaTaskExecutionResult result) {
+        row.put("jobId", result.getJob().getJobId());
+        row.put("configVersion", result.getJob().getConfigVersion());
+        row.put("idempotentKey", result.getJob().getIdempotentKey());
+        row.put("reused", Boolean.valueOf(result.isReused()));
+        copyExecutionValue(row, result, "forceRun");
+        copyExecutionValue(row, result, "forceRunId");
+        copyExecutionValue(row, result, "baseExecutionInputFingerprint");
+        copyExecutionValue(row, result, "executionInputFingerprint");
+        copyExecutionValue(row, result, "currentSelectRule");
+    }
+
+    private static void copyExecutionValue(Map<String, Object> row,
+                                           RahaTaskExecutionResult result,
+                                           String key) {
+        Object value = result.getResultSummary().get(key);
+        if (value == null) {
+            value = result.getAttributes().get(key);
+        }
+        row.put(key, value);
+    }
+
+    private static String udfStatus(JobStatus status) {
+        if (status == JobStatus.SUCCEEDED
+                || status == JobStatus.PARTIAL_SUCCESS) {
+            return "SUCCESS";
+        }
+        if (status == JobStatus.FAILED || status == JobStatus.CANCELLED) {
+            return "FAILED";
+        }
+        return status.name();
     }
 
     private DatasetSnapshot snapshot(RahaTaskExecutionResult result) {

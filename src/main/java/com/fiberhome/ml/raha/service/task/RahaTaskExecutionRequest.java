@@ -11,10 +11,13 @@ import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
 import com.fiberhome.ml.raha.model.training.LogisticRegressionTrainingConfig;
 import com.fiberhome.ml.raha.service.train.TrainingBatchReference;
+import com.fiberhome.ml.raha.util.HashUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 保存统一任务入口执行训练、检测或采样所需的类型化输入。
@@ -58,6 +61,8 @@ public final class RahaTaskExecutionRequest {
     private final String modelSetVersion;
     /** 检测字段缺少模型或模型不兼容时的处理策略。 */
     private final MissingModelPolicy missingModelPolicy;
+    /** 执行输入指纹元数据，区分基础血缘指纹和最终幂等指纹。 */
+    private final ExecutionFingerprint executionFingerprint;
 
     private RahaTaskExecutionRequest(RahaJobConfig config,
                                      DataLoadRequest dataLoadRequest,
@@ -79,7 +84,7 @@ public final class RahaTaskExecutionRequest {
                 annotationBatchId, annotationPartitionMonth, rowIdentityConfig,
                 legacyBatchReferences(sampleBatchId, samplePartitionMonth,
                         annotationBatchId, annotationPartitionMonth),
-                null, MissingModelPolicy.PARTIAL);
+                null, MissingModelPolicy.PARTIAL, null);
     }
 
     private RahaTaskExecutionRequest(RahaJobConfig config,
@@ -98,7 +103,8 @@ public final class RahaTaskExecutionRequest {
                                      RowIdentityConfig rowIdentityConfig,
                                      List<TrainingBatchReference> trainingBatchReferences,
                                      String modelSetVersion,
-                                     MissingModelPolicy missingModelPolicy) {
+                                     MissingModelPolicy missingModelPolicy,
+                                     ExecutionFingerprint executionFingerprint) {
         if (config == null || dataLoadRequest == null) {
             throw new IllegalArgumentException("任务配置和数据加载请求不能为空");
         }
@@ -125,6 +131,9 @@ public final class RahaTaskExecutionRequest {
         this.modelSetVersion = trimToNull(modelSetVersion);
         this.missingModelPolicy = missingModelPolicy == null
                 ? MissingModelPolicy.FAIL : missingModelPolicy;
+        this.executionFingerprint = executionFingerprint == null
+                ? defaultExecutionFingerprint(config)
+                : executionFingerprint;
         validateByType();
     }
 
@@ -254,7 +263,7 @@ public final class RahaTaskExecutionRequest {
                 first.getSampleBatchId(), first.getSamplePartitionMonth(),
                 first.getAnnotationBatchId(),
                 first.getAnnotationPartitionMonth(), rowIdentityConfig,
-                references, null, MissingModelPolicy.FAIL);
+                references, null, MissingModelPolicy.FAIL, null);
     }
 
     public static RahaTaskExecutionRequest detection(
@@ -290,7 +299,7 @@ public final class RahaTaskExecutionRequest {
                 Collections.<CellLabel>emptyList(), null, null, null, null,
                 0, null, null, null, null, null, null,
                 Collections.<TrainingBatchReference>emptyList(),
-                modelSetVersion, missingModelPolicy);
+                modelSetVersion, missingModelPolicy, null);
     }
 
     public static RahaTaskExecutionRequest sampling(
@@ -390,6 +399,64 @@ public final class RahaTaskExecutionRequest {
     }
     public String getModelSetVersion() { return modelSetVersion; }
     public MissingModelPolicy getMissingModelPolicy() { return missingModelPolicy; }
+    public ExecutionFingerprint getExecutionFingerprint() {
+        return executionFingerprint;
+    }
+    public String getBaseExecutionInputFingerprint() {
+        return executionFingerprint.getBaseExecutionInputFingerprint();
+    }
+    public String getExecutionInputFingerprint() {
+        return executionFingerprint.getExecutionInputFingerprint();
+    }
+    public boolean isForceRun() { return executionFingerprint.isForceRun(); }
+    public String getForceRunId() { return executionFingerprint.getForceRunId(); }
+    public String getRunNonce() { return executionFingerprint.getRunNonce(); }
+
+    /**
+     * 创建包含请求指纹元数据的新请求副本。
+     *
+     * @param fingerprint 请求工厂已生成的指纹结果
+     * @return 保留业务输入的新请求
+     */
+    public RahaTaskExecutionRequest withExecutionFingerprint(
+            ExecutionFingerprint fingerprint) {
+        if (fingerprint == null) {
+            throw new IllegalArgumentException("执行输入指纹元数据不能为空");
+        }
+        return new RahaTaskExecutionRequest(config, dataLoadRequest, labels,
+                propagationMethod, propagationConfig, trainingConfig,
+                modelNamePrefix, samplingRound, evaluator, sampleBatchId,
+                samplePartitionMonth, annotationBatchId,
+                annotationPartitionMonth, rowIdentityConfig,
+                trainingBatchReferences, modelSetVersion, missingModelPolicy,
+                fingerprint);
+    }
+
+    /**
+     * 创建可进入任务结果摘要的请求级元数据。
+     *
+     * @return 包含指纹、强制运行参数和任务输入的有序摘要
+     */
+    public Map<String, Object> executionSummarySeed() {
+        Map<String, Object> result = new LinkedHashMap<String, Object>(
+                executionFingerprint.toSummaryMap());
+        result.put("jobType", config.getJobType().name());
+        result.put("datasetId", config.getDatasetId());
+        result.put("inputReference", config.getInputReference());
+        result.put("snapshotId", config.getSnapshotId());
+        if (modelSetVersion != null) {
+            result.put("modelSetVersion", modelSetVersion);
+        }
+        result.put("missingModelPolicy", missingModelPolicy.name());
+        if (sampleBatchId != null) {
+            result.put("sampleBatchId", sampleBatchId);
+        }
+        if (annotationBatchId != null) {
+            result.put("annotationBatchId", annotationBatchId);
+        }
+        result.put("samplingRound", Integer.valueOf(samplingRound));
+        return result;
+    }
 
     public boolean hasPersistedTrainingInput() {
         return !trainingBatchReferences.isEmpty();
@@ -427,5 +494,15 @@ public final class RahaTaskExecutionRequest {
 
     private static String trimToNull(String value) {
         return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    private static ExecutionFingerprint defaultExecutionFingerprint(
+            RahaJobConfig config) {
+        String fingerprint = trimToNull(config.getExecutionInputFingerprint());
+        if (fingerprint == null) {
+            // 老入口可能没有显式执行输入指纹，兜底指纹仅用于观测，不写回配置。
+            fingerprint = HashUtils.sha256Hex(config.toCanonicalString());
+        }
+        return ExecutionFingerprint.fromConfig(fingerprint);
     }
 }

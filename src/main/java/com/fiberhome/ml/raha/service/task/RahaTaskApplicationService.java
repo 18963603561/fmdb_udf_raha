@@ -7,6 +7,7 @@ import com.fiberhome.ml.raha.job.execution.RahaJobOrchestrator;
 import com.fiberhome.ml.raha.job.stage.core.StageHandler;
 import com.fiberhome.ml.raha.repository.port.StageRepository;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,23 +90,28 @@ public final class RahaTaskApplicationService {
         if (request == null) {
             throw new IllegalArgumentException("统一任务执行请求不能为空");
         }
-        LOGGER.info("开始统一执行 Raha 任务，jobType={}，datasetId={}",
-                request.getConfig().getJobType(), request.getConfig().getDatasetId());
+        LOGGER.info("开始统一执行 Raha 任务，jobType={}，datasetId={}，forceRun={}",
+                request.getConfig().getJobType(), request.getConfig().getDatasetId(),
+                Boolean.valueOf(request.isForceRun()));
         RahaJob job = jobOrchestrator.submit(request.getConfig());
         if (job.getStatus() != JobStatus.CREATED) {
             // 相同幂等任务已经执行或正在执行时返回已有状态，禁止重复运行阶段。
             LOGGER.info("复用已有 Raha 任务，jobId={}，status={}",
                     job.getJobId(), job.getStatus());
             return RahaTaskExecutionResult.reused(job,
-                    stageRepository.findByJobId(job.getJobId()));
+                    stageRepository.findByJobId(job.getJobId()), request,
+                    jobOrchestrator.findResultSummary(job));
         }
         RahaWorkflow workflow = workflowRegistry.require(job.getJobType());
         List<StageHandler> handlers = workflow.createStageHandlers(request);
         JobRunResult runResult = jobOrchestrator.execute(
                 job, request.getConfig(), handlers);
+        Map<String, Object> resultSummary =
+                RahaTaskResultSummaryBuilder.build(request, runResult);
+        jobOrchestrator.saveResultSummary(runResult.getJob(), resultSummary);
         LOGGER.info("统一 Raha 任务执行完成，jobId={}，status={}，stageCount={}",
                 runResult.getJob().getJobId(), runResult.getJob().getStatus(),
                 runResult.getStages().size());
-        return RahaTaskExecutionResult.executed(runResult);
+        return RahaTaskExecutionResult.executed(runResult, resultSummary);
     }
 }

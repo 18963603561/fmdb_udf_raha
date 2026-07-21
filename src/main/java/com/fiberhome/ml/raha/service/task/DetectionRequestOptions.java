@@ -7,12 +7,21 @@ public final class DetectionRequestOptions {
 
     /** 指定模型缺失或不兼容时的处理策略。 */
     private final MissingModelPolicy missingModelPolicy;
+    /** 执行覆盖选项，用于控制强制运行和请求级幂等。 */
+    private final ExecutionOverrideOptions executionOverrideOptions;
 
     public DetectionRequestOptions(MissingModelPolicy missingModelPolicy) {
+        this(missingModelPolicy, ExecutionOverrideOptions.DEFAULT);
+    }
+
+    public DetectionRequestOptions(MissingModelPolicy missingModelPolicy,
+                                   ExecutionOverrideOptions executionOverrideOptions) {
         if (missingModelPolicy == null) {
             throw new IllegalArgumentException("检测缺失模型策略不能为空");
         }
         this.missingModelPolicy = missingModelPolicy;
+        this.executionOverrideOptions = executionOverrideOptions == null
+                ? ExecutionOverrideOptions.DEFAULT : executionOverrideOptions;
     }
 
     /**
@@ -26,5 +35,9 @@ public final class DetectionRequestOptions {
 
     public MissingModelPolicy getMissingModelPolicy() {
         return missingModelPolicy;
+    }
+
+    public ExecutionOverrideOptions getExecutionOverrideOptions() {
+        return executionOverrideOptions;
     }
 }

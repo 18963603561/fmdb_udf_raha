@@ -8,10 +8,12 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.result.FmdbResultWriter;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbPhysicalTable;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.schema.FmdbTableSchemas;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbPersistenceConfig;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
 import com.fiberhome.ml.raha.repository.core.SaveOutcome;
 import com.fiberhome.ml.raha.repository.port.JobRepository;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import org.apache.spark.sql.Row;
@@ -51,6 +53,13 @@ public final class FmdbJobRepository implements JobRepository {
 
     @Override
     public synchronized SaveOutcome save(RahaJob job, long updatedAt) {
+        return save(job, updatedAt, Collections.<String, Object>emptyMap());
+    }
+
+    @Override
+    public synchronized SaveOutcome save(RahaJob job,
+                                         long updatedAt,
+                                         Map<String, Object> resultSummary) {
         if (job == null || updatedAt <= 0L) {
             throw new IllegalArgumentException("任务和更新时间必须有效");
         }
@@ -59,8 +68,9 @@ public final class FmdbJobRepository implements JobRepository {
         }
         boolean exists = findByIdempotentKey(job.getDatasetId(),
                 job.getIdempotentKey()).isPresent();
-        long written = resultWriter.writeJob(tableName, job,
-                Collections.<String, Object>emptyMap());
+        Map<String, Object> summary = resultSummary == null
+                ? Collections.<String, Object>emptyMap() : resultSummary;
+        long written = resultWriter.writeJob(tableName, job, summary);
         SaveOutcome outcome = written == 0L ? SaveOutcome.UNCHANGED
                 : exists ? SaveOutcome.UPDATED : SaveOutcome.CREATED;
         LOGGER.info("FMDB 任务状态保存完成，jobId={}，status={}，outcome={}",
@@ -86,6 +96,33 @@ public final class FmdbJobRepository implements JobRepository {
                 .collectAsList();
         return rows.isEmpty() ? Optional.<RahaJob>empty()
                 : Optional.of(toJob(rows.get(0)));
+    }
+
+    @Override
+    public Optional<Map<String, Object>> findResultSummaryByIdempotentKey(
+            String datasetId,
+            String idempotentKey) {
+        String validatedDataset = ValueUtils.requireNotBlank(datasetId, "数据集标识");
+        String validatedKey = ValueUtils.requireNotBlank(idempotentKey, "幂等键");
+        if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.JOB_RUN)
+                || !tableGateway.tableExists(tableName)) {
+            return Optional.empty();
+        }
+        List<Row> rows = tableGateway.read(tableName,
+                        Collections.singletonList("result_summary_json"),
+                        functions.col("dataset_id").equalTo(validatedDataset)
+                                .and(functions.col("idempotent_key")
+                                        .equalTo(validatedKey)))
+                .orderBy(functions.col("state_version").desc()).limit(1)
+                .collectAsList();
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<String, Object> summary = FmdbJsonCodec.readObject(
+                (String) rows.get(0).getAs("result_summary_json"));
+        return summary.isEmpty()
+                ? Optional.<Map<String, Object>>empty()
+                : Optional.of(summary);
     }
 
     private static RahaJob toJob(Row row) {

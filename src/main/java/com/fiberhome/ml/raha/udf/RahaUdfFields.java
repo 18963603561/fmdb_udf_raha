@@ -19,7 +19,16 @@ public final class RahaUdfFields {
                     RahaUdfField.string("snapshotId"),
                     RahaUdfField.string("sourceType"),
                     RahaUdfField.string("inputReference"),
-                    RahaUdfField.longField("createdAt")));
+                    RahaUdfField.longField("createdAt"),
+                    RahaUdfField.string("jobId"),
+                    RahaUdfField.string("configVersion"),
+                    RahaUdfField.string("idempotentKey"),
+                    RahaUdfField.booleanField("reused"),
+                    RahaUdfField.booleanField("forceRun"),
+                    RahaUdfField.string("forceRunId"),
+                    RahaUdfField.string("baseExecutionInputFingerprint"),
+                    RahaUdfField.string("executionInputFingerprint"),
+                    RahaUdfField.string("currentSelectRule")));
 
     /** 采集函数输出字段。 */
     public static final List<RahaUdfField> COLLECT = append(COMMON,

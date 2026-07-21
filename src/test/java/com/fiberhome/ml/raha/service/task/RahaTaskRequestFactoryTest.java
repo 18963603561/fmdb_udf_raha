@@ -117,6 +117,63 @@ class RahaTaskRequestFactoryTest {
     }
 
     @Test
+    void shouldCreateNewFinalFingerprintForEachForceRunWithoutForceRunId() {
+        RahaTaskRequestFactory factory = factory(
+                Collections.<SampleBatch>emptyList(),
+                Collections.<AnnotationBatch>emptyList(),
+                Collections.<String, ModelSetManifest>emptyMap());
+        FmdbInputSpec input = FmdbInputSpec.table("dw.orders");
+
+        RahaTaskExecutionRequest first = factory.sampling(input,
+                new SamplingRequestOptions(null, 1,
+                        Collections.<CellLabel>emptyList(),
+                        new ExecutionOverrideOptions(true, null)));
+        RahaTaskExecutionRequest second = factory.sampling(input,
+                new SamplingRequestOptions(null, 1,
+                        Collections.<CellLabel>emptyList(),
+                        new ExecutionOverrideOptions(true, null)));
+
+        assertTrue(first.isForceRun());
+        assertEquals(first.getBaseExecutionInputFingerprint(),
+                second.getBaseExecutionInputFingerprint());
+        assertNotEquals(first.getExecutionInputFingerprint(),
+                second.getExecutionInputFingerprint());
+        assertNotEquals(first.getConfig().getExecutionInputFingerprint(),
+                second.getConfig().getExecutionInputFingerprint());
+    }
+
+    @Test
+    void shouldKeepForcedRetryIdempotentWhenForceRunIdIsSame() {
+        RahaTaskRequestFactory factory = factory(
+                Collections.<SampleBatch>emptyList(),
+                Collections.<AnnotationBatch>emptyList(),
+                Collections.<String, ModelSetManifest>emptyMap());
+        FmdbInputSpec input = FmdbInputSpec.table("dw.orders");
+        ExecutionOverrideOptions forceRun =
+                new ExecutionOverrideOptions(true, "manual-20260721-001");
+
+        RahaTaskExecutionRequest first = factory.sampling(input,
+                new SamplingRequestOptions(null, 1,
+                        Collections.<CellLabel>emptyList(), forceRun));
+        RahaTaskExecutionRequest second = factory.sampling(input,
+                new SamplingRequestOptions(null, 1,
+                        Collections.<CellLabel>emptyList(), forceRun));
+
+        assertEquals("manual-20260721-001", first.getForceRunId());
+        assertEquals(first.getBaseExecutionInputFingerprint(),
+                second.getBaseExecutionInputFingerprint());
+        assertEquals(first.getExecutionInputFingerprint(),
+                second.getExecutionInputFingerprint());
+    }
+
+    @Test
+    void shouldRejectForceRunIdWithoutForceRun() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new ExecutionOverrideOptions(false,
+                        "manual-20260721-001"));
+    }
+
+    @Test
     void shouldResolveMultipleTrainingBatchesInStableOrder() {
         SampleBatch second = sampleBatch("sample-b", "annotation-row-b");
         SampleBatch first = sampleBatch("sample-a", "annotation-row-a");

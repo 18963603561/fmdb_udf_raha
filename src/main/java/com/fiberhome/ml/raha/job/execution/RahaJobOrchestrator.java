@@ -21,6 +21,7 @@ import com.fiberhome.ml.raha.repository.port.JobRepository;
 import com.fiberhome.ml.raha.repository.port.StageRepository;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -100,6 +101,36 @@ public final class RahaJobOrchestrator {
         jobRepository.save(job, clock.millis());
         LOGGER.info("Raha 任务创建完成，jobId={}，jobType={}", job.getJobId(), job.getJobType());
         return job.snapshot();
+    }
+
+    /**
+     * 保存任务完成后的结果摘要。
+     *
+     * @param job 任务快照
+     * @param resultSummary 应用层组装的结果摘要
+     */
+    public void saveResultSummary(RahaJob job, Map<String, Object> resultSummary) {
+        if (job == null) {
+            throw new IllegalArgumentException("任务不能为空");
+        }
+        jobRepository.save(job, clock.millis(), resultSummary);
+    }
+
+    /**
+     * 读取同一幂等任务最新保存的结果摘要。
+     *
+     * @param job 已命中的任务
+     * @return 结果摘要，不存在时返回空映射
+     */
+    public Map<String, Object> findResultSummary(RahaJob job) {
+        if (job == null) {
+            throw new IllegalArgumentException("任务不能为空");
+        }
+        Optional<Map<String, Object>> summary =
+                jobRepository.findResultSummaryByIdempotentKey(
+                        job.getDatasetId(), job.getIdempotentKey());
+        return summary.isPresent() ? summary.get()
+                : Collections.<String, Object>emptyMap();
     }
 
     /**
