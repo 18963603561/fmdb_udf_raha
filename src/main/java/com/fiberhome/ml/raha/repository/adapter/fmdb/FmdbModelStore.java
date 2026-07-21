@@ -263,7 +263,12 @@ public final class FmdbModelStore implements ColumnModelStore {
     }
 
     private String modelPath(String version) {
-        return MODEL_SCHEME + modelTable + "/" + version;
+        String validated = ValueUtils.requireNotBlank(version, "FMDB 模型版本");
+        if (validated.contains("/") || validated.contains("\\")
+                || validated.contains(":")) {
+            throw new IllegalArgumentException("FMDB 模型版本不能包含路径分隔符");
+        }
+        return MODEL_SCHEME + modelTable + "/" + validated;
     }
 
     private String versionFromPath(String path) {

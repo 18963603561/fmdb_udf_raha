@@ -16,8 +16,10 @@ public final class DataLoadRequest {
 
     /** 逻辑数据集标识。 */
     private final String datasetId;
-    /** 输入文件或目录。 */
+    /** 输入文件、表名或 SQL 原文，用于实际读取数据。 */
     private final String inputReference;
+    /** 持久化和输出展示的来源引用，SQL 输入时为首个来源表。 */
+    private final String sourceReference;
     /** 来源表或逻辑表名称。 */
     private final String tableName;
     /** 输入业务键或全字段内容哈希行身份配置。 */
@@ -48,8 +50,27 @@ public final class DataLoadRequest {
                            Set<String> sensitiveColumns,
                            String snapshotId,
                            String sourceVersion) {
+        this(datasetId, inputReference, inputReference, tableName,
+                rowIdentityConfig, format, options, includedColumns,
+                excludedColumns, sensitiveColumns, snapshotId, sourceVersion);
+    }
+
+    public DataLoadRequest(String datasetId,
+                           String inputReference,
+                           String sourceReference,
+                           String tableName,
+                           RowIdentityConfig rowIdentityConfig,
+                           DataFormat format,
+                           Map<String, String> options,
+                           Set<String> includedColumns,
+                           Set<String> excludedColumns,
+                           Set<String> sensitiveColumns,
+                           String snapshotId,
+                           String sourceVersion) {
         this.datasetId = ValueUtils.requireNotBlank(datasetId, "数据集标识");
         this.inputReference = ValueUtils.requireNotBlank(inputReference, "输入数据引用");
+        this.sourceReference = ValueUtils.requireNotBlank(
+                sourceReference, "展示来源引用");
         this.tableName = ValueUtils.requireNotBlank(tableName, "表名");
         if (rowIdentityConfig == null) {
             throw new IllegalArgumentException("行身份配置不能为空");
@@ -78,6 +99,10 @@ public final class DataLoadRequest {
 
     public String getInputReference() {
         return inputReference;
+    }
+
+    public String getSourceReference() {
+        return sourceReference;
     }
 
     public String getTableName() {

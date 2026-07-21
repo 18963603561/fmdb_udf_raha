@@ -33,7 +33,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 验证检测指标数学、平均精确率、阈值选优和发布阈值生效。
@@ -104,9 +104,12 @@ class DetectionEvaluationServiceTest {
                 store, new ColumnModelCompatibilityValidator()).load(
                 "dataset", "code", "schema-v1", "dictionary-v1", "plan-v1");
         assertEquals(0.5d, published.getThreshold(), 0.000001d);
-        assertThrows(IllegalStateException.class,
-                () -> result.getUpdatedModel().withStatus(ModelStatus.PUBLISHED)
-                        .withEvaluation(0.4d, Collections.<String, Double>emptyMap()));
+        RahaColumnModel tuned = result.getUpdatedModel()
+                .withStatus(ModelStatus.PUBLISHED)
+                .withEvaluation(0.4d, Collections.<String, Double>emptyMap());
+        assertEquals(ModelStatus.PUBLISHED, tuned.getStatus());
+        assertEquals(0.4d, tuned.getThreshold(), 0.000001d);
+        assertTrue(tuned.getPublishedAt() > 0L);
     }
 
     private static List<CellLabel> truth(int first,

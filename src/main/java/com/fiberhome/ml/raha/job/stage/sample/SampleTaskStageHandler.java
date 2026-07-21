@@ -139,6 +139,7 @@ public final class SampleTaskStageHandler implements StageHandler {
                             (DatasetSnapshot) snapshotValue,
                             context.getConfig().getRowIdentityConfig(),
                             sourceType,
+                            context.getConfig().getInputReference(),
                             result.getPayload().getSampling());
             // 首个可用闭环要求采样成功时 c1 已真实入库，关闭表开关不能伪造成功。
             if (!materialized.isPersisted()) {

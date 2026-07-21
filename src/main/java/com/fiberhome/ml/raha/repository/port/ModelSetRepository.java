@@ -15,4 +15,12 @@ public interface ModelSetRepository {
      * @return 存在时返回经过一致性校验的模型集合清单
      */
     Optional<ModelSetManifest> find(String modelSetVersion);
+
+    /**
+     * 查询指定数据集当前最新的完整已发布模型集合。
+     *
+     * @param datasetId 数据集标识
+     * @return 存在时返回最新完整已发布模型集合
+     */
+    Optional<ModelSetManifest> findLatestPublishedByDataset(String datasetId);
 }

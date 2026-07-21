@@ -228,7 +228,7 @@ public final class RahaColumnModel {
     }
 
     /**
-     * 为草稿或候选模型保存评测选定阈值和指标，不改变训练参数版本。
+     * 为草稿、候选或已发布模型保存评测选定阈值和指标，不改变训练参数版本。
      *
      * @param selectedThreshold 已评测选定阈值
      * @param evaluationMetrics 需要合并的评测指标
@@ -236,8 +236,9 @@ public final class RahaColumnModel {
      */
     public RahaColumnModel withEvaluation(double selectedThreshold,
                                           Map<String, Double> evaluationMetrics) {
-        if (status != ModelStatus.DRAFT && status != ModelStatus.CANDIDATE) {
-            throw new IllegalStateException("只有草稿或候选模型可以更新评测阈值");
+        if (status != ModelStatus.DRAFT && status != ModelStatus.CANDIDATE
+                && status != ModelStatus.PUBLISHED) {
+            throw new IllegalStateException("只有草稿、候选或已发布模型可以更新评测阈值");
         }
         if (Double.isNaN(selectedThreshold) || selectedThreshold < 0.0d
                 || selectedThreshold > 1.0d || evaluationMetrics == null) {

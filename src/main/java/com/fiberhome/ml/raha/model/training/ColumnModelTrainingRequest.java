@@ -16,6 +16,10 @@ public final class ColumnModelTrainingRequest {
     private final String schemaHash;
     /** 训练策略计划版本。 */
     private final String strategyPlanVersion;
+    /** 当前字段所属的模型集合版本。 */
+    private final String modelSetVersion;
+    /** 模型命名使用的可读来源名称。 */
+    private final String modelSourceName;
     /** 单列训练数据。 */
     private final ColumnTrainingDataset dataset;
     /** 分类器、阈值和降级配置。 */
@@ -30,11 +34,26 @@ public final class ColumnModelTrainingRequest {
                                       ColumnTrainingDataset dataset,
                                       ModelConfig modelConfig,
                                       LogisticRegressionTrainingConfig trainingConfig) {
+        this(modelName, datasetId, schemaHash, strategyPlanVersion, null,
+                null, dataset, modelConfig, trainingConfig);
+    }
+
+    public ColumnModelTrainingRequest(String modelName,
+                                      String datasetId,
+                                      String schemaHash,
+                                      String strategyPlanVersion,
+                                      String modelSetVersion,
+                                      String modelSourceName,
+                                      ColumnTrainingDataset dataset,
+                                      ModelConfig modelConfig,
+                                      LogisticRegressionTrainingConfig trainingConfig) {
         this.modelName = ValueUtils.requireNotBlank(modelName, "模型名称");
         this.datasetId = ValueUtils.requireNotBlank(datasetId, "数据集标识");
         this.schemaHash = ValueUtils.requireNotBlank(schemaHash, "模式哈希");
         this.strategyPlanVersion = ValueUtils.requireNotBlank(
                 strategyPlanVersion, "策略计划版本");
+        this.modelSetVersion = trimToNull(modelSetVersion);
+        this.modelSourceName = trimToNull(modelSourceName);
         if (dataset == null || modelConfig == null || trainingConfig == null) {
             throw new IllegalArgumentException("训练数据、模型配置和优化配置不能为空");
         }
@@ -47,7 +66,13 @@ public final class ColumnModelTrainingRequest {
     public String getDatasetId() { return datasetId; }
     public String getSchemaHash() { return schemaHash; }
     public String getStrategyPlanVersion() { return strategyPlanVersion; }
+    public String getModelSetVersion() { return modelSetVersion; }
+    public String getModelSourceName() { return modelSourceName; }
     public ColumnTrainingDataset getDataset() { return dataset; }
     public ModelConfig getModelConfig() { return modelConfig; }
     public LogisticRegressionTrainingConfig getTrainingConfig() { return trainingConfig; }
+
+    private static String trimToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
 }

@@ -29,6 +29,8 @@ class SnapshotMetadataFactoryTest {
 
         assertEquals(first.getSnapshotId(), replay.getSnapshotId());
         assertNotEquals(first.getSnapshotId(), changed.getSnapshotId());
+        assertEquals("snapshot_dw.orders@content-content-v1",
+                first.getSnapshotId());
     }
 
     private static DataLoadRequest request() {

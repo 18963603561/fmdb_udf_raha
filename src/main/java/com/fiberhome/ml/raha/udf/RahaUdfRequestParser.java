@@ -5,7 +5,6 @@ import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
 import com.fiberhome.ml.raha.service.task.FmdbInputSpec;
 import com.fiberhome.ml.raha.util.FormDataCodec;
-import com.fiberhome.ml.raha.util.HashUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -107,10 +106,12 @@ public final class RahaUdfRequestParser {
             return null;
         }
         if ("SQL".equals(sourceType)) {
-            String datasetId = required("datasetId", "SQL 逻辑数据集标识");
             String sql = firstRequired("sqlText", "sql", "SQL 文本");
-            return withCommonInputOptions(new FmdbInputSpec(datasetId, sql,
-                    datasetId, DataFormat.FMDB_SQL, rowIdentity(), optional("snapshotId"),
+            FmdbInputSpec parsed = FmdbInputSpec.sql(sql);
+            return withCommonInputOptions(new FmdbInputSpec(
+                    parsed.getDatasetId(), parsed.getInputReference(),
+                    parsed.getTableName(), DataFormat.FMDB_SQL, rowIdentity(),
+                    optional("snapshotId"),
                     optional("sourceVersion"), Collections.<String, String>emptyMap(),
                     csvSet("includeColumns"), csvSet("excludeColumns"),
                     csvSet("sensitiveColumns")));
@@ -151,9 +152,7 @@ public final class RahaUdfRequestParser {
             return null;
         }
         if (input.getFormat() == DataFormat.FMDB_SQL) {
-            return "sql:" + HashUtils.sha256Hex(input.getInputReference())
-                    .substring(0, 16) + ":len="
-                    + input.getInputReference().length();
+            return input.getSourceReference();
         }
         return input.getInputReference();
     }

@@ -181,8 +181,8 @@ class Iteration9FmdbPipelineIntegrationTest {
         }
         RahaColumnModel candidate = trained.getPayload()
                 .getCandidateModels().get("code");
-        releaseManager.publish("fmdb-dataset", "code",
-                candidate.getModelVersion(), version("publish-stage"));
+        assertEquals(com.fiberhome.ml.raha.data.type.ModelStatus.PUBLISHED,
+                candidate.getStatus());
 
         // 使用新存储实例模拟服务重启，确保检测不依赖训练进程内缓存。
         FmdbModelStore restartedStore = new FmdbModelStore(spark, fmdbGateway,

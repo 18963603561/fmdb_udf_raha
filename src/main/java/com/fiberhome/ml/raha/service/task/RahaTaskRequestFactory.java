@@ -112,9 +112,20 @@ public final class RahaTaskRequestFactory {
     }
 
     /**
-     * 使用稳定逻辑标识和只读 SQL 创建默认首轮采样请求。
+     * 使用只读 SQL 创建默认首轮采样请求。
      *
-     * @param datasetId 稳定逻辑数据集标识
+     * @param sql FMDB 只读 SQL
+     * @return 完整采样执行请求
+     */
+    public RahaTaskExecutionRequest samplingSql(String sql) {
+        return sampling(FmdbInputSpec.sql(sql),
+                SamplingRequestOptions.defaults());
+    }
+
+    /**
+     * 使用只读 SQL 创建默认首轮采样请求，旧数据集参数保留兼容。
+     *
+     * @param datasetId 旧调用方逻辑数据集标识，新规则按 SQL 首表生成
      * @param sql FMDB 只读 SQL
      * @return 完整采样执行请求
      */
@@ -247,40 +258,100 @@ public final class RahaTaskRequestFactory {
     }
 
     /**
-     * 使用 FMDB 表和不可变模型集合版本创建检测请求。
+     * 使用 FMDB 表创建检测请求，自动选择最新完整已发布模型集合。
      *
      * @param inputReference 待检测完整 FMDB 表名
-     * @param modelSetVersion 不可变模型集合版本
+     * @return 完整检测执行请求
+     */
+    public RahaTaskExecutionRequest detectionTable(String inputReference) {
+        return detectionTable(inputReference, null);
+    }
+
+    /**
+     * 使用 FMDB 表和可选不可变模型集合版本创建检测请求。
+     *
+     * @param inputReference 待检测完整 FMDB 表名
+     * @param modelSetVersion 不可变模型集合版本，空值时自动选择最新版本
      * @return 完整检测执行请求
      */
     public RahaTaskExecutionRequest detectionTable(
             String inputReference,
             String modelSetVersion) {
-        ModelSetManifest manifest = requirePublishedModelSet(modelSetVersion);
         String table = ValueUtils.requireNotBlank(inputReference, "检测 FMDB 表名");
-        FmdbInputSpec input = new FmdbInputSpec(manifest.getDatasetId(), table,
-                table, DataFormat.FMDB_TABLE, null, null, null,
-                null, null, null, null);
-        return detection(input, modelSetVersion,
+        String version = trimToNull(modelSetVersion);
+        ModelSetManifest manifest;
+        FmdbInputSpec input;
+        if (version == null) {
+            input = FmdbInputSpec.table(table);
+            manifest = requireLatestPublishedModelSet(input.getDatasetId());
+            version = manifest.getModelSetVersion();
+        } else {
+            manifest = requirePublishedModelSet(version);
+            input = new FmdbInputSpec(manifest.getDatasetId(), table,
+                    table, DataFormat.FMDB_TABLE, null, null, null,
+                    null, null, null, null);
+        }
+        return detection(input, version,
                 DetectionRequestOptions.defaults(), manifest);
     }
 
     /**
-     * 使用只读 SQL 和不可变模型集合版本创建检测请求。
+     * 使用只读 SQL 创建检测请求，自动选择最新完整已发布模型集合。
      *
-     * @param datasetId 调用方声明的逻辑数据集标识
      * @param sql 待检测只读 SQL
-     * @param modelSetVersion 不可变模型集合版本
+     * @return 完整检测执行请求
+     */
+    public RahaTaskExecutionRequest detectionSql(String sql) {
+        return detectionSql(sql, null);
+    }
+
+    /**
+     * 使用只读 SQL 和可选不可变模型集合版本创建检测请求。
+     *
+     * @param sql 待检测只读 SQL
+     * @param modelSetVersion 不可变模型集合版本，空值时自动选择最新版本
+     * @return 完整检测执行请求
+     */
+    public RahaTaskExecutionRequest detectionSql(String sql,
+            String modelSetVersion) {
+        FmdbInputSpec parsed = FmdbInputSpec.sql(sql);
+        String version = trimToNull(modelSetVersion);
+        ModelSetManifest manifest;
+        FmdbInputSpec input;
+        if (version == null) {
+            input = parsed;
+            manifest = requireLatestPublishedModelSet(input.getDatasetId());
+            version = manifest.getModelSetVersion();
+        } else {
+            manifest = requirePublishedModelSet(version);
+            input = new FmdbInputSpec(manifest.getDatasetId(),
+                    parsed.getInputReference(), parsed.getTableName(),
+                    DataFormat.FMDB_SQL, null, parsed.getSnapshotId(),
+                    parsed.getSourceVersion(), parsed.getOptions(),
+                    parsed.getIncludedColumns(), parsed.getExcludedColumns(),
+                    parsed.getSensitiveColumns());
+        }
+        return detection(input, version,
+                DetectionRequestOptions.defaults(), manifest);
+    }
+
+    /**
+     * 使用只读 SQL 和可选模型集合版本创建检测请求，旧数据集参数保留兼容。
+     *
+     * @param datasetId 旧调用方逻辑数据集标识，新规则按 SQL 首表生成
+     * @param sql 待检测只读 SQL
+     * @param modelSetVersion 不可变模型集合版本，空值时自动选择最新版本
      * @return 完整检测执行请求
      */
     public RahaTaskExecutionRequest detectionSql(
             String datasetId,
             String sql,
             String modelSetVersion) {
-        ModelSetManifest manifest = requirePublishedModelSet(modelSetVersion);
-        FmdbInputSpec input = FmdbInputSpec.sql(datasetId, sql);
-        return detection(input, modelSetVersion,
-                DetectionRequestOptions.defaults(), manifest);
+        if (datasetId != null && !datasetId.trim().isEmpty()) {
+            LOGGER.debug("SQL 检测入口忽略外部 datasetId，按首表解析模型来源，"
+                    + "datasetId={}", datasetId);
+        }
+        return detectionSql(sql, modelSetVersion);
     }
 
     /**
@@ -295,8 +366,17 @@ public final class RahaTaskRequestFactory {
             FmdbInputSpec input,
             String modelSetVersion,
             DetectionRequestOptions options) {
-        return detection(input, modelSetVersion, options,
-                requirePublishedModelSet(modelSetVersion));
+        if (input == null || options == null) {
+            throw new IllegalArgumentException("检测输入和选项不能为空");
+        }
+        String version = trimToNull(modelSetVersion);
+        ModelSetManifest manifest = version == null
+                ? requireLatestPublishedModelSet(input.getDatasetId())
+                : requirePublishedModelSet(version);
+        FmdbInputSpec resolvedInput = version == null ? input
+                : rebindDataset(input, manifest.getDatasetId());
+        return detection(resolvedInput, manifest.getModelSetVersion(), options,
+                manifest);
     }
 
     /**
@@ -339,7 +419,7 @@ public final class RahaTaskRequestFactory {
         if (input.getSnapshotId() != null) {
             config = config.withSnapshotId(input.getSnapshotId());
         }
-        LOGGER.info("显式模型集合检测请求创建完成，datasetId={}，"
+        LOGGER.info("模型集合检测请求创建完成，datasetId={}，"
                         + "modelSetVersion={}，sourceType={}，missingModelPolicy={}",
                 manifest.getDatasetId(), modelSetVersion, input.getFormat(),
                 options.getMissingModelPolicy());
@@ -370,6 +450,36 @@ public final class RahaTaskRequestFactory {
     }
 
     /**
+     * 按数据集读取最新完整已发布模型集合。
+     *
+     * @param datasetId 检测输入解析出的数据集标识
+     * @return 最新完整已发布模型集合
+     */
+    private ModelSetManifest requireLatestPublishedModelSet(String datasetId) {
+        String dataset = ValueUtils.requireNotBlank(datasetId, "检测数据集标识");
+        LOGGER.debug("调用模型集合仓储解析最新检测版本，datasetId={}", dataset);
+        Optional<ModelSetManifest> result =
+                modelSetRepository.findLatestPublishedByDataset(dataset);
+        if (!result.isPresent()) {
+            throw new IllegalStateException("数据集没有完整已发布模型集合：" + dataset);
+        }
+        return result.get().requirePublished();
+    }
+
+    private static FmdbInputSpec rebindDataset(FmdbInputSpec input,
+                                               String datasetId) {
+        if (datasetId.equals(input.getDatasetId())) {
+            return input;
+        }
+        return new FmdbInputSpec(datasetId, input.getInputReference(),
+                input.getTableName(), input.getFormat(),
+                input.getRowIdentityConfig(), input.getSnapshotId(),
+                input.getSourceVersion(), input.getOptions(),
+                input.getIncludedColumns(), input.getExcludedColumns(),
+                input.getSensitiveColumns());
+    }
+
+    /**
      * 从一个或多个训练批次中解析统一的训练数据输入。
      *
      * <p>多批次训练要求数据集、输入来源、来源版本、表结构摘要、行身份规则和来源类型完全一致。
@@ -389,6 +499,7 @@ public final class RahaTaskRequestFactory {
         RowIdentityConfig identity = identity(first);
         String datasetId = first.getDatasetId();
         String inputReference = first.getInputReference();
+        String readInputReference = readInputReference(first);
         String sourceVersion = first.getSourceVersion();
         String schemaHash = first.getSchemaHash();
         DataFormat sourceType = sourceType(first);
@@ -396,6 +507,8 @@ public final class RahaTaskRequestFactory {
             for (SampleRecord record : batch.sample.getRecords()) {
                 if (!datasetId.equals(record.getDatasetId())
                         || !inputReference.equals(record.getInputReference())
+                        || !equalsNullable(readInputReference,
+                        readInputReference(record))
                         || !equalsNullable(sourceVersion, record.getSourceVersion())
                         || !schemaHash.equals(record.getSchemaHash())
                         || !sameIdentity(identity, identity(record))
@@ -429,9 +542,14 @@ public final class RahaTaskRequestFactory {
                     ? "采样批次缺少来源类型，请显式提供训练输入覆盖"
                     : "最小 FMDB 训练入口不支持采样来源类型：" + sourceType);
         }
-        String tableName = sourceType == DataFormat.FMDB_TABLE
-                ? inputReference : datasetId;
-        FmdbInputSpec spec = new FmdbInputSpec(datasetId, inputReference,
+        String tableName = inputReference;
+        String loadReference = inputReference;
+        if (sourceType == DataFormat.FMDB_SQL) {
+            loadReference = readInputReference == null
+                    ? inputReference : readInputReference;
+            tableName = FmdbSqlSourceTableResolver.firstSourceTable(loadReference);
+        }
+        FmdbInputSpec spec = new FmdbInputSpec(datasetId, loadReference,
                 tableName, sourceType, identity, null, sourceVersion,
                 null, null, null, null);
         return new TrainingInput(spec, identity);
@@ -530,6 +648,19 @@ public final class RahaTaskRequestFactory {
             throw new IllegalStateException("采样批次来源类型非法：" + raw,
                     exception);
         }
+    }
+
+    private static String readInputReference(SampleRecord record) {
+        Object raw = record.getSamplingContext().get(
+                SampleRecord.READ_INPUT_REFERENCE_CONTEXT_KEY);
+        if (raw == null) {
+            return null;
+        }
+        if (!(raw instanceof String)) {
+            throw new IllegalStateException("采样批次读取引用必须为文本");
+        }
+        String value = ((String) raw).trim();
+        return value.isEmpty() ? null : value;
     }
 
     /**
@@ -643,6 +774,7 @@ public final class RahaTaskRequestFactory {
         StringBuilder source = new StringBuilder();
         appendToken(source, input.getDatasetId());
         appendToken(source, input.getInputReference());
+        appendToken(source, input.getSourceReference());
         appendToken(source, input.getTableName());
         appendToken(source, input.getFormat());
         appendToken(source, input.getRowIdentityConfig() == null ? null
@@ -739,6 +871,10 @@ public final class RahaTaskRequestFactory {
      */
     private static boolean equalsNullable(Object first, Object second) {
         return first == null ? second == null : first.equals(second);
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 
     /**

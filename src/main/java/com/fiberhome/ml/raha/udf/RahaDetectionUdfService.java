@@ -285,20 +285,20 @@ public final class RahaDetectionUdfService {
     public RahaUdfRows detect(String argument) {
         RahaUdfRequestParser parser = RahaUdfRequestParser.parse(argument);
         FmdbInputSpec input = parser.inputSpec(true);
-        String modelSetVersion = parser.required(
-                "modelSetVersion", "模型集合版本");
+        String modelSetVersion = parser.optional("modelSetVersion");
         MissingModelPolicy policy = missingModelPolicy(parser);
         LOGGER.info("开始执行检测 UDF，datasetId={}，modelSetVersion={}，missingModelPolicy={}",
                 input.getDatasetId(), modelSetVersion, policy);
         RahaTaskExecutionRequest taskRequest = requestFactory.detection(
                 input, modelSetVersion, new DetectionRequestOptions(policy));
+        String resolvedModelSetVersion = taskRequest.getModelSetVersion();
         RahaTaskExecutionResult taskResult = taskService.execute(taskRequest);
         RahaDetectOutput output = requirePayload(taskResult, RahaDetectOutput.class,
                 "DETECT_OUTPUT_NOT_FOUND", "检测任务没有返回检测输出");
         DatasetSnapshot snapshot = snapshot(taskResult);
         RahaDataset dataset = dataset(taskResult);
         Map<String, Object> row = successBase(parser, input, snapshot);
-        row.put("modelSetVersion", modelSetVersion);
+        row.put("modelSetVersion", resolvedModelSetVersion);
         row.put("schemaHash", snapshot == null ? null : snapshot.getSchemaHash());
         row.put("rowCount", snapshot == null ? null
                 : Long.valueOf(snapshot.getRowCount()));
@@ -320,8 +320,8 @@ public final class RahaDetectionUdfService {
             Path workDir = runWorkDir(publishConfig, "detect");
             String fileTime = fileTime();
             String detailName = "raha-detrun-detail_"
-                    + safeFileToken(modelSetVersion) + "_" + fileTime + ".xls";
-            String zipName = "raha-detrun_" + safeFileToken(modelSetVersion)
+                    + safeFileToken(resolvedModelSetVersion) + "_" + fileTime + ".xls";
+            String zipName = "raha-detrun_" + safeFileToken(resolvedModelSetVersion)
                     + "_" + fileTime + ".zip";
             List<Map<String, Object>> detailRows =
                     detectionDetailRows(taskResult, output);

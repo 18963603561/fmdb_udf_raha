@@ -12,7 +12,9 @@ import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -51,6 +53,16 @@ public final class DefaultModelMetadataRepository implements ModelMetadataReposi
                         new RepositoryKey(RepositoryNamespace.MODEL_SET,
                                 model.getModelSetVersion(),
                                 model.getColumnName().length() + ":"
+                                        + model.getColumnName()
+                                        + model.getModelVersion().length() + ":"
+                                        + model.getModelVersion()),
+                        version, model, updatedAt));
+                transactionRepository.save(new RepositoryRecord<RahaColumnModel>(
+                        new RepositoryKey(RepositoryNamespace.MODEL_SET,
+                                datasetPartition(model.getDatasetId()),
+                                model.getModelSetVersion().length() + ":"
+                                        + model.getModelSetVersion()
+                                        + model.getColumnName().length() + ":"
                                         + model.getColumnName()
                                         + model.getModelVersion().length() + ":"
                                         + model.getModelVersion()),
@@ -107,6 +119,45 @@ public final class DefaultModelMetadataRepository implements ModelMetadataReposi
     }
 
     @Override
+    public List<RahaColumnModel> findLatestPublishedModelSet(String datasetId) {
+        String dataset = ValueUtils.requireNotBlank(datasetId, "数据集标识");
+        List<RepositoryRecord<RahaColumnModel>> records =
+                repository.findByPartition(RepositoryNamespace.MODEL_SET,
+                        datasetPartition(dataset), RahaColumnModel.class);
+        Map<String, List<RahaColumnModel>> bySet =
+                new LinkedHashMap<String, List<RahaColumnModel>>();
+        for (RepositoryRecord<RahaColumnModel> record : records) {
+            RahaColumnModel model = record.getPayload();
+            if (!dataset.equals(model.getDatasetId())) {
+                throw new IllegalStateException("模型数据集索引存在错误记录");
+            }
+            List<RahaColumnModel> group = bySet.get(model.getModelSetVersion());
+            if (group == null) {
+                group = new ArrayList<RahaColumnModel>();
+                bySet.put(model.getModelSetVersion(), group);
+            }
+            group.add(model);
+        }
+        List<RahaColumnModel> selected = null;
+        for (List<RahaColumnModel> models : bySet.values()) {
+            if (!allActivePublished(models)) {
+                continue;
+            }
+            if (selected == null || compareModelSet(models, selected) > 0) {
+                selected = models;
+            }
+        }
+        if (selected == null) {
+            return Collections.emptyList();
+        }
+        List<RahaColumnModel> result = new ArrayList<RahaColumnModel>(selected);
+        Collections.sort(result, Comparator.comparing(
+                RahaColumnModel::getColumnName)
+                .thenComparing(RahaColumnModel::getModelVersion));
+        return Collections.unmodifiableList(result);
+    }
+
+    @Override
     public Optional<RahaColumnModel> findPublished(String datasetId, String columnName) {
         RahaColumnModel published = null;
         for (RahaColumnModel model : findByColumn(datasetId, columnName)) {
@@ -123,5 +174,54 @@ public final class DefaultModelMetadataRepository implements ModelMetadataReposi
     private static String partition(String datasetId, String columnName) {
         return datasetId.length() + ":" + datasetId
                 + columnName.length() + ":" + columnName;
+    }
+
+    private static String datasetPartition(String datasetId) {
+        return "dataset:" + datasetId.length() + ":" + datasetId;
+    }
+
+    private static boolean allActivePublished(List<RahaColumnModel> models) {
+        if (models == null || models.isEmpty()) {
+            return false;
+        }
+        for (RahaColumnModel model : models) {
+            if (model.getStatus() != ModelStatus.PUBLISHED
+                    || model.getPublishedAt() == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int compareModelSet(List<RahaColumnModel> first,
+                                       List<RahaColumnModel> second) {
+        long firstPublished = latestPublishedAt(first);
+        long secondPublished = latestPublishedAt(second);
+        if (firstPublished != secondPublished) {
+            return firstPublished < secondPublished ? -1 : 1;
+        }
+        long firstCreated = latestCreatedAt(first);
+        long secondCreated = latestCreatedAt(second);
+        if (firstCreated != secondCreated) {
+            return firstCreated < secondCreated ? -1 : 1;
+        }
+        return first.get(0).getModelSetVersion().compareTo(
+                second.get(0).getModelSetVersion());
+    }
+
+    private static long latestPublishedAt(List<RahaColumnModel> models) {
+        long value = 0L;
+        for (RahaColumnModel model : models) {
+            value = Math.max(value, model.getPublishedAt().longValue());
+        }
+        return value;
+    }
+
+    private static long latestCreatedAt(List<RahaColumnModel> models) {
+        long value = 0L;
+        for (RahaColumnModel model : models) {
+            value = Math.max(value, model.getCreatedAt());
+        }
+        return value;
     }
 }

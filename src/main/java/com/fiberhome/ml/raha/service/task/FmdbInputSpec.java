@@ -23,8 +23,10 @@ public final class FmdbInputSpec {
     private static final String TABLE_DATASET_PREFIX = "fmdb-table:";
     /** 逻辑数据集标识。 */
     private final String datasetId;
-    /** FMDB 完整表名或只读 SQL。 */
+    /** FMDB 完整表名或只读 SQL，供加载器实际读取。 */
     private final String inputReference;
+    /** 持久化和输出展示的来源引用，SQL 输入时为首个来源表。 */
+    private final String sourceReference;
     /** 结果和日志使用的稳定逻辑表名。 */
     private final String tableName;
     /** 输入来源类型，仅允许 FMDB 表或 FMDB SQL。 */
@@ -65,6 +67,8 @@ public final class FmdbInputSpec {
         this.format = format;
         this.inputReference = format == DataFormat.FMDB_SQL
                 ? requireReadOnlySql(reference) : reference;
+        this.sourceReference = format == DataFormat.FMDB_SQL
+                ? this.tableName : reference;
         this.rowIdentityConfig = rowIdentityConfig;
         this.snapshotId = trimToNull(snapshotId);
         this.sourceVersion = trimToNull(sourceVersion);
@@ -94,17 +98,29 @@ public final class FmdbInputSpec {
     }
 
     /**
-     * 使用稳定逻辑标识和只读 SQL 创建最小输入规格。
+     * 使用只读 SQL 创建最小输入规格。
      *
-     * @param datasetId 调用方维护的稳定逻辑标识
+     * @param sql 只读 SQL
+     * @return 尚未指定行身份和版本的 SQL 输入
+     */
+    public static FmdbInputSpec sql(String sql) {
+        String sourceTable = FmdbSqlSourceTableResolver.firstSourceTable(sql);
+        return new FmdbInputSpec(datasetIdFromTable(sourceTable), sql,
+                sourceTable,
+                DataFormat.FMDB_SQL, null, null, null,
+                null, null, null, null);
+    }
+
+    /**
+     * 使用只读 SQL 创建最小输入规格，旧参数保留兼容但不再参与数据集推断。
+     *
+     * @param datasetId 旧调用方传入的逻辑数据集标识，新规则统一按 SQL 首表生成
      * @param sql 只读 SQL
      * @return 尚未指定行身份和版本的 SQL 输入
      */
     public static FmdbInputSpec sql(String datasetId, String sql) {
-        String logicalId = ValueUtils.requireNotBlank(datasetId, "SQL 逻辑数据集标识");
-        return new FmdbInputSpec(logicalId, sql, logicalId,
-                DataFormat.FMDB_SQL, null, null, null,
-                null, null, null, null);
+        ValueUtils.requireNotBlank(datasetId, "SQL 逻辑数据集标识");
+        return sql(sql);
     }
 
     /**
@@ -190,13 +206,15 @@ public final class FmdbInputSpec {
         if (identity == null) {
             throw new IllegalArgumentException("FMDB 数据加载缺少行身份规则");
         }
-        return new DataLoadRequest(datasetId, inputReference, tableName,
+        return new DataLoadRequest(datasetId, inputReference, sourceReference,
+                tableName,
                 identity, format, options, includedColumns, excludedColumns,
                 sensitiveColumns, snapshotId, sourceVersion);
     }
 
     public String getDatasetId() { return datasetId; }
     public String getInputReference() { return inputReference; }
+    public String getSourceReference() { return sourceReference; }
     public String getTableName() { return tableName; }
     public DataFormat getFormat() { return format; }
     public RowIdentityConfig getRowIdentityConfig() { return rowIdentityConfig; }

@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | 采集样本 | `F_DW_DETCOLLECT` | `com.fiberhome.ml.raha.udf.F_DW_DETCOLLECT` | 采集检测样本并生成待标注压缩包 |
 | 模型训练 | `F_DW_DETTRAIN` | `com.fiberhome.ml.raha.udf.F_DW_DETTRAIN` | 根据样本批次和人工标注训练检测模型 |
-| 执行检测 | `F_DW_DETRUN` | `com.fiberhome.ml.raha.udf.F_DW_DETRUN` | 使用模型版本对表或 SQL 数据执行检测 |
+| 执行检测 | `F_DW_DETRUN` | `com.fiberhome.ml.raha.udf.F_DW_DETRUN` | 默认按输入来源选择最新已发布模型集合，对表或 SQL 数据执行检测 |
 
 ## 构建
 
@@ -87,8 +87,8 @@ sourceType=TABLE&tableName=dw.customer&rowKeyColumns=id&publishZip=true
 | --- | --- | --- | --- |
 | `sourceType` | 采集和检测建议传入 | 自动推断 | 数据来源类型，支持 `TABLE`、`SQL`。当传入 `tableName` 时推断为 `TABLE`，传入 `sqlText` 时推断为 `SQL` |
 | `tableName` | `sourceType=TABLE` 时必填 | 无 | 待处理表名 |
-| `sqlText` | `sourceType=SQL` 时必填 | 无 | 待处理查询语句，仅支持 `SELECT` 或 `WITH` 开头的查询 |
-| `datasetId` | SQL 来源建议必填 | TABLE 来源按表名生成 | 数据集标识，用于关联快照、样本、模型和结果 |
+| `sqlText` | `sourceType=SQL` 时必填 | 无 | 待处理查询语句，仅支持 `SELECT` 或 `WITH` 开头的查询；持久化和输出引用按第一个来源表生成 |
+| `datasetId` | 否 | 按输入来源生成 | 数据集标识，用于关联快照、样本、模型和结果。表输入按表名生成，SQL 输入按第一个来源表生成；旧调用传入该参数时仅保留兼容 |
 | `snapshotId` | 否 | 自动生成 | 快照标识 |
 | `sourceVersion` | 否 | 空 | 来源数据版本 |
 | `rowKeyColumns` | 否 | 空 | 行主键字段，多个字段用英文逗号分隔 |
@@ -111,7 +111,7 @@ sourceType=TABLE&tableName=dw.customer&rowKeyColumns=id&publishZip=true
 | `datasetId` | 数据集标识 |
 | `snapshotId` | 快照标识 |
 | `sourceType` | 数据来源类型 |
-| `inputReference` | 输入引用，表名或 SQL 摘要 |
+| `inputReference` | 输入引用，表名或 SQL 第一个来源表 |
 | `createdAt` | 结果生成时间 |
 
 ## F_DW_DETCOLLECT
@@ -163,7 +163,7 @@ FROM F_DW_DETCOLLECT(
 ```sql
 SELECT *
 FROM F_DW_DETCOLLECT(
-  '{"sourceType":"SQL","datasetId":"customer_query","sqlText":"select * from dw.customer where dt=''20260720''","rowKeyColumns":"id"}'
+  '{"sourceType":"SQL","sqlText":"select * from dw.customer where dt=''20260720''","rowKeyColumns":"id"}'
 );
 ```
 
@@ -257,7 +257,7 @@ FROM F_DW_DETTRAIN(
 
 ### 功能
 
-检测函数使用指定 `modelSetVersion` 对表或 SQL 数据执行检测，输出检测数据基本信息、预测错误量和明细 ZIP 地址。
+检测函数默认根据表名或 SQL 第一个来源表选择最新完整已发布模型集合，对表或 SQL 数据执行检测，并输出检测数据基本信息、预测错误量和明细 ZIP 地址。需要回放历史模型时，可显式传入 `modelSetVersion`。
 
 检测明细以 Excel 输出。字段值按原值展示，当前不再输出 `masked_value` 脱敏展示值。
 
@@ -266,7 +266,7 @@ FROM F_DW_DETTRAIN(
 | 参数 | 是否必填 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | 公共入参 | 按公共规则 | 按公共规则 | 表或 SQL 来源配置 |
-| `modelSetVersion` | 是 | 无 | 模型集合版本 |
+| `modelSetVersion` | 否 | 最新已发布模型集合 | 模型集合版本；为空时按输入表或 SQL 第一个来源表自动选择最新完整已发布模型集合 |
 | `missingModelPolicy` | 否 | `PARTIAL` | 字段模型缺失策略，支持 `FAIL`、`PARTIAL` |
 | `detailFormat` | 否 | `xls` | 明细文件格式，当前固定为 `xls` |
 | `publishZip` | 否 | `true` | 是否生成检测明细 ZIP |
@@ -312,14 +312,21 @@ FROM F_DW_DETTRAIN(
 ```sql
 SELECT *
 FROM F_DW_DETRUN(
-  'sourceType=TABLE&tableName=dw.customer&rowKeyColumns=id&modelSetVersion=model-set-20260720150000&missingModelPolicy=PARTIAL'
+  'sourceType=TABLE&tableName=dw.customer&rowKeyColumns=id&missingModelPolicy=PARTIAL'
 );
 ```
 
 ```sql
 SELECT *
 FROM F_DW_DETRUN(
-  '{"sourceType":"SQL","datasetId":"customer_query","sqlText":"select * from dw.customer where dt=''20260720''","modelSetVersion":"model-set-20260720150000"}'
+  '{"sourceType":"SQL","sqlText":"select * from dw.customer where dt=''20260720''"}'
+);
+```
+
+```sql
+SELECT *
+FROM F_DW_DETRUN(
+  'sourceType=TABLE&tableName=dw.customer&modelSetVersion=dw.customer@20260720150000.000-train-job-1'
 );
 ```
 

@@ -11,7 +11,7 @@ public final class DatasetSnapshot {
     private final String datasetId;
     /** 输入快照标识。 */
     private final String snapshotId;
-    /** 输入表、文件或 SQL 引用。 */
+    /** 持久化和输出展示的输入来源引用。 */
     private final String inputReference;
     /** 来源表或逻辑表名称。 */
     private final String tableName;
@@ -93,4 +93,3 @@ public final class DatasetSnapshot {
         return createdAt;
     }
 }
-

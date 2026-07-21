@@ -3,7 +3,7 @@ package com.fiberhome.ml.raha.data.loader.metadata;
 import com.fiberhome.ml.raha.data.domain.DatasetSnapshot;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityColumns;
-import com.fiberhome.ml.raha.util.HashUtils;
+import com.fiberhome.ml.raha.util.ReadableIdUtils;
 
 /**
  * 根据数据源版本、模式和规模创建输入快照元数据。
@@ -48,12 +48,13 @@ public final class SnapshotMetadataFactory {
                         ? "legacy-read-" + createdAt
                         : "content-" + contentFingerprint;
             }
-            String source = request.getDatasetId() + "|" + request.getInputReference()
-                    + "|" + sourceVersion + "|" + schemaHash + "|" + rowCount;
-            snapshotId = "snapshot-" + HashUtils.sha256Hex(source).substring(0, 24);
+            snapshotId = "snapshot_"
+                    + ReadableIdUtils.normalizeSourceName(
+                    request.getSourceReference()) + "@"
+                    + ReadableIdUtils.safeToken(sourceVersion);
         }
         return new DatasetSnapshot(request.getDatasetId(), snapshotId,
-                request.getInputReference(), request.getTableName(),
+                request.getSourceReference(), request.getTableName(),
                 RowIdentityColumns.ROW_ID,
                 schemaHash, rowCount, columnCount, request.getSourceVersion(), createdAt);
     }

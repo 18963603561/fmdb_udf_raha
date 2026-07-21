@@ -3,6 +3,8 @@ package com.fiberhome.ml.raha.model;
 import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.model.domain.ColumnModelArtifact;
 import com.fiberhome.ml.raha.model.domain.ModelPersistenceContext;
+import com.fiberhome.ml.raha.model.release.ModelReadableVersioner;
+import com.fiberhome.ml.raha.util.ValueUtils;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -40,13 +42,15 @@ public final class FileColumnModelStore implements ColumnModelStore {
     @Override
     public String save(ColumnModelArtifact artifact,
                        ModelPersistenceContext context) {
-        if (artifact == null || context == null
-                || !artifact.getModelVersion().matches("[0-9a-f]{64}")) {
+        if (artifact == null || context == null) {
             throw new IllegalArgumentException("模型参数和版本必须有效");
         }
-        Path target = rootDirectory.resolve(artifact.getModelVersion() + ".properties").normalize();
+        String modelVersion = ValueUtils.requireNotBlank(
+                artifact.getModelVersion(), "模型版本");
+        String fileToken = ModelReadableVersioner.safeFileToken(modelVersion);
+        Path target = rootDirectory.resolve(fileToken + ".properties").normalize();
         ensureInsideRoot(target);
-        Path temporary = rootDirectory.resolve(artifact.getModelVersion() + ".tmp").normalize();
+        Path temporary = rootDirectory.resolve(fileToken + ".tmp").normalize();
         LOGGER.info("开始保存列级模型文件，modelVersion={}，columnName={}",
                 artifact.getModelVersion(), artifact.getColumnName());
         try {

@@ -176,6 +176,63 @@ public final class FmdbModelMetadataRepository implements ModelMetadataRepositor
     }
 
     @Override
+    public List<RahaColumnModel> findLatestPublishedModelSet(String datasetId) {
+        String dataset = ValueUtils.requireNotBlank(datasetId, "数据集标识");
+        if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT)
+                || !tableGateway.tableExists(tableName)) {
+            return Collections.emptyList();
+        }
+        LOGGER.debug("开始读取 FMDB 最新已发布模型集合，datasetId={}", dataset);
+        List<Row> rows = tableGateway.read(tableName,
+                FmdbTableSchemas.columns(FmdbPhysicalTable.MODEL_ARTIFACT),
+                functions.col("dataset_id").equalTo(dataset)).collectAsList();
+        Map<String, Row> latestByModel = new LinkedHashMap<String, Row>();
+        for (Row row : rows) {
+            String key = String.valueOf((Object) row.getAs("model_set_version"))
+                    + "\u0000" + String.valueOf((Object) row.getAs("column_name"))
+                    + "\u0000" + String.valueOf((Object) row.getAs("model_version"));
+            Row current = latestByModel.get(key);
+            if (current == null || ((Number) row.getAs("state_version")).intValue()
+                    > ((Number) current.getAs("state_version")).intValue()) {
+                latestByModel.put(key, row);
+            }
+        }
+        Map<String, List<RahaColumnModel>> bySet =
+                new LinkedHashMap<String, List<RahaColumnModel>>();
+        for (Row row : latestByModel.values()) {
+            RahaColumnModel model = toModel(row);
+            List<RahaColumnModel> group = bySet.get(model.getModelSetVersion());
+            if (group == null) {
+                group = new ArrayList<RahaColumnModel>();
+                bySet.put(model.getModelSetVersion(), group);
+            }
+            group.add(model);
+        }
+        List<RahaColumnModel> selected = null;
+        for (List<RahaColumnModel> models : bySet.values()) {
+            if (!allActivePublished(models)) {
+                continue;
+            }
+            if (selected == null || compareModelSet(models, selected) > 0) {
+                selected = models;
+            }
+        }
+        if (selected == null) {
+            LOGGER.debug("FMDB 未找到完整已发布模型集合，datasetId={}", dataset);
+            return Collections.emptyList();
+        }
+        List<RahaColumnModel> result =
+                new ArrayList<RahaColumnModel>(selected);
+        Collections.sort(result, Comparator.comparing(
+                RahaColumnModel::getColumnName)
+                .thenComparing(RahaColumnModel::getModelVersion));
+        LOGGER.debug("FMDB 最新已发布模型集合读取完成，datasetId={}，"
+                        + "modelSetVersion={}，modelCount={}", dataset,
+                result.get(0).getModelSetVersion(), result.size());
+        return Collections.unmodifiableList(result);
+    }
+
+    @Override
     public Optional<RahaColumnModel> findPublished(String datasetId,
                                                    String columnName) {
         List<RahaColumnModel> published = new ArrayList<RahaColumnModel>();
@@ -237,6 +294,51 @@ public final class FmdbModelMetadataRepository implements ModelMetadataRepositor
             case FAILED: return 1;
             default: return 0;
         }
+    }
+
+    private static boolean allActivePublished(List<RahaColumnModel> models) {
+        if (models == null || models.isEmpty()) {
+            return false;
+        }
+        for (RahaColumnModel model : models) {
+            if (model.getStatus() != ModelStatus.PUBLISHED
+                    || model.getPublishedAt() == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int compareModelSet(List<RahaColumnModel> first,
+                                       List<RahaColumnModel> second) {
+        long firstPublished = latestPublishedAt(first);
+        long secondPublished = latestPublishedAt(second);
+        if (firstPublished != secondPublished) {
+            return firstPublished < secondPublished ? -1 : 1;
+        }
+        long firstCreated = latestCreatedAt(first);
+        long secondCreated = latestCreatedAt(second);
+        if (firstCreated != secondCreated) {
+            return firstCreated < secondCreated ? -1 : 1;
+        }
+        return first.get(0).getModelSetVersion().compareTo(
+                second.get(0).getModelSetVersion());
+    }
+
+    private static long latestPublishedAt(List<RahaColumnModel> models) {
+        long value = 0L;
+        for (RahaColumnModel model : models) {
+            value = Math.max(value, model.getPublishedAt().longValue());
+        }
+        return value;
+    }
+
+    private static long latestCreatedAt(List<RahaColumnModel> models) {
+        long value = 0L;
+        for (RahaColumnModel model : models) {
+            value = Math.max(value, model.getCreatedAt());
+        }
+        return value;
     }
 
     private static boolean sameState(Row row, RahaColumnModel model) {

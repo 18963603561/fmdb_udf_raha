@@ -34,4 +34,16 @@ public final class DefaultModelSetRepository implements ModelSetRepository {
                 ? Optional.<ModelSetManifest>empty()
                 : Optional.of(new ModelSetManifest(version, models));
     }
+
+    @Override
+    public Optional<ModelSetManifest> findLatestPublishedByDataset(
+            String datasetId) {
+        String dataset = ValueUtils.requireNotBlank(datasetId, "数据集标识");
+        List<RahaColumnModel> models = metadataRepository
+                .findLatestPublishedModelSet(dataset);
+        return models.isEmpty()
+                ? Optional.<ModelSetManifest>empty()
+                : Optional.of(new ModelSetManifest(
+                models.get(0).getModelSetVersion(), models));
+    }
 }

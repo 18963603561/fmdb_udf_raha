@@ -208,12 +208,13 @@ class Iteration7RahaLearningPipelineIntegrationTest {
                 new PublishedColumnModelLoader(modelRepository, modelStore,
                         new ColumnModelCompatibilityValidator()),
                 new ColumnModelPredictor(), detectionRepository, clock);
-        RahaDetectRequest beforePublishRequest = detectRequest(
-                "detect-before-publish", dirty, trained.getPayload(), version("detect-before"));
-        RahaServiceResult<RahaDetectOutput> beforePublish =
-                detectService.detect(beforePublishRequest);
-        assertEquals(JobStatus.FAILED, beforePublish.getStatus());
-        assertEquals("NO_PUBLISHED_MODEL_RESULT", beforePublish.getErrorCode());
+        RahaDetectRequest autoPublishedRequest = detectRequest(
+                "detect-auto-published", dirty, trained.getPayload(),
+                version("detect-auto-published"));
+        RahaServiceResult<RahaDetectOutput> autoPublished =
+                detectService.detect(autoPublishedRequest);
+        assertEquals(JobStatus.SUCCEEDED, autoPublished.getStatus());
+        assertEquals(8, autoPublished.getPayload().getResults().size());
 
         List<ColumnPrediction> predictions = new ColumnModelPredictor().predict(
                 modelStore.load(candidate.getModelPath()),
@@ -231,9 +232,6 @@ class Iteration7RahaLearningPipelineIntegrationTest {
         assertTrue(threshold.getUpdatedModel().getMetrics()
                 .get("evaluation.f1") > 0.5d,
                 () -> diagnostics(trained.getPayload(), predictions, threshold));
-        releaseManager.publish("dataset", "code", candidate.getModelVersion(),
-                version("publish-stage"));
-
         RahaServiceResult<RahaDetectOutput> detected = detectService.detect(detectRequest(
                 "detect-job", dirty, trained.getPayload(), version("detect-stage")));
         assertEquals(JobStatus.SUCCEEDED, detected.getStatus());

@@ -16,6 +16,9 @@ public final class SampleRecord {
 
     /** 采样上下文中保存明确输入来源类型的字段名。 */
     public static final String SOURCE_TYPE_CONTEXT_KEY = "sourceType";
+    /** 采样上下文中保存实际读取引用的字段名，SQL 来源时为 SQL 原文。 */
+    public static final String READ_INPUT_REFERENCE_CONTEXT_KEY =
+            "readInputReference";
 
     /** 采样批次标识。 */
     private final String sampleBatchId;

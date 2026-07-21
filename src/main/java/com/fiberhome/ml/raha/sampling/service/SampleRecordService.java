@@ -11,7 +11,7 @@ import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
 import com.fiberhome.ml.raha.sampling.domain.SampleBatch;
 import com.fiberhome.ml.raha.sampling.domain.SampleRecord;
-import com.fiberhome.ml.raha.util.HashUtils;
+import com.fiberhome.ml.raha.util.ReadableIdUtils;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
@@ -75,7 +75,7 @@ public final class SampleRecordService {
             RowIdentityConfig identityConfig,
             SamplingBatchResult sampling) {
         return materializeAndPersist(dataset, snapshot, identityConfig, null,
-                sampling);
+                null, sampling);
     }
 
     /**
@@ -93,6 +93,28 @@ public final class SampleRecordService {
             DatasetSnapshot snapshot,
             RowIdentityConfig identityConfig,
             DataFormat sourceType,
+            SamplingBatchResult sampling) {
+        return materializeAndPersist(dataset, snapshot, identityConfig,
+                sourceType, null, sampling);
+    }
+
+    /**
+     * 回取采样完整业务行，并把展示来源和实际读取引用分别写入持久化上下文。
+     *
+     * @param dataset 已完成行身份处理的可信数据集
+     * @param snapshot 当前输入快照
+     * @param identityConfig 行身份规则
+     * @param sourceType 表、SQL 或文件等明确来源类型；为空时按旧协议不保存
+     * @param readInputReference 实际读取引用，SQL 来源时保存 SQL 原文
+     * @param sampling 当前采样结果
+     * @return 采样批次物化和持久化结果
+     */
+    public SampleMaterializationResult materializeAndPersist(
+            RahaDataset dataset,
+            DatasetSnapshot snapshot,
+            RowIdentityConfig identityConfig,
+            DataFormat sourceType,
+            String readInputReference,
             SamplingBatchResult sampling) {
         if (dataset == null || snapshot == null || identityConfig == null
                 || sampling == null || sampling.getTasks().isEmpty()) {
@@ -115,13 +137,13 @@ public final class SampleRecordService {
         }
         long createdAt = Math.max(1L, clock.millis());
         String partitionMonth = FmdbPartitionUtils.month(createdAt);
-        String sampleBatchId = batchId(dataset, sampling, rowIds);
+        String sampleBatchId = batchId(dataset, createdAt);
         LOGGER.info("开始物化 c1 采样批次，sampleBatchId={}，datasetId={}，"
                         + "selectedRowCount={}，samplingVersion={}", sampleBatchId,
                 dataset.getDatasetId(), rowIds.size(), sampling.getSamplingVersion());
         SampleBatch batch = buildBatch(sampleBatchId, dataset, snapshot,
-                identityConfig, sourceType, sampling, taskByRow, createdAt,
-                partitionMonth);
+                identityConfig, sourceType, readInputReference, sampling,
+                taskByRow, createdAt, partitionMonth);
         if (!repository.isPersistenceEnabled()) {
             LOGGER.info("c1 采样物理表开关已关闭，仅完成当前任务内存物化，"
                             + "sampleBatchId={}，recordCount={}", sampleBatchId,
@@ -152,6 +174,7 @@ public final class SampleRecordService {
             DatasetSnapshot snapshot,
             RowIdentityConfig identityConfig,
             DataFormat sourceType,
+            String readInputReference,
             SamplingBatchResult sampling,
             Map<String, AnnotationTask> taskByRow,
             long createdAt,
@@ -185,8 +208,8 @@ public final class SampleRecordService {
                     dataset.getSchemaHash(), columnSchema,
                     rowData(row, frameSchema, dataset.getColumns()), duplicateCount,
                     sampling.getSamplingVersion(), samplingContext(task,
-                    snapshot.getSnapshotId(), sourceType), createdAt,
-                    partitionMonth));
+                    snapshot.getSnapshotId(), sourceType, readInputReference),
+                    createdAt, partitionMonth));
         }
         Collections.sort(records, new Comparator<SampleRecord>() {
             @Override
@@ -199,19 +222,9 @@ public final class SampleRecordService {
                 sampling.getSamplingVersion(), createdAt, partitionMonth, records);
     }
 
-    private static String batchId(RahaDataset dataset,
-                                  SamplingBatchResult sampling,
-                                  Set<String> rowIds) {
-        List<String> sorted = new ArrayList<String>(rowIds);
-        Collections.sort(sorted);
-        StringBuilder source = new StringBuilder();
-        source.append(dataset.getDatasetId()).append('|')
-                .append(dataset.getSnapshotId()).append('|')
-                .append(sampling.getSamplingVersion());
-        for (String rowId : sorted) {
-            source.append('|').append(rowId);
-        }
-        return "sample-" + HashUtils.sha256Hex(source.toString()).substring(0, 24);
+    private static String batchId(RahaDataset dataset, long createdAt) {
+        return ReadableIdUtils.prefixedVersion("sample",
+                dataset.getTableName(), createdAt);
     }
 
     private static Map<String, Object> columnSchema(List<ColumnMetadata> columns) {
@@ -246,7 +259,8 @@ public final class SampleRecordService {
 
     private static Map<String, Object> samplingContext(AnnotationTask task,
                                                        String snapshotId,
-                                                       DataFormat sourceType) {
+                                                       DataFormat sourceType,
+                                                       String readInputReference) {
         Map<String, Object> context = new LinkedHashMap<String, Object>();
         context.put("annotationTaskId", task.getTaskId());
         context.put("jobId", task.getJobId());
@@ -259,6 +273,11 @@ public final class SampleRecordService {
         if (sourceType != null) {
             context.put(SampleRecord.SOURCE_TYPE_CONTEXT_KEY,
                     sourceType.name());
+        }
+        if (sourceType == DataFormat.FMDB_SQL && readInputReference != null
+                && !readInputReference.trim().isEmpty()) {
+            context.put(SampleRecord.READ_INPUT_REFERENCE_CONTEXT_KEY,
+                    readInputReference);
         }
         return context;
     }

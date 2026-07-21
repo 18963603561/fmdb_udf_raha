@@ -82,6 +82,8 @@ class RahaTaskRequestFactoryTest {
 
         assertEquals(DataFormat.FMDB_SQL,
                 request.getDataLoadRequest().getFormat());
+        assertEquals("dw.orders",
+                request.getDataLoadRequest().getSourceReference());
         assertEquals(Collections.singletonList("order_id"),
                 request.getDataLoadRequest().getRowIdentityConfig()
                         .getKeyColumns());
@@ -150,7 +152,7 @@ class RahaTaskRequestFactoryTest {
     @Test
     void shouldRestoreTrainingSourceTypeFromSamplingContext() {
         SampleBatch sample = sampleBatch("sample-sql", "annotation-row",
-                "SELECT * FROM dw.orders", DataFormat.FMDB_SQL);
+                "dw.orders", DataFormat.FMDB_SQL);
         AnnotationBatch annotation = annotationBatch(sample, "annotation-sql");
         RahaTaskRequestFactory factory = factory(
                 Collections.singletonList(sample),
@@ -163,6 +165,52 @@ class RahaTaskRequestFactoryTest {
                 request.getDataLoadRequest().getFormat());
         assertEquals("SELECT * FROM dw.orders",
                 request.getDataLoadRequest().getInputReference());
+        assertEquals("dw.orders",
+                request.getDataLoadRequest().getSourceReference());
+    }
+
+    @Test
+    void shouldResolveLatestPublishedModelSetWhenDetectionVersionIsBlank() {
+        RowIdentityConfig identity = RowIdentityConfig.sourceKey("order_id");
+        ModelSetManifest older = manifest("dw.orders@20260721010101.000",
+                identity, 1000L);
+        ModelSetManifest latest = manifest("dw.orders@20260721020202.000",
+                identity, 2000L);
+        Map<String, ModelSetManifest> manifests =
+                new LinkedHashMap<String, ModelSetManifest>();
+        manifests.put(older.getModelSetVersion(), older);
+        manifests.put(latest.getModelSetVersion(), latest);
+        RahaTaskRequestFactory factory = factory(
+                Collections.<SampleBatch>emptyList(),
+                Collections.<AnnotationBatch>emptyList(), manifests);
+
+        RahaTaskExecutionRequest request = factory.detectionTable("dw.orders");
+
+        assertEquals(latest.getModelSetVersion(),
+                request.getModelSetVersion());
+        assertEquals("fmdb-table:dw.orders",
+                request.getConfig().getDatasetId());
+        assertEquals("dw.orders",
+                request.getDataLoadRequest().getSourceReference());
+    }
+
+    @Test
+    void shouldUseFirstSqlTableForDetectionDefaultModelLookup() {
+        RowIdentityConfig identity = RowIdentityConfig.sourceKey("order_id");
+        ModelSetManifest manifest = manifest("dw.orders@20260721010101.000",
+                identity);
+        RahaTaskRequestFactory factory = factory(
+                Collections.<SampleBatch>emptyList(),
+                Collections.<AnnotationBatch>emptyList(),
+                Collections.singletonMap(manifest.getModelSetVersion(), manifest));
+
+        RahaTaskExecutionRequest request = factory.detectionSql(
+                "select * from dw.orders o join dw.customer c on o.id = c.id");
+
+        assertEquals(manifest.getModelSetVersion(),
+                request.getModelSetVersion());
+        assertEquals("dw.orders",
+                request.getDataLoadRequest().getSourceReference());
     }
 
     @Test
@@ -275,6 +323,10 @@ class RahaTaskRequestFactoryTest {
             context.put(SampleRecord.SOURCE_TYPE_CONTEXT_KEY,
                     sourceType.name());
         }
+        if (sourceType == DataFormat.FMDB_SQL) {
+            context.put(SampleRecord.READ_INPUT_REFERENCE_CONTEXT_KEY,
+                    "SELECT * FROM dw.orders");
+        }
         SampleRecord record = new SampleRecord(batchId, "orders-logical",
                 inputReference, "source-v1",
                 RowIdentityConfig.sourceKey("id").getMode(),
@@ -314,15 +366,26 @@ class RahaTaskRequestFactoryTest {
 
     private static ModelSetManifest manifest(String modelSetVersion,
                                              RowIdentityConfig identity) {
+        return manifest(modelSetVersion, identity, 1200L);
+    }
+
+    private static ModelSetManifest manifest(String modelSetVersion,
+                                             RowIdentityConfig identity,
+                                             long publishedAt) {
         RahaColumnModel model = new RahaColumnModel("orders-value",
-                "model-" + modelSetVersion, "orders-logical", "value",
+                "model-" + modelSetVersion, datasetId(modelSetVersion), "value",
                 "schema-v1", ClassifierType.LOGISTIC_REGRESSION,
                 "dictionary-v1", "plan-v1", 0.5d,
                 "memory://" + modelSetVersion, ModelStatus.PUBLISHED,
-                Collections.<String, Double>emptyMap(), 1000L, 1200L,
+                Collections.<String, Double>emptyMap(), 1000L, publishedAt,
                 modelSetVersion, identity);
         return new ModelSetManifest(modelSetVersion,
                 Collections.singletonList(model));
+    }
+
+    private static String datasetId(String modelSetVersion) {
+        return modelSetVersion.startsWith("dw.orders@")
+                ? "fmdb-table:dw.orders" : "orders-logical";
     }
 
     /** 内存测试采样仓储。 */
@@ -405,6 +468,30 @@ class RahaTaskRequestFactoryTest {
 
         @Override public Optional<ModelSetManifest> find(String version) {
             return Optional.ofNullable(values.get(version));
+        }
+
+        @Override public Optional<ModelSetManifest> findLatestPublishedByDataset(
+                String datasetId) {
+            ModelSetManifest selected = null;
+            for (ModelSetManifest manifest : values.values()) {
+                if (!datasetId.equals(manifest.getDatasetId())
+                        || !manifest.isPublished()) {
+                    continue;
+                }
+                if (selected == null || latestPublishedAt(manifest)
+                        > latestPublishedAt(selected)) {
+                    selected = manifest;
+                }
+            }
+            return Optional.ofNullable(selected);
+        }
+
+        private static long latestPublishedAt(ModelSetManifest manifest) {
+            long value = 0L;
+            for (RahaColumnModel model : manifest.getModelsByColumn().values()) {
+                value = Math.max(value, model.getPublishedAt().longValue());
+            }
+            return value;
         }
     }
 }

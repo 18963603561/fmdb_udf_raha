@@ -14,7 +14,7 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.support.FmdbJsonCodec;
 import com.fiberhome.ml.raha.repository.port.AnnotationRecordRepository;
 import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
 import com.fiberhome.ml.raha.sampling.domain.SampleAnnotationRow;
-import com.fiberhome.ml.raha.util.HashUtils;
+import com.fiberhome.ml.raha.util.ReadableIdUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.io.IOException;
 import java.io.InputStream;
@@ -142,9 +142,8 @@ public final class AnnotationImportService {
                     errors, validation);
         }
 
-        String annotationBatchId = "ann-" + HashUtils.sha256Hex(
-                request.getDatasetId() + "|" + request.getSampleBatchId()
-                        + "|" + fingerprint);
+        String annotationBatchId = ReadableIdUtils.prefixedTokenVersion("ann",
+                request.getSampleBatchId(), startedAt);
         validateRevision(request, annotationBatchId, errors);
         if (!errors.isEmpty()) {
             Path validation = writeErrors(request, errors);

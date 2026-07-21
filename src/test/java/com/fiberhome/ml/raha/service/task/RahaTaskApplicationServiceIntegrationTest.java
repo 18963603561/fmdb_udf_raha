@@ -232,8 +232,8 @@ class RahaTaskApplicationServiceIntegrationTest {
                         .count());
 
         RahaColumnModel candidate = trainOutput.getCandidateModels().get("code");
-        releaseManager.publish("dataset", "code", candidate.getModelVersion(),
-                new ArtifactVersion("publish-config", "snapshot-v1", "publish-stage", 1));
+        assertEquals(com.fiberhome.ml.raha.data.type.ModelStatus.PUBLISHED,
+                candidate.getStatus());
         RahaTaskExecutionResult detected = applicationService.execute(
                 RahaTaskExecutionRequest.detection(
                         config(JobType.DETECTION), loadRequest()));

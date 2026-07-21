@@ -28,5 +28,13 @@ public interface ModelMetadataRepository {
      */
     List<RahaColumnModel> findByModelSetVersion(String modelSetVersion);
 
+    /**
+     * 查询指定数据集当前最新的完整已发布模型集合。
+     *
+     * @param datasetId 数据集标识
+     * @return 最新模型集合内按字段名称排序的列模型
+     */
+    List<RahaColumnModel> findLatestPublishedModelSet(String datasetId);
+
     Optional<RahaColumnModel> findPublished(String datasetId, String columnName);
 }

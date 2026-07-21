@@ -149,8 +149,8 @@ class Iteration8ParallelLearningIntegrationTest {
                 .get("maxObservedColumnConcurrency"), 2);
         for (RahaColumnModel candidate
                 : trained.getPayload().getCandidateModels().values()) {
-            releaseManager.publish("parallel-dataset", candidate.getColumnName(),
-                    candidate.getModelVersion(), version("publish-" + candidate.getColumnName()));
+            assertEquals(com.fiberhome.ml.raha.data.type.ModelStatus.PUBLISHED,
+                    candidate.getStatus());
         }
 
         DetectionResultRepository detectionRepository =

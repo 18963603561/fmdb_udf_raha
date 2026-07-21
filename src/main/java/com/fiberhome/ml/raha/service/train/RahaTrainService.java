@@ -18,6 +18,8 @@ import com.fiberhome.ml.raha.model.ColumnModelStore;
 import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
 import com.fiberhome.ml.raha.model.domain.ModelPersistenceContext;
 import com.fiberhome.ml.raha.model.release.ColumnModelMetadataFactory;
+import com.fiberhome.ml.raha.model.release.ModelReadableVersioner;
+import com.fiberhome.ml.raha.model.release.ModelSourceKey;
 import com.fiberhome.ml.raha.model.release.ModelReleaseManager;
 import com.fiberhome.ml.raha.model.training.ColumnModelTrainer;
 import com.fiberhome.ml.raha.model.training.ColumnModelTrainingRequest;
@@ -312,10 +314,15 @@ public final class RahaTrainService {
                         propagation.getMetrics().getPropagatedLabelCount());
             }
             final LabelPropagationResult trainingPropagation = propagation;
-            String modelSetVersion = HashUtils.sha256Hex(request.getDataset().getDatasetId() + "|"
-                    + request.getDataset().getSnapshotId() + "|" + planVersion + "|"
-                    + request.getConfig().getExecutionConfigFingerprint() + "|"
-                    + (mergeResult == null ? "legacy" : mergeResult.getTrainingBatchId()));
+            ModelSourceKey modelSource = ModelSourceKey.fromDatasetAndTable(
+                    request.getDataset().getDatasetId(),
+                    request.getDataset().getTableName());
+            String modelSetVersion = ModelReadableVersioner.modelSetVersion(
+                    modelSource.getSourceName(), clock.millis(), request.getJobId());
+            LOGGER.info("生成可读模型集合版本，jobId={}，datasetId={}，"
+                            + "sourceName={}，modelSetVersion={}",
+                    request.getJobId(), request.getDataset().getDatasetId(),
+                    modelSource.getSourceName(), modelSetVersion);
             Map<String, ColumnTrainingDataset> frozenDatasets = null;
             TrainingArtifactMaterializationResult materialization = null;
             if (mergeResult != null) {
@@ -453,10 +460,15 @@ public final class RahaTrainService {
                     columnName, trainingDataset.getExamples().size(),
                     trainingDataset.getPositiveCount(), trainingDataset.getNegativeCount());
         }
-        ColumnModelTrainingRequest trainingRequest = new ColumnModelTrainingRequest(
-                request.getModelNamePrefix() + "-" + columnName,
+        ModelSourceKey modelSource = ModelSourceKey.fromDatasetAndTable(
                 request.getDataset().getDatasetId(),
-                request.getDataset().getSchemaHash(), planVersion, trainingDataset,
+                request.getDataset().getTableName());
+        ColumnModelTrainingRequest trainingRequest = new ColumnModelTrainingRequest(
+                ModelReadableVersioner.modelName(request.getModelNamePrefix(),
+                        modelSource.getSourceName(), columnName),
+                request.getDataset().getDatasetId(),
+                request.getDataset().getSchemaHash(), planVersion,
+                modelSetVersion, modelSource.getSourceName(), trainingDataset,
                 request.getConfig().getModelConfig(), request.getTrainingConfig());
         ColumnModelTrainingResult trainingResult = trainer.train(trainingRequest);
         trainingResult = ModelQualityGate.evaluate(trainingResult,

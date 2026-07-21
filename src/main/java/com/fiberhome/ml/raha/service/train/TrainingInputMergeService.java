@@ -18,6 +18,7 @@ import com.fiberhome.ml.raha.data.profile.ColumnProfiler;
 import com.fiberhome.ml.raha.sampling.domain.SampleBatch;
 import com.fiberhome.ml.raha.sampling.domain.SampleRecord;
 import com.fiberhome.ml.raha.util.HashUtils;
+import com.fiberhome.ml.raha.util.ReadableIdUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -185,8 +186,8 @@ public final class TrainingInputMergeService {
                 metrics.getSampleCount(), metrics.getOriginalCount(),
                 metrics.getMergedCount(), metrics.getDedupGroupCount(),
                 metrics.getDedupRowCount(), metrics.getC1OnlyCount());
-        String trainingSnapshotId = "train-" + HashUtils.sha256Hex(
-                trainingSnapshotSource(request, original)).substring(0, 32);
+        String trainingSnapshotId = ReadableIdUtils.prefixedVersion("train",
+                original.getTableName(), startedAt);
         RahaDataset trainingDataset = new RahaDataset(original.getDatasetId(),
                 trainingSnapshotId, original.getTableName(), original.getRowIdColumn(),
                 original.getColumns(), merged, original.getSchemaHash(),
@@ -453,18 +454,6 @@ public final class TrainingInputMergeService {
             }
         });
         return Collections.unmodifiableList(result);
-    }
-
-    private static String trainingSnapshotSource(TrainingMergeRequest request,
-                                                 RahaDataset original) {
-        StringBuilder source = new StringBuilder();
-        source.append(original.getDatasetId()).append('|')
-                .append(original.getSnapshotId()).append('|')
-                .append(MERGE_ALGORITHM_VERSION);
-        for (TrainingBatchReference reference : request.getBatchReferences()) {
-            source.append('|').append(reference.toCanonicalString());
-        }
-        return source.toString();
     }
 
     private static String joinIds(List<String> values) {
