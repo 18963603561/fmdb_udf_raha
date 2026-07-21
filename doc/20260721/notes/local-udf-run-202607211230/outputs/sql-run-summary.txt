@@ -1,0 +1,2 @@
+scriptPath=doc\20260720\person-info-raha-run-202607201851\sql\person_info_create_insert_202607201851.sql
+executed=8

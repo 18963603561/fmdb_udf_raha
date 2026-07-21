@@ -1,0 +1,8 @@
+{
+  "input": "doc\\20260721\\notes\\local-udf-run-202607211230\\annotation-upload\\raha-annotation_sample_dw.person_info@20260721072331.552_20260721152338.xls",
+  "output": "doc\\20260721\\notes\\local-udf-run-202607211230\\annotation-upload\\raha-annotation_sample_dw.person_info@20260721072331.552_20260721152338_labeled.xls",
+  "labeledCount": 300,
+  "errorRowCount": 69,
+  "correctRowCount": 231,
+  "unmatchedRows": []
+}

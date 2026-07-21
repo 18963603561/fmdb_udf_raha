@@ -1,0 +1,18 @@
+{
+  "sourceType": "SQL",
+  "datasetId": "person_info",
+  "sqlText": "select * from dw.person_info limit 450",
+  "sourceVersion": "person-info-detect-local-limit450",
+  "modelSetVersion": "dw.person_info@20260721073639.556-job-3963b1bf-7218-41b8-87b0-9b59818a230c",
+  "missingModelPolicy": "PARTIAL",
+  "detailFormat": "xls",
+  "publishZip": "true",
+  "artifactBaseDir": "F:\\ai-code\\fmdb_udf_raha\\doc\\20260721\\notes\\local-udf-run-202607211230\\udf-work",
+  "localWebRoot": "F:\\ai-code\\fmdb_udf_raha\\doc\\20260721\\notes\\local-udf-run-202607211230\\web",
+  "hdfsExportPath": "/fmdb/detection/output/person-info-raha-run-202607201851/",
+  "caller": "codex",
+  "requestId": "person-info-detect-local-limit450-20260721",
+  "webBaseUrl": "http://127.0.0.1:18080",
+  "forceRun": true,
+  "forceRunId": "local-detect-20260721-1"
+}
