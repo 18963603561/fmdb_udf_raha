@@ -63,6 +63,8 @@ public final class RahaTaskExecutionRequest {
     private final MissingModelPolicy missingModelPolicy;
     /** 执行输入指纹元数据，区分基础血缘指纹和最终幂等指纹。 */
     private final ExecutionFingerprint executionFingerprint;
+    /** 是否从采样快照检查点恢复训练前置产物。 */
+    private final boolean reuseSnapshotCheckpoint;
 
     private RahaTaskExecutionRequest(RahaJobConfig config,
                                      DataLoadRequest dataLoadRequest,
@@ -84,7 +86,7 @@ public final class RahaTaskExecutionRequest {
                 annotationBatchId, annotationPartitionMonth, rowIdentityConfig,
                 legacyBatchReferences(sampleBatchId, samplePartitionMonth,
                         annotationBatchId, annotationPartitionMonth),
-                null, MissingModelPolicy.PARTIAL, null);
+                null, MissingModelPolicy.PARTIAL, null, false);
     }
 
     private RahaTaskExecutionRequest(RahaJobConfig config,
@@ -104,7 +106,8 @@ public final class RahaTaskExecutionRequest {
                                      List<TrainingBatchReference> trainingBatchReferences,
                                      String modelSetVersion,
                                      MissingModelPolicy missingModelPolicy,
-                                     ExecutionFingerprint executionFingerprint) {
+                                     ExecutionFingerprint executionFingerprint,
+                                     boolean reuseSnapshotCheckpoint) {
         if (config == null || dataLoadRequest == null) {
             throw new IllegalArgumentException("任务配置和数据加载请求不能为空");
         }
@@ -134,6 +137,7 @@ public final class RahaTaskExecutionRequest {
         this.executionFingerprint = executionFingerprint == null
                 ? defaultExecutionFingerprint(config)
                 : executionFingerprint;
+        this.reuseSnapshotCheckpoint = reuseSnapshotCheckpoint;
         validateByType();
     }
 
@@ -210,6 +214,24 @@ public final class RahaTaskExecutionRequest {
     /**
      * 创建使用持久化 c1 和标注批次的训练任务，标签由合并阶段从标注仓储读取。
      */
+    /**
+     * 创建从采样快照检查点恢复前置产物的训练请求。
+     */
+    public static RahaTaskExecutionRequest trainingFromSnapshotCheckpoint(
+            RahaJobConfig config,
+            DataLoadRequest dataLoadRequest,
+            List<CellLabel> directLabels,
+            LabelPropagationMethod propagationMethod,
+            LabelPropagationConfig propagationConfig,
+            LogisticRegressionTrainingConfig trainingConfig,
+            String modelNamePrefix) {
+        return new RahaTaskExecutionRequest(config, dataLoadRequest, directLabels,
+                propagationMethod, propagationConfig, trainingConfig,
+                modelNamePrefix, 0, null, null, null, null, null, null,
+                Collections.<TrainingBatchReference>emptyList(), null,
+                MissingModelPolicy.FAIL, null, true);
+    }
+
     public static RahaTaskExecutionRequest training(
             RahaJobConfig config,
             DataLoadRequest dataLoadRequest,
@@ -263,7 +285,7 @@ public final class RahaTaskExecutionRequest {
                 first.getSampleBatchId(), first.getSamplePartitionMonth(),
                 first.getAnnotationBatchId(),
                 first.getAnnotationPartitionMonth(), rowIdentityConfig,
-                references, null, MissingModelPolicy.FAIL, null);
+                references, null, MissingModelPolicy.FAIL, null, false);
     }
 
     public static RahaTaskExecutionRequest detection(
@@ -299,7 +321,7 @@ public final class RahaTaskExecutionRequest {
                 Collections.<CellLabel>emptyList(), null, null, null, null,
                 0, null, null, null, null, null, null,
                 Collections.<TrainingBatchReference>emptyList(),
-                modelSetVersion, missingModelPolicy, null);
+                modelSetVersion, missingModelPolicy, null, false);
     }
 
     public static RahaTaskExecutionRequest sampling(
@@ -341,6 +363,12 @@ public final class RahaTaskExecutionRequest {
             throw new IllegalArgumentException("训练批次引用和行身份配置必须完整提供");
         }
         if (jobType == JobType.TRAINING) {
+            if (reuseSnapshotCheckpoint
+                    && (config.getSnapshotId() == null
+                    || config.getSnapshotId().trim().isEmpty())) {
+                throw new IllegalArgumentException(
+                        "检查点复用训练必须指定 snapshotId");
+            }
             if (modelSetVersion != null) {
                 throw new IllegalArgumentException("训练任务不能指定检测模型集合");
             }
@@ -358,6 +386,9 @@ public final class RahaTaskExecutionRequest {
                 throw new IllegalArgumentException("持久化标注训练不能同时传入调用方标签");
             }
             return;
+        }
+        if (reuseSnapshotCheckpoint) {
+            throw new IllegalArgumentException("仅训练任务可以复用快照检查点");
         }
         if (hasAnyBatchReference) {
             throw new IllegalArgumentException("仅训练任务可以引用 c1 和标注批次");
@@ -411,6 +442,7 @@ public final class RahaTaskExecutionRequest {
     public boolean isForceRun() { return executionFingerprint.isForceRun(); }
     public String getForceRunId() { return executionFingerprint.getForceRunId(); }
     public String getRunNonce() { return executionFingerprint.getRunNonce(); }
+    public boolean isReuseSnapshotCheckpoint() { return reuseSnapshotCheckpoint; }
 
     /**
      * 创建包含请求指纹元数据的新请求副本。
@@ -429,7 +461,7 @@ public final class RahaTaskExecutionRequest {
                 samplePartitionMonth, annotationBatchId,
                 annotationPartitionMonth, rowIdentityConfig,
                 trainingBatchReferences, modelSetVersion, missingModelPolicy,
-                fingerprint);
+                fingerprint, reuseSnapshotCheckpoint);
     }
 
     /**
@@ -444,6 +476,8 @@ public final class RahaTaskExecutionRequest {
         result.put("datasetId", config.getDatasetId());
         result.put("inputReference", config.getInputReference());
         result.put("snapshotId", config.getSnapshotId());
+        result.put("reuseSnapshotCheckpoint",
+                Boolean.valueOf(reuseSnapshotCheckpoint));
         if (modelSetVersion != null) {
             result.put("modelSetVersion", modelSetVersion);
         }

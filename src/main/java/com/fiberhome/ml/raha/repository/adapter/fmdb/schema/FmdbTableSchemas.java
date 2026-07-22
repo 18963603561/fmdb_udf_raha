@@ -58,6 +58,37 @@ public final class FmdbTableSchemas {
             field("annotated_at", DataTypes.LongType, false),
             field("partition_month", DataTypes.StringType, false));
     /** 训练列级产物模式。 */
+    /** 采样快照检查点模式。 */
+    private static final StructType SNAPSHOT_CHECKPOINT = schema(
+            field("checkpoint_id", DataTypes.StringType, false),
+            field("dataset_id", DataTypes.StringType, false),
+            field("snapshot_id", DataTypes.StringType, false),
+            field("source_job_id", DataTypes.StringType, false),
+            field("sample_batch_id", DataTypes.StringType, true),
+            field("record_type", DataTypes.StringType, false),
+            field("record_scope", DataTypes.StringType, false),
+            field("column_name", DataTypes.StringType, true),
+            field("row_id", DataTypes.StringType, true),
+            field("cell_id", DataTypes.StringType, true),
+            field("cell_value", DataTypes.StringType, true),
+            field("artifact_version", DataTypes.StringType, true),
+            field("profile_json", DataTypes.StringType, true),
+            field("strategy_plan_json", DataTypes.StringType, true),
+            field("strategy_hit_json", DataTypes.StringType, true),
+            field("feature_dictionary_json", DataTypes.StringType, true),
+            field("feature_vector_json", DataTypes.StringType, true),
+            field("feature_summary_json", DataTypes.StringType, true),
+            field("cluster_version", DataTypes.StringType, true),
+            field("cluster_id", DataTypes.StringType, true),
+            field("cluster_distance", DataTypes.DoubleType, true),
+            field("cluster_summary_json", DataTypes.StringType, true),
+            field("payload_json", DataTypes.StringType, true),
+            field("row_set_fingerprint", DataTypes.StringType, false),
+            field("config_fingerprint", DataTypes.StringType, false),
+            field("schema_hash", DataTypes.StringType, false),
+            field("source_version", DataTypes.StringType, true),
+            field("created_at", DataTypes.LongType, false),
+            field("partition_month", DataTypes.StringType, false));
     private static final StructType TRAINING_COLUMN_ARTIFACT = schema(
             field("training_batch_id", DataTypes.StringType, false),
             field("dataset_id", DataTypes.StringType, false),
@@ -210,6 +241,8 @@ public final class FmdbTableSchemas {
                 return SAMPLE_RECORD;
             case ANNOTATION_RECORD:
                 return ANNOTATION_RECORD;
+            case SNAPSHOT_CHECKPOINT:
+                return SNAPSHOT_CHECKPOINT;
             case TRAINING_COLUMN_ARTIFACT:
                 return TRAINING_COLUMN_ARTIFACT;
             case TRAINING_CELL:

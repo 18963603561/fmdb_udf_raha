@@ -50,6 +50,7 @@ import com.fiberhome.ml.raha.repository.adapter.DefaultFeatureRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultJobRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultModelMetadataRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultModelSetRepository;
+import com.fiberhome.ml.raha.repository.adapter.DefaultSnapshotCheckpointRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultStageRepository;
 import com.fiberhome.ml.raha.repository.adapter.DefaultStrategyRepository;
 import com.fiberhome.ml.raha.repository.adapter.InMemoryRahaRepository;
@@ -66,6 +67,7 @@ import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbDetectionRes
 import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbFeatureRepository;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbModelMetadataRepository;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbSampleRecordRepository;
+import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbSnapshotCheckpointRepository;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbStageRepository;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbStrategyRepository;
 import com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbTrainingArtifactRepository;
@@ -87,6 +89,7 @@ import com.fiberhome.ml.raha.repository.port.JobRepository;
 import com.fiberhome.ml.raha.repository.port.ModelMetadataRepository;
 import com.fiberhome.ml.raha.repository.port.ModelSetRepository;
 import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
+import com.fiberhome.ml.raha.repository.port.SnapshotCheckpointRepository;
 import com.fiberhome.ml.raha.repository.port.StageRepository;
 import com.fiberhome.ml.raha.repository.port.StrategyRepository;
 import com.fiberhome.ml.raha.sampling.ClusterCoverageScorer;
@@ -406,7 +409,7 @@ public final class RahaTaskApplicationServiceFactory {
         // 阶段五：创建数据加载路由器和三类工作流，形成任务类型到阶段链路的注册表。
         RahaWorkflowRegistry workflowRegistry = createWorkflowRegistry(
                 sparkSession, storageMode, infrastructure, preparationServices,
-                taskServices);
+                taskServices, runtimeRepositories);
 
         // 阶段六：创建任务编排器，负责幂等提交、阶段执行、状态推进和结果登记。
         RahaJobOrchestrator orchestrator = createJobOrchestrator(storageMode,
@@ -525,14 +528,18 @@ public final class RahaTaskApplicationServiceFactory {
                     new FmdbFeatureRepository(tableGateway, persistenceConfig),
                     new FmdbColumnProfileRepository(tableGateway, persistenceConfig),
                     new FmdbClusterRepository(tableGateway, persistenceConfig),
-                    new FmdbDetectionResultRepository(resultWriter, tableGateway, persistenceConfig));
+                    new FmdbDetectionResultRepository(resultWriter, tableGateway,
+                            persistenceConfig),
+                    new FmdbSnapshotCheckpointRepository(sparkSession,
+                            tableGateway, persistenceConfig));
         }
         return new RuntimeRepositories(new DefaultStageRepository(repository),
                 new DefaultStrategyRepository(repository),
                 new DefaultFeatureRepository(repository),
                 new DefaultColumnProfileRepository(repository),
                 new DefaultClusterRepository(repository),
-                new DefaultDetectionResultRepository(repository));
+                new DefaultDetectionResultRepository(repository),
+                new DefaultSnapshotCheckpointRepository());
     }
 
     /**
@@ -786,7 +793,8 @@ public final class RahaTaskApplicationServiceFactory {
             RahaStorageMode storageMode,
             RuntimeInfrastructure infrastructure,
             PreparationServices preparationServices,
-            TaskServices taskServices) {
+            TaskServices taskServices,
+            RuntimeRepositories runtimeRepositories) {
         RahaDatasetLoader loader = datasetLoader(sparkSession,
                 infrastructure.getClock());
         ResultPersistenceVerifier verifier = new FmdbResultPersistenceVerifier(
@@ -800,7 +808,8 @@ public final class RahaTaskApplicationServiceFactory {
                 preparationServices.getPropagationService(),
                 taskServices.getTrainService(),
                 taskServices.getInputMergeService(),
-                storageMode == RahaStorageMode.FMDB ? verifier : null);
+                storageMode == RahaStorageMode.FMDB ? verifier : null,
+                runtimeRepositories.getSnapshotCheckpointRepository());
         SamplingWorkflow samplingWorkflow = new SamplingWorkflow(loader,
                 preparationServices.getProfileService(),
                 preparationServices.getPlanService(),
@@ -808,7 +817,8 @@ public final class RahaTaskApplicationServiceFactory {
                 preparationServices.getFeatureService(),
                 preparationServices.getClusteringService(),
                 taskServices.getSampleService(),
-                taskServices.getSampleRecordService(), verifier);
+                taskServices.getSampleRecordService(), verifier,
+                runtimeRepositories.getSnapshotCheckpointRepository());
         DetectionWorkflow detectionWorkflow = new DetectionWorkflow(loader,
                 preparationServices.getProfileService(),
                 preparationServices.getPlanService(),
@@ -1027,7 +1037,7 @@ public final class RahaTaskApplicationServiceFactory {
         }
     }
 
-    /** 按运行时存储模式统一选择的六类仓储。 */
+    /** 按运行时存储模式统一选择的运行期仓储。 */
     static final class RuntimeRepositories {
 
         /** 阶段状态仓储。 */
@@ -1042,17 +1052,21 @@ public final class RahaTaskApplicationServiceFactory {
         private final ClusterRepository clusterRepository;
         /** 最终检测错误仓储。 */
         private final DetectionResultRepository detectionResultRepository;
+        /** 采样快照检查点仓储。 */
+        private final SnapshotCheckpointRepository snapshotCheckpointRepository;
 
         private RuntimeRepositories(StageRepository stageRepository,
                                     StrategyRepository strategyRepository,
                                     FeatureRepository featureRepository,
                                     ColumnProfileRepository columnProfileRepository,
                                     ClusterRepository clusterRepository,
-                                    DetectionResultRepository detectionResultRepository) {
+                                    DetectionResultRepository detectionResultRepository,
+                                    SnapshotCheckpointRepository snapshotCheckpointRepository) {
             if (stageRepository == null || strategyRepository == null
                     || featureRepository == null || columnProfileRepository == null
-                    || clusterRepository == null || detectionResultRepository == null) {
-                throw new IllegalArgumentException("运行时六类仓储不能为空");
+                    || clusterRepository == null || detectionResultRepository == null
+                    || snapshotCheckpointRepository == null) {
+                throw new IllegalArgumentException("运行时仓储不能为空");
             }
             this.stageRepository = stageRepository;
             this.strategyRepository = strategyRepository;
@@ -1060,6 +1074,7 @@ public final class RahaTaskApplicationServiceFactory {
             this.columnProfileRepository = columnProfileRepository;
             this.clusterRepository = clusterRepository;
             this.detectionResultRepository = detectionResultRepository;
+            this.snapshotCheckpointRepository = snapshotCheckpointRepository;
         }
 
         /**
@@ -1114,6 +1129,15 @@ public final class RahaTaskApplicationServiceFactory {
          */
         DetectionResultRepository getDetectionResultRepository() {
             return detectionResultRepository;
+        }
+
+        /**
+         * 获取采样快照检查点仓储。
+         *
+         * @return 快照检查点仓储
+         */
+        SnapshotCheckpointRepository getSnapshotCheckpointRepository() {
+            return snapshotCheckpointRepository;
         }
     }
 

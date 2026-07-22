@@ -6,6 +6,7 @@ import com.fiberhome.ml.raha.data.loader.RahaDatasetLoader;
 import com.fiberhome.ml.raha.data.profile.ColumnProfileService;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.feature.FeatureService;
+import com.fiberhome.ml.raha.job.stage.checkpoint.RestoreSnapshotCheckpointStageHandler;
 import com.fiberhome.ml.raha.job.stage.feature.ClusterStageHandler;
 import com.fiberhome.ml.raha.job.stage.data.TrainingInputMergeStageHandler;
 import com.fiberhome.ml.raha.job.stage.label.DirectLabelStageHandler;
@@ -16,11 +17,13 @@ import com.fiberhome.ml.raha.job.stage.model.ResultPersistenceStageHandler;
 import com.fiberhome.ml.raha.job.stage.model.ResultPersistenceVerifier;
 import com.fiberhome.ml.raha.job.stage.core.StageHandler;
 import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
+import com.fiberhome.ml.raha.repository.port.SnapshotCheckpointRepository;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationService;
 import com.fiberhome.ml.raha.service.train.RahaTrainService;
 import com.fiberhome.ml.raha.service.train.TrainingInputMergeService;
 import com.fiberhome.ml.raha.strategy.execution.StrategyExecutionService;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlanService;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -39,6 +42,8 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
     private final TrainingInputMergeService inputMergeService;
     /** 可选最终物理结果回读验证器。 */
     private final ResultPersistenceVerifier resultPersistenceVerifier;
+    /** 可选快照检查点仓储，用于训练复用采样前置产物。 */
+    private final SnapshotCheckpointRepository snapshotCheckpointRepository;
 
     public TrainingWorkflow(RahaDatasetLoader datasetLoader,
                             ColumnProfileService profileService,
@@ -50,7 +55,7 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
                             RahaTrainService trainService) {
         this(datasetLoader, profileService, planService, executionService,
                 featureService, clusteringService, propagationService,
-                trainService, null, null);
+                trainService, null, null, null);
     }
 
     /**
@@ -67,7 +72,7 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
                             TrainingInputMergeService inputMergeService) {
         this(datasetLoader, profileService, planService, executionService,
                 featureService, clusteringService, propagationService,
-                trainService, inputMergeService, null);
+                trainService, inputMergeService, null, null);
     }
 
     public TrainingWorkflow(RahaDatasetLoader datasetLoader,
@@ -89,6 +94,32 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
         this.trainService = trainService;
         this.inputMergeService = inputMergeService;
         this.resultPersistenceVerifier = resultPersistenceVerifier;
+        this.snapshotCheckpointRepository = null;
+    }
+
+    public TrainingWorkflow(RahaDatasetLoader datasetLoader,
+                            ColumnProfileService profileService,
+                            StrategyPlanService planService,
+                            StrategyExecutionService executionService,
+                            FeatureService featureService,
+                            ColumnClusteringService clusteringService,
+                            LabelPropagationService propagationService,
+                            RahaTrainService trainService,
+                            TrainingInputMergeService inputMergeService,
+                            ResultPersistenceVerifier resultPersistenceVerifier,
+                            SnapshotCheckpointRepository snapshotCheckpointRepository) {
+        super(datasetLoader, profileService, planService, executionService, featureService);
+        if (clusteringService == null || propagationService == null
+                || trainService == null) {
+            throw new IllegalArgumentException(
+                    "训练工作流业务依赖不能为空");
+        }
+        this.clusteringService = clusteringService;
+        this.propagationService = propagationService;
+        this.trainService = trainService;
+        this.inputMergeService = inputMergeService;
+        this.resultPersistenceVerifier = resultPersistenceVerifier;
+        this.snapshotCheckpointRepository = snapshotCheckpointRepository;
     }
 
     @Override
@@ -100,6 +131,29 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
     public List<StageHandler> createStageHandlers(RahaTaskExecutionRequest request) {
         if (request == null || request.getConfig().getJobType() != JobType.TRAINING) {
             throw new IllegalArgumentException("训练工作流请求类型不匹配");
+        }
+        if (request.isReuseSnapshotCheckpoint()) {
+            if (snapshotCheckpointRepository == null) {
+                throw new IllegalStateException("快照检查点复用未配置仓储");
+            }
+            List<StageHandler> handlers = new ArrayList<StageHandler>();
+            handlers.add(new RestoreSnapshotCheckpointStageHandler(
+                    snapshotCheckpointRepository));
+            handlers.add(new DirectLabelStageHandler(request.getLabels()));
+            handlers.add(new LabelPropagationStageHandler(propagationService,
+                    request.getPropagationMethod(),
+                    request.getPropagationConfig()));
+            handlers.add(new ModelTrainingStageHandler(trainService,
+                    request.getTrainingConfig(), request.getModelNamePrefix(),
+                    request.getPropagationMethod(),
+                    request.getPropagationConfig()));
+            if (request.getEvaluator() != null) {
+                handlers.add(new EvaluationStageHandler(request.getEvaluator()));
+            }
+            handlers.add(new ResultPersistenceStageHandler(
+                    StageAttributeKeys.TRAIN_SERVICE_RESULT,
+                    resultPersistenceVerifier));
+            return Collections.unmodifiableList(handlers);
         }
         List<StageHandler> handlers = preparationStages(request);
         if (request.hasPersistedTrainingInput()) {

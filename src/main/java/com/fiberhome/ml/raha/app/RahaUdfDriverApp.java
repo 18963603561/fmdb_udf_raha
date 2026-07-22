@@ -21,7 +21,9 @@ import java.util.Map;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
 
 /**
  * 在 Spark Driver 侧直接执行 Raha 三个 GenericUDF 的本地调试入口。
@@ -138,6 +140,7 @@ public final class RahaUdfDriverApp {
                         + outputPath.toAbsolutePath().normalize());
             }
             System.out.println(json);
+            printStageTimings(spark, rows);
         } finally {
             spark.stop();
         }
@@ -355,6 +358,90 @@ public final class RahaUdfDriverApp {
             result.add(row);
         }
         return result;
+    }
+
+    /**
+     * 从任务阶段表读取并打印本次函数执行的阶段耗时。
+     *
+     * <p>该输出只用于本地驱动调试，不改变 UDF 原始二维表结果。</p>
+     */
+    private static void printStageTimings(SparkSession spark,
+                                          List<Map<String, Object>> rows) {
+        String jobId = firstJobId(rows);
+        if (jobId == null) {
+            return;
+        }
+        Map<String, Object> summary = new LinkedHashMap<String, Object>();
+        summary.put("jobId", jobId);
+        try {
+            if (!stageTableExists(spark)) {
+                summary.put("stageTimingAvailable", Boolean.FALSE);
+                summary.put("reason", "stage table not found");
+                System.out.println("RAHA_STAGE_TIMINGS_JSON="
+                        + FmdbJsonCodec.write(summary));
+                return;
+            }
+            List<Row> stageRows = spark.table("dw.raha_job_stage_attempt")
+                    .filter(functions.col("job_id").equalTo(jobId))
+                    .select("stage_id", "stage_type", "attempt_id", "status",
+                            "error_code", "started_at", "completed_at")
+                    .orderBy(functions.col("started_at").asc(),
+                            functions.col("attempt_id").asc())
+                    .collectAsList();
+            List<Map<String, Object>> stages =
+                    new ArrayList<Map<String, Object>>(stageRows.size());
+            long totalMillis = 0L;
+            for (Row row : stageRows) {
+                long startedAt = longValue(row.getAs("started_at"));
+                long completedAt = longValue(row.getAs("completed_at"));
+                long elapsedMillis = Math.max(0L, completedAt - startedAt);
+                totalMillis += elapsedMillis;
+                Map<String, Object> stage = new LinkedHashMap<String, Object>();
+                stage.put("stageId", row.getAs("stage_id"));
+                stage.put("stageType", row.getAs("stage_type"));
+                stage.put("attemptId", row.getAs("attempt_id"));
+                stage.put("status", row.getAs("status"));
+                stage.put("errorCode", row.getAs("error_code"));
+                stage.put("startedAt", Long.valueOf(startedAt));
+                stage.put("completedAt", Long.valueOf(completedAt));
+                stage.put("elapsedMillis", Long.valueOf(elapsedMillis));
+                stages.add(stage);
+            }
+            summary.put("stageTimingAvailable", Boolean.TRUE);
+            summary.put("stageCount", Integer.valueOf(stages.size()));
+            summary.put("totalStageMillis", Long.valueOf(totalMillis));
+            summary.put("stages", stages);
+        } catch (RuntimeException exception) {
+            summary.put("stageTimingAvailable", Boolean.FALSE);
+            summary.put("reason", exception.getMessage());
+        }
+        System.out.println("RAHA_STAGE_TIMINGS_JSON="
+                + FmdbJsonCodec.write(summary));
+    }
+
+    private static boolean stageTableExists(SparkSession spark) {
+        try {
+            return spark.catalog().tableExists("dw.raha_job_stage_attempt");
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    private static String firstJobId(List<Map<String, Object>> rows) {
+        if (rows == null) {
+            return null;
+        }
+        for (Map<String, Object> row : rows) {
+            Object value = row.get("jobId");
+            if (value != null && !String.valueOf(value).trim().isEmpty()) {
+                return String.valueOf(value).trim();
+            }
+        }
+        return null;
+    }
+
+    private static long longValue(Object value) {
+        return value instanceof Number ? ((Number) value).longValue() : 0L;
     }
 
     private static String readRequest(String argument) throws IOException {

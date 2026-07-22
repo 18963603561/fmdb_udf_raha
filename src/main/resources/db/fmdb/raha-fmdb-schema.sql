@@ -55,6 +55,42 @@ PARTITIONED BY (dataset_id, partition_month)
 TBLPROPERTIES ('raha.schema.version' = '1');
 
 -- 保存列画像、策略、特征字典、聚类和传播摘要。
+-- 保存采样快照检查点，供训练阶段复用 PROFILE、RUN_STRATEGY、FEATURE 和 CLUSTER 产物。
+CREATE TABLE IF NOT EXISTS dw.raha_snapshot_checkpoint (
+    checkpoint_id STRING NOT NULL,
+    dataset_id STRING NOT NULL,
+    snapshot_id STRING NOT NULL,
+    source_job_id STRING NOT NULL,
+    sample_batch_id STRING,
+    record_type STRING NOT NULL,
+    record_scope STRING NOT NULL,
+    column_name STRING,
+    row_id STRING,
+    cell_id STRING,
+    cell_value STRING,
+    artifact_version STRING,
+    profile_json STRING,
+    strategy_plan_json STRING,
+    strategy_hit_json STRING,
+    feature_dictionary_json STRING,
+    feature_vector_json STRING,
+    feature_summary_json STRING,
+    cluster_version STRING,
+    cluster_id STRING,
+    cluster_distance DOUBLE,
+    cluster_summary_json STRING,
+    payload_json STRING,
+    row_set_fingerprint STRING NOT NULL,
+    config_fingerprint STRING NOT NULL,
+    schema_hash STRING NOT NULL,
+    source_version STRING,
+    created_at BIGINT NOT NULL,
+    partition_month STRING NOT NULL
+)
+USING ORC
+PARTITIONED BY (dataset_id, partition_month)
+TBLPROPERTIES ('raha.schema.version' = '1');
+
 CREATE TABLE IF NOT EXISTS dw.raha_training_column_artifact (
     training_batch_id STRING NOT NULL,
     dataset_id STRING NOT NULL,

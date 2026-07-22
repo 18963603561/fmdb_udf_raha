@@ -178,17 +178,19 @@ public final class RahaJobOrchestrator {
             int attemptId = 1;
             while (true) {
                 String stageId = idGenerator.newStageId(job.getJobId(), handler.getStageType(), attemptId);
+                boolean shouldSaveJobStart = firstStage;
                 if (firstStage) {
                     job.start(stageId, clock.millis());
                     firstStage = false;
                 } else {
                     job.moveToStage(stageId);
                 }
-                jobRepository.save(job, clock.millis());
+                if (shouldSaveJobStart) {
+                    jobRepository.save(job, clock.millis());
+                }
 
                 RahaStage stage = new RahaStage(stageId, job.getJobId(), handler.getStageType(), attemptId);
                 stage.start(clock.millis());
-                saveStage(stage, job);
                 RahaLogContext logContext = new RahaLogContext(job.getJobId(), stageId,
                         attemptId, job.getSnapshotId());
                 LOGGER.info("Raha 阶段开始，context={}，stageType={}",
@@ -210,7 +212,6 @@ public final class RahaJobOrchestrator {
                     stage.succeed(clock.millis());
                     saveStage(stage, job);
                     stages.add(stage.snapshot());
-                    jobRepository.save(job, clock.millis());
                     RahaLogContext successLogContext = new RahaLogContext(job.getJobId(), stageId,
                             attemptId, job.getSnapshotId());
                     LOGGER.info("Raha 阶段成功，context={}，stageType={}，elapsedMillis={}，"
@@ -225,7 +226,6 @@ public final class RahaJobOrchestrator {
                     saveStage(stage, job);
                     stages.add(stage.snapshot());
                     partialSuccess = true;
-                    jobRepository.save(job, clock.millis());
                     LOGGER.warn("Raha 阶段部分成功，context={}，stageType={}，errorCode={}，"
                                     + "elapsedMillis={}，totalItemCount={}，failedItemCount={}",
                             logContext.toLogText(), handler.getStageType(), result.getErrorCode(),

@@ -5,12 +5,14 @@ import com.fiberhome.ml.raha.data.loader.RahaDatasetLoader;
 import com.fiberhome.ml.raha.data.profile.ColumnProfileService;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.feature.FeatureService;
+import com.fiberhome.ml.raha.job.stage.checkpoint.SnapshotCheckpointStageHandler;
 import com.fiberhome.ml.raha.job.stage.feature.ClusterStageHandler;
 import com.fiberhome.ml.raha.job.stage.model.ResultPersistenceStageHandler;
 import com.fiberhome.ml.raha.job.stage.model.ResultPersistenceVerifier;
 import com.fiberhome.ml.raha.job.stage.sample.SampleTaskStageHandler;
 import com.fiberhome.ml.raha.job.stage.core.StageAttributeKeys;
 import com.fiberhome.ml.raha.job.stage.core.StageHandler;
+import com.fiberhome.ml.raha.repository.port.SnapshotCheckpointRepository;
 import com.fiberhome.ml.raha.service.sample.RahaSampleService;
 import com.fiberhome.ml.raha.sampling.service.SampleRecordService;
 import com.fiberhome.ml.raha.strategy.execution.StrategyExecutionService;
@@ -31,6 +33,8 @@ public final class SamplingWorkflow extends AbstractRahaWorkflow {
     private final SampleRecordService sampleRecordService;
     /** 可选采样物理结果回读验证器。 */
     private final ResultPersistenceVerifier resultPersistenceVerifier;
+    /** 可选快照检查点仓储，用于训练复用采样前置产物。 */
+    private final SnapshotCheckpointRepository snapshotCheckpointRepository;
 
     public SamplingWorkflow(RahaDatasetLoader datasetLoader,
                             ColumnProfileService profileService,
@@ -42,7 +46,7 @@ public final class SamplingWorkflow extends AbstractRahaWorkflow {
                             SampleRecordService sampleRecordService) {
         this(datasetLoader, profileService, planService, executionService,
                 featureService, clusteringService, sampleService,
-                sampleRecordService, null);
+                sampleRecordService, null, null);
     }
 
     public SamplingWorkflow(RahaDatasetLoader datasetLoader,
@@ -54,6 +58,21 @@ public final class SamplingWorkflow extends AbstractRahaWorkflow {
                             RahaSampleService sampleService,
                             SampleRecordService sampleRecordService,
                             ResultPersistenceVerifier resultPersistenceVerifier) {
+        this(datasetLoader, profileService, planService, executionService,
+                featureService, clusteringService, sampleService,
+                sampleRecordService, resultPersistenceVerifier, null);
+    }
+
+    public SamplingWorkflow(RahaDatasetLoader datasetLoader,
+                            ColumnProfileService profileService,
+                            StrategyPlanService planService,
+                            StrategyExecutionService executionService,
+                            FeatureService featureService,
+                            ColumnClusteringService clusteringService,
+                            RahaSampleService sampleService,
+                            SampleRecordService sampleRecordService,
+                            ResultPersistenceVerifier resultPersistenceVerifier,
+                            SnapshotCheckpointRepository snapshotCheckpointRepository) {
         super(datasetLoader, profileService, planService, executionService, featureService);
         if (clusteringService == null || sampleService == null
                 || sampleRecordService == null) {
@@ -63,6 +82,7 @@ public final class SamplingWorkflow extends AbstractRahaWorkflow {
         this.sampleService = sampleService;
         this.sampleRecordService = sampleRecordService;
         this.resultPersistenceVerifier = resultPersistenceVerifier;
+        this.snapshotCheckpointRepository = snapshotCheckpointRepository;
     }
 
     @Override
@@ -77,6 +97,10 @@ public final class SamplingWorkflow extends AbstractRahaWorkflow {
         }
         List<StageHandler> handlers = preparationStages(request);
         handlers.add(new ClusterStageHandler(clusteringService));
+        if (snapshotCheckpointRepository != null) {
+            handlers.add(new SnapshotCheckpointStageHandler(
+                    snapshotCheckpointRepository));
+        }
         handlers.add(new SampleTaskStageHandler(sampleService, sampleRecordService,
                 request.getDataLoadRequest().getFormat(),
                 request.getSamplingRound(), request.getLabels()));

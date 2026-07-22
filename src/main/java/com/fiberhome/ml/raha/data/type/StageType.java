@@ -20,6 +20,10 @@ public enum StageType {
     GENERATE_FEATURE,
     /** 执行列内聚类。 */
     CLUSTER,
+    /** 固化采样快照检查点，供后续训练复用。 */
+    SNAPSHOT_CHECKPOINT,
+    /** 从采样快照检查点恢复画像、策略、特征和聚类产物。 */
+    RESTORE_SNAPSHOT_CHECKPOINT,
     /** 选择待标注元组。 */
     SAMPLE,
     /** 接收或生成直接标签。 */

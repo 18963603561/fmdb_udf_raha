@@ -254,7 +254,12 @@ public final class RahaTrainService {
                     merged.getTrainingSnapshotId(), merged.getMetrics().getMergedCount());
         }
         Dataset<Row> inputFrame = request.getDataset().getDataFrame();
-        boolean ownsInputCache = request.getPreparedFeatures() == null
+        boolean requiresInputFrame = request.getPreparedFeatures() == null;
+        if (requiresInputFrame && inputFrame == null) {
+            throw new IllegalArgumentException(
+                    "未复用特征时训练数据集必须绑定 Spark DataFrame");
+        }
+        boolean ownsInputCache = requiresInputFrame
                 && inputFrame.storageLevel().equals(StorageLevel.NONE());
         LOGGER.info("开始 Raha 训练服务，jobId={}，datasetId={}，directLabelCount={}",
                 request.getJobId(), request.getDataset().getDatasetId(),

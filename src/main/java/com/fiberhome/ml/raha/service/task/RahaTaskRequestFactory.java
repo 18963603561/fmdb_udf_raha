@@ -2,9 +2,12 @@ package com.fiberhome.ml.raha.service.task;
 
 import com.fiberhome.ml.raha.annotation.domain.AnnotationBatch;
 import com.fiberhome.ml.raha.annotation.domain.AnnotationBatchStatus;
+import com.fiberhome.ml.raha.annotation.domain.AnnotationRecord;
+import com.fiberhome.ml.raha.annotation.domain.RowAnnotation;
 import com.fiberhome.ml.raha.config.dto.RahaJobConfig;
 import com.fiberhome.ml.raha.config.dto.SamplingConfig;
 import com.fiberhome.ml.raha.config.validation.RahaConfigFactory;
+import com.fiberhome.ml.raha.data.domain.CellCoordinate;
 import com.fiberhome.ml.raha.data.loader.DataFormat;
 import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
@@ -17,6 +20,7 @@ import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
 import com.fiberhome.ml.raha.sampling.domain.SampleBatch;
 import com.fiberhome.ml.raha.sampling.domain.SampleRecord;
 import com.fiberhome.ml.raha.service.train.TrainingBatchReference;
+import com.fiberhome.ml.raha.util.HashUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -226,6 +230,10 @@ public final class RahaTaskRequestFactory {
         }
         TrainingInput trainingInput = resolveTrainingInput(resolved,
                 options.getInputOverride());
+        if (options.isReuseSnapshotCheckpoint()) {
+            trainingInput = checkpointTrainingInput(trainingInput, resolved,
+                    options.getRequestedSnapshotId());
+        }
         List<TrainingBatchReference> references =
                 new ArrayList<TrainingBatchReference>(resolved.size());
         for (ResolvedTrainingBatch item : resolved) {
@@ -247,6 +255,23 @@ public final class RahaTaskRequestFactory {
         }
         DataLoadRequest loadRequest = trainingInput.spec.toDataLoadRequest(
                 trainingInput.identity);
+        if (options.isReuseSnapshotCheckpoint()) {
+            RahaTaskExecutionRequest request =
+                    RahaTaskExecutionRequest.trainingFromSnapshotCheckpoint(
+                            config, loadRequest,
+                            directLabels(resolved,
+                                    trainingInput.spec.getDatasetId(),
+                                    trainingInput.spec.getSnapshotId()),
+                            options.getPropagationMethod(),
+                            configFactory.labelPropagationConfig(),
+                            configFactory.logisticRegressionTrainingConfig(),
+                            options.getModelNamePrefix())
+                            .withExecutionFingerprint(batchFingerprint);
+            LOGGER.info("最小训练请求已切换为快照检查点复用，datasetId={}，snapshotId={}，batchCount={}",
+                    trainingInput.spec.getDatasetId(),
+                    trainingInput.spec.getSnapshotId(), references.size());
+            return request;
+        }
         RahaTaskExecutionRequest request = RahaTaskExecutionRequest.trainingBatches(
                 config, loadRequest, options.getPropagationMethod(),
                 configFactory.labelPropagationConfig(),
@@ -562,6 +587,81 @@ public final class RahaTaskRequestFactory {
                 tableName, sourceType, identity, null, sourceVersion,
                 null, null, null, null);
         return new TrainingInput(spec, identity);
+    }
+
+    /**
+     * 校验并补齐检查点复用训练使用的采样快照。
+     *
+     * <p>检查点按照采样阶段的数据快照固化，训练复用时必须确保请求快照与采样批次快照一致。
+     * 否则人工标签会映射到另一份输入上，导致训练样本语义错位。</p>
+     */
+    private static TrainingInput checkpointTrainingInput(
+            TrainingInput input,
+            List<ResolvedTrainingBatch> batches,
+            String requestedSnapshotId) {
+        String snapshotId = ValueUtils.requireNotBlank(requestedSnapshotId,
+                "检查点复用训练 snapshotId");
+        for (ResolvedTrainingBatch batch : batches) {
+            if (!snapshotId.equals(batch.sample.getSnapshotId())) {
+                throw new IllegalArgumentException(
+                        "检查点复用训练的 snapshotId 必须与采样批次一致："
+                                + batch.sample.getSampleBatchId());
+            }
+        }
+        if (input.spec.getSnapshotId() != null
+                && !snapshotId.equals(input.spec.getSnapshotId())) {
+            throw new IllegalArgumentException(
+                    "训练输入快照与检查点复用快照不一致");
+        }
+        return new TrainingInput(input.spec.withVersion(snapshotId,
+                input.spec.getSourceVersion()), input.identity);
+    }
+
+    /**
+     * 将人工标注重映射到采样快照的单元格标识。
+     *
+     * <p>快照检查点训练不会生成新的合并快照，因此标签必须直接绑定到采样快照。
+     * 多批次场景下若同一单元格出现冲突标签会立即失败，避免传播阶段放大错误。</p>
+     */
+    private static List<CellLabel> directLabels(
+            List<ResolvedTrainingBatch> batches,
+            String datasetId,
+            String snapshotId) {
+        List<CellLabel> labels = new ArrayList<CellLabel>();
+        Map<String, CellLabel> sourceByCell =
+                new TreeMap<String, CellLabel>();
+        for (ResolvedTrainingBatch batch : batches) {
+            for (AnnotationRecord record : batch.annotation.getRecords()) {
+                RowAnnotation annotation = record.getAnnotation();
+                List<String> columns = new ArrayList<String>(
+                        annotation.getReviewedColumns());
+                for (int index = 0; index < columns.size(); index++) {
+                    CellLabel source = annotation.getCellLabels().get(index);
+                    String column = columns.get(index);
+                    String sourceCell = annotation.getRowId() + "\u0000" + column;
+                    CellLabel existing = sourceByCell.get(sourceCell);
+                    if (existing != null
+                            && existing.getLabel() != source.getLabel()) {
+                        throw new IllegalArgumentException(
+                                "检查点复用训练包含冲突标签："
+                                        + annotation.getRowId() + "/" + column);
+                    }
+                    if (existing != null) {
+                        continue;
+                    }
+                    sourceByCell.put(sourceCell, source);
+                    String cellId = new CellCoordinate(datasetId, snapshotId,
+                            annotation.getRowId(), column).toCellId();
+                    String labelId = HashUtils.md5Hex(source.getLabelId()
+                            + "|" + snapshotId);
+                    labels.add(new CellLabel(labelId, cellId, source.getLabel(),
+                            source.getLabelSource(), source.getConfidence(),
+                            null, null, null, null, 1.0d, 0, null,
+                            source.getAnnotator(), source.getCreatedAt()));
+                }
+            }
+        }
+        return Collections.unmodifiableList(labels);
     }
 
     /**

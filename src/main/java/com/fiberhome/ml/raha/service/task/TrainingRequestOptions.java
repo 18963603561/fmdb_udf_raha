@@ -18,6 +18,10 @@ public final class TrainingRequestOptions {
     private final FmdbInputSpec inputOverride;
     /** 执行覆盖选项，用于控制强制运行和请求级幂等。 */
     private final ExecutionOverrideOptions executionOverrideOptions;
+    /** 请求显式指定的采样快照标识，用于检查点恢复训练。 */
+    private final String requestedSnapshotId;
+    /** 是否复用采样阶段固化的快照检查点。 */
+    private final boolean reuseSnapshotCheckpoint;
 
     public TrainingRequestOptions(boolean allowPartialAnnotation,
                                   String modelNamePrefix,
@@ -32,6 +36,17 @@ public final class TrainingRequestOptions {
                                   LabelPropagationMethod propagationMethod,
                                   FmdbInputSpec inputOverride,
                                   ExecutionOverrideOptions executionOverrideOptions) {
+        this(allowPartialAnnotation, modelNamePrefix, propagationMethod,
+                inputOverride, executionOverrideOptions, null, false);
+    }
+
+    public TrainingRequestOptions(boolean allowPartialAnnotation,
+                                  String modelNamePrefix,
+                                  LabelPropagationMethod propagationMethod,
+                                  FmdbInputSpec inputOverride,
+                                  ExecutionOverrideOptions executionOverrideOptions,
+                                  String requestedSnapshotId,
+                                  boolean reuseSnapshotCheckpoint) {
         this.allowPartialAnnotation = allowPartialAnnotation;
         this.modelNamePrefix = ValueUtils.requireNotBlank(
                 modelNamePrefix, "训练模型名称前缀");
@@ -42,6 +57,8 @@ public final class TrainingRequestOptions {
         this.inputOverride = inputOverride;
         this.executionOverrideOptions = executionOverrideOptions == null
                 ? ExecutionOverrideOptions.DEFAULT : executionOverrideOptions;
+        this.requestedSnapshotId = trimToNull(requestedSnapshotId);
+        this.reuseSnapshotCheckpoint = reuseSnapshotCheckpoint;
     }
 
     /**
@@ -60,5 +77,11 @@ public final class TrainingRequestOptions {
     public FmdbInputSpec getInputOverride() { return inputOverride; }
     public ExecutionOverrideOptions getExecutionOverrideOptions() {
         return executionOverrideOptions;
+    }
+    public String getRequestedSnapshotId() { return requestedSnapshotId; }
+    public boolean isReuseSnapshotCheckpoint() { return reuseSnapshotCheckpoint; }
+
+    private static String trimToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 }

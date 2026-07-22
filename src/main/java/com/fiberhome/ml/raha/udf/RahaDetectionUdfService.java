@@ -272,11 +272,22 @@ public final class RahaDetectionUdfService {
             annotationFileName = annotationFileName(annotationBatch);
         }
 
-        FmdbInputSpec inputOverride = parser.inputSpec(false);
+        String requestedSnapshotId = parser.optional("snapshotId");
+        boolean reuseSnapshotCheckpoint = requestedSnapshotId != null
+                && trainingInputMissing(parser);
+        if (reuseSnapshotCheckpoint
+                && !requestedSnapshotId.equals(sampleBatch.getSnapshotId())) {
+            return RahaUdfRows.single(failedBase("SNAPSHOT_MISMATCH",
+                    "训练复用的 snapshotId 必须与采样批次一致",
+                    parser, null, sampleBatchId));
+        }
+        FmdbInputSpec inputOverride = reuseSnapshotCheckpoint
+                ? null : parser.inputSpec(false);
         TrainingRequestOptions options = new TrainingRequestOptions(
                 allowPartial, parser.optional("modelNamePrefix", "raha"),
                 LabelPropagationMethod.HOMOGENEITY, inputOverride,
-                parser.executionOverrideOptions());
+                parser.executionOverrideOptions(), requestedSnapshotId,
+                reuseSnapshotCheckpoint);
         RahaTaskExecutionRequest taskRequest = requestFactory.training(
                 Collections.singletonList(sampleBatchId), options);
         RahaTaskExecutionResult taskResult = taskService.execute(taskRequest);
@@ -887,6 +898,15 @@ public final class RahaDetectionUdfService {
             }
         }
         return count;
+    }
+
+    private static boolean trainingInputMissing(RahaUdfRequestParser parser) {
+        return parser.optional("sourceType") == null
+                && parser.optional("datasetId") == null
+                && parser.optional("sqlText") == null
+                && parser.optional("sql") == null
+                && parser.optional("tableName") == null
+                && parser.optional("table") == null;
     }
 
     private static String sourceType(FmdbInputSpec input) {

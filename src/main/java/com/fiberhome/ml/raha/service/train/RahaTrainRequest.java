@@ -175,11 +175,15 @@ public final class RahaTrainRequest {
         this.jobId = ValueUtils.requireNotBlank(jobId, "训练任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "训练阶段标识");
         this.modelNamePrefix = ValueUtils.requireNotBlank(modelNamePrefix, "模型名称前缀");
-        if (dataset == null || dataset.getDataFrame() == null || config == null
+        if (dataset == null || config == null
                 || directLabels == null || propagationMethod == null
                 || propagationConfig == null || trainingConfig == null
                 || artifactVersion == null) {
             throw new IllegalArgumentException("训练服务输入、配置和版本不能为空");
+        }
+        if (preparedFeatures == null && dataset.getDataFrame() == null) {
+            throw new IllegalArgumentException(
+                    "未复用特征时训练数据集必须绑定 Spark DataFrame");
         }
         if (!dataset.getDatasetId().equals(config.getDatasetId())) {
             throw new IllegalArgumentException("训练数据集与任务配置标识不一致");

@@ -49,6 +49,15 @@ public final class StrategyExecutionResult {
                 Collections.<StrategyHit>emptyList(), false);
     }
 
+    /** 使用已持久化的执行摘要恢复策略结果，不再要求命中对象已物化。 */
+    public static StrategyExecutionResult summaryOnly(StrategyRunSummary summary) {
+        if (summary == null) {
+            throw new IllegalArgumentException("策略执行摘要不能为空");
+        }
+        return new StrategyExecutionResult(summary,
+                Collections.<StrategyHit>emptyList(), false);
+    }
+
     public StrategyRunSummary getSummary() {
         return summary;
     }

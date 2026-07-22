@@ -20,6 +20,10 @@ public enum FmdbPhysicalTable {
             "raha.persistence.table.annotation-record.enabled",
             "dataset_id", "partition_month"),
     /** 训练列级阶段产物表。 */
+    /** 采样快照检查点表。 */
+    SNAPSHOT_CHECKPOINT("dw.raha_snapshot_checkpoint",
+            "raha.persistence.table.snapshot-checkpoint.enabled",
+            "dataset_id", "partition_month"),
     TRAINING_COLUMN_ARTIFACT("dw.raha_training_column_artifact",
             "raha.persistence.table.training-column-artifact.enabled"),
     /** 全量训练单元格中间状态表。 */
