@@ -5,12 +5,13 @@ import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.spark.sql.SparkSession;
 
 /**
  * 聚类提供方解析器。
  *
- * <p>统一把配置中的 provider 解析为实际聚类实现。AUTO 会保留为自动路由模式，
- * 由聚类器在运行时按单列样本量选择 Smile 精确路径或可扩展近似路径。</p>
+ * <p>统一把配置中的 provider 解析为实际聚类实现。默认 AUTO 在有 Spark 会话时会按样本量选择
+ * Smile 精确聚类或 Spark KMeans；无 Spark 会话时保留旧的可扩展近似聚类兜底。</p>
  */
 public final class ClusteringProviderResolver {
 
@@ -19,15 +20,18 @@ public final class ClusteringProviderResolver {
 
     /** 自动路由聚类提供方。 */
     private static final String AUTO_PROVIDER = "AUTO";
-    /** 解析后的层次聚类提供方。 */
+    /** 自研层次聚类提供方。 */
     private static final String HIERARCHICAL_PROVIDER = "HierarchicalColumnClusterer";
-    /** 解析后的可扩展聚类提供方。 */
+    /** 自研可扩展近似聚类提供方。 */
     private static final String SCALABLE_PROVIDER = "ScalableColumnClusterer";
-    /** 解析后的 Smile 层次聚类提供方。 */
+    /** Smile 平均链接层次聚类提供方。 */
     private static final String SMILE_HIERARCHICAL_PROVIDER =
             "SmileHierarchicalColumnClusterer";
+    /** Spark MLlib KMeans 聚类提供方。 */
+    private static final String SPARK_KMEANS_PROVIDER =
+            "SparkKMeansColumnClusterer";
 
-    /** 支持的 provider 别名到标准名称的映射。 */
+    /** 支持的 provider 别名到规范名称的映射。 */
     private static final Map<String, String> PROVIDER_ALIASES;
 
     static {
@@ -37,10 +41,16 @@ public final class ClusteringProviderResolver {
         registerAlias(aliases, AUTO_PROVIDER, AUTO_PROVIDER);
         registerAlias(aliases, HIERARCHICAL_PROVIDER, HIERARCHICAL_PROVIDER);
         registerAlias(aliases, SCALABLE_PROVIDER, SCALABLE_PROVIDER);
-        registerAlias(aliases, SMILE_HIERARCHICAL_PROVIDER, SMILE_HIERARCHICAL_PROVIDER);
+        registerAlias(aliases, SMILE_HIERARCHICAL_PROVIDER,
+                SMILE_HIERARCHICAL_PROVIDER);
         registerAlias(aliases, "SmileHierarchical", SMILE_HIERARCHICAL_PROVIDER);
         registerAlias(aliases, "SmileAverage", SMILE_HIERARCHICAL_PROVIDER);
-        registerAlias(aliases, "SmileAverageColumnClusterer", SMILE_HIERARCHICAL_PROVIDER);
+        registerAlias(aliases, "SmileAverageColumnClusterer",
+                SMILE_HIERARCHICAL_PROVIDER);
+        registerAlias(aliases, SPARK_KMEANS_PROVIDER, SPARK_KMEANS_PROVIDER);
+        registerAlias(aliases, "SparkKMeans", SPARK_KMEANS_PROVIDER);
+        registerAlias(aliases, "SparkMlKMeans", SPARK_KMEANS_PROVIDER);
+        registerAlias(aliases, "KMeans", SPARK_KMEANS_PROVIDER);
         PROVIDER_ALIASES = Collections.unmodifiableMap(aliases);
     }
 
@@ -60,8 +70,8 @@ public final class ClusteringProviderResolver {
     /**
      * 把 provider 收敛为规范化名称。
      *
-     * <p>空值和空串会归一到默认 AUTO；AUTO 会保留为独立模式，
-     * 以便配置指纹能够体现自动路由语义。</p>
+     * <p>空值和空字符串会归一到默认 AUTO，AUTO 会保留为独立模式，
+     * 以便配置指纹体现自动路由语义。</p>
      *
      * @param provider 配置中的聚类提供方
      * @return 规范化后的 provider
@@ -75,6 +85,9 @@ public final class ClusteringProviderResolver {
     /**
      * 创建实际的单列聚类实现。
      *
+     * <p>该重载用于不依赖 Spark 会话的本地测试和旧调用方。显式 Spark KMeans provider
+     * 需要使用带 SparkSession 的重载。</p>
+     *
      * @param provider 配置中的聚类提供方
      * @param versioner 聚类版本生成器
      * @param clock 时间源
@@ -83,12 +96,31 @@ public final class ClusteringProviderResolver {
     public static ColumnClusterer resolve(String provider,
                                           ClusterVersioner versioner,
                                           Clock clock) {
+        return resolve(provider, versioner, clock, null);
+    }
+
+    /**
+     * 创建实际的单列聚类实现。
+     *
+     * <p>Spark KMeans 需要 driver 侧 Spark 会话，运行时装配必须通过该重载传入
+     * {@link SparkSession}。非 Spark provider 会忽略该参数。</p>
+     *
+     * @param provider 配置中的聚类提供方
+     * @param versioner 聚类版本生成器
+     * @param clock 时间源
+     * @param sparkSession Spark 会话，Spark KMeans provider 必须提供
+     * @return 可执行的聚类实现
+     */
+    public static ColumnClusterer resolve(String provider,
+                                          ClusterVersioner versioner,
+                                          Clock clock,
+                                          SparkSession sparkSession) {
         if (versioner == null || clock == null) {
             throw new IllegalArgumentException("聚类提供方解析依赖不能为空");
         }
         String canonical = canonicalProvider(provider);
         if (AUTO_PROVIDER.equals(canonical)) {
-            return new AutoColumnClusterer(versioner, clock);
+            return new AutoColumnClusterer(versioner, clock, sparkSession);
         }
         if (HIERARCHICAL_PROVIDER.equals(canonical)) {
             return new HierarchicalColumnClusterer(versioner, clock);
@@ -98,6 +130,13 @@ public final class ClusteringProviderResolver {
         }
         if (SMILE_HIERARCHICAL_PROVIDER.equals(canonical)) {
             return new SmileHierarchicalColumnClusterer(versioner, clock);
+        }
+        if (SPARK_KMEANS_PROVIDER.equals(canonical)) {
+            if (sparkSession == null) {
+                throw new IllegalArgumentException(
+                        "Spark KMeans 聚类提供方需要 SparkSession");
+            }
+            return new SparkKMeansColumnClusterer(sparkSession, versioner, clock);
         }
         throw new IllegalArgumentException("不支持的聚类提供方: " + provider);
     }

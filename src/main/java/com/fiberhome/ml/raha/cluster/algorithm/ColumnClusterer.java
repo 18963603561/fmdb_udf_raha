@@ -19,6 +19,18 @@ public interface ColumnClusterer {
     String getAlgorithm();
 
     /**
+     * 判断当前聚类器是否允许通过本地线程池按列并发执行。
+     *
+     * <p>Spark MLlib 类聚类器会在 driver 侧提交 Spark 作业，不适合由本地线程池同时发起多列训练，
+     * 因此需要通过该能力声明让上层服务降级为串行调度。</p>
+     *
+     * @return 是否支持本地列级并发
+     */
+    default boolean supportsLocalColumnParallelism() {
+        return true;
+    }
+
+    /**
      * 对同一字段的单元格稀疏特征进行聚类。
      *
      * @param columnName 字段名称

@@ -399,7 +399,7 @@ public final class RahaTaskApplicationServiceFactory {
 
         // 阶段三：创建数据准备领域服务，训练、采样和检测工作流都会复用这些能力。
         PreparationServices preparationServices = createPreparationServices(
-                repository, runtimeRepositories, infrastructure.getClock());
+                sparkSession, repository, runtimeRepositories, infrastructure.getClock());
 
         // 阶段四：创建任务业务服务，按存储模式选择模型元数据和模型产物存储位置。
         TaskServices taskServices = createTaskServices(sparkSession, modelDirectory,
@@ -548,12 +548,14 @@ public final class RahaTaskApplicationServiceFactory {
      * <p>数据准备服务包含策略计划、策略执行、特征组装、列画像、列聚类和标签传播。
      * 这些服务在多个工作流之间复用，以保证同一任务链路中的中间产物语义一致。</p>
      *
+     * @param sparkSession Spark 会话，供 Spark KMeans 聚类在 driver 侧提交作业
      * @param repository 内存标签仓储的底层聚合仓储，不能为空
      * @param runtimeRepositories 当前存储模式下的运行时仓储，不能为空
      * @param clock 统一时间源，不能为空
      * @return 数据准备阶段领域服务集合
      */
     private static PreparationServices createPreparationServices(
+            SparkSession sparkSession,
             RahaRepository repository,
             RuntimeRepositories runtimeRepositories,
             Clock clock) {
@@ -566,7 +568,7 @@ public final class RahaTaskApplicationServiceFactory {
         ColumnProfileService profileService = profileService(
                 runtimeRepositories.getColumnProfileRepository(), clock);
         ColumnClusteringService clusteringService = clusteringService(
-                runtimeRepositories.getClusterRepository(), clock);
+                sparkSession, runtimeRepositories.getClusterRepository(), clock);
         CellLabelRepository labelRepository = new DefaultCellLabelRepository(repository);
         LabelPropagationService propagationService = new LabelPropagationService(
                 labelRepository, clock);
@@ -938,14 +940,16 @@ public final class RahaTaskApplicationServiceFactory {
     /**
      * 创建列聚类服务。
      *
-     * <p>该服务根据列画像结果计算相似列簇，用于后续采样和检测。</p>
+     * <p>该服务根据列画像结果计算相似列簇，用于后续采样和检测。
+     * Spark KMeans provider 需要复用运行时 Spark 会话在 driver 侧提交作业。</p>
      */
     private static ColumnClusteringService clusteringService(
-            ClusterRepository repository, Clock clock) {
+            SparkSession sparkSession, ClusterRepository repository, Clock clock) {
         ClusteringConfig clusteringConfig = RahaDefaultConfigProvider.factory()
                 .clusteringConfig();
         ColumnClusterer clusterer = ClusteringProviderResolver.resolve(
-                clusteringConfig.getProvider(), new ClusterVersioner(), clock);
+                clusteringConfig.getProvider(), new ClusterVersioner(), clock,
+                sparkSession);
         return new ColumnClusteringService(clusterer, repository, clock);
     }
 

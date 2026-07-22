@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 按字段隔离执行列内聚类并保存版本化结果。
+ * 按字段隔离执行列内聚类，并保存版本化聚类摘要和成员映射。
  */
 public final class ColumnClusteringService {
 
@@ -62,7 +62,7 @@ public final class ColumnClusteringService {
     }
 
     /**
-     * 按字段隔离执行聚类，并在同一业务版本下保存摘要和成员。
+     * 按字段隔离串行执行聚类，并在同一业务版本下保存摘要和成员。
      *
      * @param jobId 任务标识
      * @param features 当前任务特征结果
@@ -117,8 +117,7 @@ public final class ColumnClusteringService {
         }
         ClusteringMetrics metrics = new ClusteringMetrics(results.size(), clusteredColumnCount,
                 assignmentCount, exceptionalColumnCount);
-        LOGGER.info("列内聚类完成，jobId={}，clusteredColumnCount={}，assignmentCount={}，"
-                        + "exceptionalColumnCount={}",
+        LOGGER.info("列内聚类完成，jobId={}，clusteredColumnCount={}，assignmentCount={}，exceptionalColumnCount={}",
                 jobId, clusteredColumnCount, assignmentCount, exceptionalColumnCount);
         return new ClusteringBatchResult(results, metrics);
     }
@@ -126,6 +125,14 @@ public final class ColumnClusteringService {
     /**
      * 按字段受限并行执行聚类，单列算法异常仍转换为该列失败结果。
      *
+     * <p>Spark MLlib 类聚类器会在 driver 侧提交 Spark 作业，不适合由本地线程池同时发起多列训练；
+     * 这类聚类器会通过能力声明自动降级到串行入口。</p>
+     *
+     * @param jobId 任务标识
+     * @param features 当前任务特征结果
+     * @param config 聚类配置
+     * @param randomSeed 可复现随机种子
+     * @param version 仓储业务版本
      * @param maxParallelColumns 最大列并发数
      * @param timeoutMillis 聚类批次超时
      * @return 全字段聚类结果和指标
@@ -141,6 +148,12 @@ public final class ColumnClusteringService {
         if (features == null || config == null || version == null
                 || maxParallelColumns <= 0 || timeoutMillis <= 0L) {
             throw new IllegalArgumentException("并行聚类输入、并发数和超时必须有效");
+        }
+        if (!clusterer.supportsLocalColumnParallelism()) {
+            // Spark MLlib 聚类由 driver 提交 Spark 作业，避免本地线程池同时发起多列训练。
+            LOGGER.warn("当前聚类器不支持本地列并发，降级为串行列聚类，jobId={}，algorithm={}，requestedMaxParallelColumns={}",
+                    jobId, clusterer.getAlgorithm(), maxParallelColumns);
+            return clusterAndSave(jobId, features, config, randomSeed, version);
         }
         Map<String, List<SparseFeatureRow>> rowsByColumn = rowsByColumn(features.getRows());
         List<ParallelWorkItem<String, ColumnClusteringResult>> items =
@@ -181,8 +194,7 @@ public final class ColumnClusteringService {
                 exceptionalColumnCount++;
             }
         }
-        LOGGER.info("并行列内聚类完成，jobId={}，assignmentCount={}，"
-                        + "maxObservedConcurrency={}",
+        LOGGER.info("并行列内聚类完成，jobId={}，assignmentCount={}，maxObservedConcurrency={}",
                 jobId, assignmentCount, parallel.getMaxObservedConcurrency());
         return new ClusteringBatchResult(results, new ClusteringMetrics(
                 results.size(), clusteredColumnCount, assignmentCount,
@@ -222,10 +234,11 @@ public final class ColumnClusteringService {
                                                 ClusteringConfig config,
                                                 long randomSeed,
                                                 RuntimeException exception) {
-        ClusterVersioner versioner = new ClusterVersioner();
-        String version = versioner.versionOf(dictionary.getColumnName(), dictionary.getVersion(),
-                clusterer.getAlgorithm(), config, randomSeed,
-                ColumnClusteringStatus.FAILED, java.util.Collections.<String, String>emptyMap());
+        ClusterVersioner localVersioner = new ClusterVersioner();
+        String version = localVersioner.versionOf(dictionary.getColumnName(),
+                dictionary.getVersion(), clusterer.getAlgorithm(), config, randomSeed,
+                ColumnClusteringStatus.FAILED,
+                java.util.Collections.<String, String>emptyMap());
         return new ColumnClusteringResult(dictionary.getColumnName(),
                 clusterer.getAlgorithm(), config.getDistanceMetric(),
                 config.getTargetClusterCount(), 0, randomSeed, version,

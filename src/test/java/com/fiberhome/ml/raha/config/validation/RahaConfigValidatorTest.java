@@ -47,6 +47,21 @@ class RahaConfigValidatorTest {
     }
 
     @Test
+    void shouldAcceptSparkKMeansClusteringProvider() {
+        RahaJobConfig config = new RahaJobConfig(
+                JobType.SAMPLING, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
+                1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                ModelConfig.defaults(),
+                new ClusteringConfig("SparkKMeansColumnClusterer",
+                        ClusteringDistanceMetric.COSINE, 2, 100),
+                SamplingConfig.defaults(), ResourceConfig.defaults(),
+                FailureToleranceConfig.defaults());
+
+        assertDoesNotThrow(() -> validator.validate(config));
+    }
+
+    @Test
     void shouldReturnStableErrorCodeForMissingDataset() {
         RahaJobConfig config = RahaJobConfig.defaults(
                 JobType.DETECTION, " ", "table-1",
