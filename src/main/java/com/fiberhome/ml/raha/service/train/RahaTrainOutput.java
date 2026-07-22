@@ -95,4 +95,33 @@ public final class RahaTrainOutput {
     public TrainingArtifactMaterializationResult getMaterializationResult() {
         return materializationResult;
     }
+
+    /**
+     * 使用首个成功列批的阶段摘要创建父任务训练输出。
+     *
+     * <p>父输出只保留一个列批的中间产物，字段训练结果和模型元数据使用全部列批的轻量汇总，
+     * 避免重新聚合所有单元格特征。</p>
+     *
+     * @param representative 首个成功列批输出
+     * @param trainingResults 全部列批训练结果
+     * @param candidateModels 全部列批模型元数据
+     * @param strategyPlanVersion 父任务模型兼容计划版本
+     * @param modelSetVersion 父任务模型集合版本
+     * @return 可供现有 UDF 返回协议消费的父任务输出
+     */
+    public static RahaTrainOutput columnBatchSummary(
+            RahaTrainOutput representative,
+            Map<String, ColumnModelTrainingResult> trainingResults,
+            Map<String, RahaColumnModel> candidateModels,
+            String strategyPlanVersion,
+            String modelSetVersion) {
+        if (representative == null) {
+            throw new IllegalArgumentException("列批训练汇总缺少代表输出");
+        }
+        return new RahaTrainOutput(representative.getStrategyPlans(),
+                representative.getStrategyBatch(), representative.getFeatures(),
+                representative.getClustering(), representative.getPropagation(),
+                trainingResults, candidateModels, strategyPlanVersion,
+                modelSetVersion, null);
+    }
 }

@@ -40,12 +40,28 @@ public final class ModelTrainingStageHandler implements StageHandler {
     private final LabelPropagationMethod propagationMethod;
     /** 标签传播配置。 */
     private final LabelPropagationConfig propagationConfig;
+    /** 父级列批训练共享的模型集合版本。 */
+    private final String modelSetVersionOverride;
+    /** 父级列批训练共享的模型兼容计划版本。 */
+    private final String modelCompatibilityVersionOverride;
 
     public ModelTrainingStageHandler(RahaTrainService trainService,
                                      LogisticRegressionTrainingConfig trainingConfig,
                                      String modelNamePrefix,
                                      LabelPropagationMethod propagationMethod,
                                      LabelPropagationConfig propagationConfig) {
+        this(trainService, trainingConfig, modelNamePrefix,
+                propagationMethod, propagationConfig, null, null);
+    }
+
+    public ModelTrainingStageHandler(
+            RahaTrainService trainService,
+            LogisticRegressionTrainingConfig trainingConfig,
+            String modelNamePrefix,
+            LabelPropagationMethod propagationMethod,
+            LabelPropagationConfig propagationConfig,
+            String modelSetVersionOverride,
+            String modelCompatibilityVersionOverride) {
         if (trainService == null || trainingConfig == null
                 || modelNamePrefix == null || modelNamePrefix.trim().isEmpty()
                 || propagationMethod == null || propagationConfig == null) {
@@ -56,6 +72,9 @@ public final class ModelTrainingStageHandler implements StageHandler {
         this.modelNamePrefix = modelNamePrefix;
         this.propagationMethod = propagationMethod;
         this.propagationConfig = propagationConfig;
+        this.modelSetVersionOverride = modelSetVersionOverride;
+        this.modelCompatibilityVersionOverride =
+                modelCompatibilityVersionOverride;
     }
 
     @Override
@@ -106,7 +125,9 @@ public final class ModelTrainingStageHandler implements StageHandler {
                         propagationConfig, trainingConfig, modelNamePrefix,
                         version, prepared, (LabelPropagationResult) propagationValue,
                         mergeValue instanceof TrainingMergeResult
-                                ? (TrainingMergeResult) mergeValue : null));
+                                ? (TrainingMergeResult) mergeValue : null,
+                        modelSetVersionOverride,
+                        modelCompatibilityVersionOverride));
         context.getAttributes().put(StageAttributeKeys.TRAIN_SERVICE_RESULT, result);
         if (result.getPayload() != null) {
             context.getAttributes().put(StageAttributeKeys.TRAIN_OUTPUT, result.getPayload());

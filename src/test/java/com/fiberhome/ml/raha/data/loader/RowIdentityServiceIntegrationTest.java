@@ -119,6 +119,28 @@ class RowIdentityServiceIntegrationTest {
                 (String) second.getAs(RowIdentityColumns.ROW_CONTENT_HASH));
     }
 
+    @Test
+    void shouldSkipWideOrderingWindowWhenSourceKeyIsUnique() {
+        SparkSession spark = SparkTestSession.get();
+        List<String> expressions = new ArrayList<String>();
+        expressions.add("cast(id as string) as row_key");
+        for (int index = 1; index <= 49; index++) {
+            expressions.add("concat('V', cast(id + " + index
+                    + " as string)) as c" + String.format("%02d", index));
+        }
+        Dataset<Row> source = spark.range(100L).selectExpr(
+                expressions.toArray(new String[0]));
+
+        RowIdentityResult result = new RowIdentityService().identify(
+                source, RowIdentityConfig.sourceKey("row_key"));
+
+        assertEquals(100L, result.getMetrics().getSourceRowCount());
+        assertEquals(100L, result.getMetrics().getLogicalRowCount());
+        assertEquals(0L, result.getMetrics().getDiscardedDuplicateCount());
+        assertEquals(100L, result.getDataFrame().filter(
+                RowIdentityColumns.DUPLICATE_COUNT + " = 1").count());
+    }
+
     private static List<String> normalizedRows(Dataset<Row> rows) {
         List<String> values = new ArrayList<String>();
         for (Row row : rows.select("key_a", "key_b", "value",

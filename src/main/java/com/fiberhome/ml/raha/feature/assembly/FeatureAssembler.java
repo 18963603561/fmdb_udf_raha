@@ -114,10 +114,33 @@ public final class FeatureAssembler {
         }
         FeatureAssemblyMetrics metrics = new FeatureAssemblyMetrics(cellCount,
                 candidateFeatureCount, retainedFeatureCount, removedConstantFeatureCount);
+        sortRows(dataset, sparseRows);
         LOGGER.info("单元格特征生成完成，cellCount={}，dictionaryCount={}，featureCount={}，removedConstantCount={}",
                 metrics.getCellCount(), dictionaries.size(), metrics.getRetainedFeatureCount(),
                 metrics.getRemovedConstantFeatureCount());
         return new FeatureAssemblyResult(dictionaries, sparseRows, metrics);
+    }
+
+    /**
+     * 按输入字段顺序和单元格标识稳定特征行，消除 Spark 分区返回顺序差异。
+     */
+    private static void sortRows(RahaDataset dataset,
+                                 List<SparseFeatureRow> rows) {
+        Map<String, Integer> columnOrder =
+                new LinkedHashMap<String, Integer>();
+        for (ColumnMetadata column : dataset.getColumns()) {
+            columnOrder.put(column.getName(), Integer.valueOf(
+                    column.getOrdinal()));
+        }
+        Collections.sort(rows, (first, second) -> {
+            Integer firstOrder = columnOrder.get(first.getColumnName());
+            Integer secondOrder = columnOrder.get(second.getColumnName());
+            int byColumn = Integer.compare(
+                    firstOrder == null ? Integer.MAX_VALUE : firstOrder,
+                    secondOrder == null ? Integer.MAX_VALUE : secondOrder);
+            return byColumn != 0 ? byColumn
+                    : first.getCellId().compareTo(second.getCellId());
+        });
     }
 
     private static LinkedHashMap<String, FeatureSpec> featureSpecs(String columnName,

@@ -49,7 +49,8 @@ abstract class AbstractRahaWorkflow implements RahaWorkflow {
     final List<StageHandler> preparationStages(RahaTaskExecutionRequest request) {
         List<StageHandler> handlers = new ArrayList<StageHandler>();
         handlers.add(new DataLoadStageHandler(datasetLoader, request.getDataLoadRequest()));
-        handlers.add(new ColumnProfileStageHandler(profileService));
+        handlers.add(new ColumnProfileStageHandler(profileService,
+                request.isColumnBatchChild()));
         handlers.add(new StrategyPlanStageHandler(planService));
         handlers.add(new StrategyRunStageHandler(executionService));
         handlers.add(new FeatureStageHandler(featureService));

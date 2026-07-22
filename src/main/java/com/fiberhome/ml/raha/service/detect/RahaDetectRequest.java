@@ -32,6 +32,8 @@ public final class RahaDetectRequest {
     private final String modelSetVersion;
     /** 字段模型缺失或不兼容时的处理策略。 */
     private final MissingModelPolicy missingModelPolicy;
+    /** 父级列批检测共享的检测批次标识，为空时使用当前任务标识。 */
+    private final String detectionBatchIdOverride;
 
     public RahaDetectRequest(String jobId,
                              String stageId,
@@ -42,7 +44,7 @@ public final class RahaDetectRequest {
                              ArtifactVersion artifactVersion) {
         this(jobId, stageId, configVersion, dataset, features,
                 strategyPlanVersion, artifactVersion, ResourceConfig.defaults(),
-                null, MissingModelPolicy.PARTIAL);
+                null, MissingModelPolicy.PARTIAL, null);
     }
 
     public RahaDetectRequest(String jobId,
@@ -55,7 +57,7 @@ public final class RahaDetectRequest {
                              ResourceConfig resourceConfig) {
         this(jobId, stageId, configVersion, dataset, features,
                 strategyPlanVersion, artifactVersion, resourceConfig,
-                null, MissingModelPolicy.PARTIAL);
+                null, MissingModelPolicy.PARTIAL, null);
     }
 
     public RahaDetectRequest(String jobId,
@@ -68,6 +70,22 @@ public final class RahaDetectRequest {
                              ResourceConfig resourceConfig,
                              String modelSetVersion,
                              MissingModelPolicy missingModelPolicy) {
+        this(jobId, stageId, configVersion, dataset, features,
+                strategyPlanVersion, artifactVersion, resourceConfig,
+                modelSetVersion, missingModelPolicy, null);
+    }
+
+    public RahaDetectRequest(String jobId,
+                             String stageId,
+                             String configVersion,
+                             RahaDataset dataset,
+                             FeatureAssemblyResult features,
+                             String strategyPlanVersion,
+                             ArtifactVersion artifactVersion,
+                             ResourceConfig resourceConfig,
+                             String modelSetVersion,
+                             MissingModelPolicy missingModelPolicy,
+                             String detectionBatchIdOverride) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "检测任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "检测阶段标识");
         this.configVersion = ValueUtils.requireNotBlank(configVersion, "检测配置版本");
@@ -89,6 +107,9 @@ public final class RahaDetectRequest {
             throw new IllegalArgumentException("检测缺失模型策略不能为空");
         }
         this.missingModelPolicy = missingModelPolicy;
+        this.detectionBatchIdOverride = detectionBatchIdOverride == null
+                || detectionBatchIdOverride.trim().isEmpty()
+                ? null : detectionBatchIdOverride.trim();
     }
 
     public String getJobId() { return jobId; }
@@ -102,5 +123,9 @@ public final class RahaDetectRequest {
     public String getModelSetVersion() { return modelSetVersion; }
     public MissingModelPolicy getMissingModelPolicy() {
         return missingModelPolicy;
+    }
+    public String getDetectionBatchId() {
+        return detectionBatchIdOverride == null
+                ? jobId : detectionBatchIdOverride;
     }
 }

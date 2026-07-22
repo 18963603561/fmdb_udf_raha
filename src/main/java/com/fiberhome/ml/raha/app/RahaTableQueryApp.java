@@ -50,7 +50,7 @@ public final class RahaTableQueryApp {
     private static final String DEFAULT_XLS_PROPERTY =
             "raha.query.default-xls";
     /** 默认查询表，配合 person_info 本地数据集使用。 */
-    private static final String DEFAULT_TABLE = "dw.raha_job_run";
+    private static final String DEFAULT_TABLE = "dw.raha_wide_50x10000";
     /** 默认查询行数，避免一次性拉取过多数据到 Driver。 */
     private static final int DEFAULT_LIMIT = 100;
     /** 控制台最多打印行数，和默认查询行数保持一致。 */

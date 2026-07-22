@@ -20,6 +20,10 @@ public final class ResourceConfig {
     private final long cacheThresholdBytes;
     /** 单阶段最大运行时间，单位毫秒。 */
     private final long stageTimeoutMillis;
+    /** 是否启用批内字段特征并行组装。 */
+    private final boolean featureParallelEnabled;
+    /** 是否启用批内字段本地并行聚类。 */
+    private final boolean clusteringParallelEnabled;
 
     public ResourceConfig(int maxParallelStrategies,
                           int maxParallelColumns,
@@ -29,7 +33,7 @@ public final class ResourceConfig {
         this(maxParallelStrategies, maxParallelColumns, broadcastThresholdBytes,
                 cacheStorageLevel,
                 RahaDefaultConfigProvider.factory().resourceCacheThresholdBytes(),
-                stageTimeoutMillis);
+                stageTimeoutMillis, true, true);
     }
 
     public ResourceConfig(int maxParallelStrategies,
@@ -38,12 +42,27 @@ public final class ResourceConfig {
                           String cacheStorageLevel,
                           long cacheThresholdBytes,
                           long stageTimeoutMillis) {
+        this(maxParallelStrategies, maxParallelColumns,
+                broadcastThresholdBytes, cacheStorageLevel,
+                cacheThresholdBytes, stageTimeoutMillis, true, true);
+    }
+
+    public ResourceConfig(int maxParallelStrategies,
+                          int maxParallelColumns,
+                          long broadcastThresholdBytes,
+                          String cacheStorageLevel,
+                          long cacheThresholdBytes,
+                          long stageTimeoutMillis,
+                          boolean featureParallelEnabled,
+                          boolean clusteringParallelEnabled) {
         this.maxParallelStrategies = maxParallelStrategies;
         this.maxParallelColumns = maxParallelColumns;
         this.broadcastThresholdBytes = broadcastThresholdBytes;
         this.cacheStorageLevel = cacheStorageLevel;
         this.cacheThresholdBytes = cacheThresholdBytes;
         this.stageTimeoutMillis = stageTimeoutMillis;
+        this.featureParallelEnabled = featureParallelEnabled;
+        this.clusteringParallelEnabled = clusteringParallelEnabled;
     }
 
     public static ResourceConfig defaults() {
@@ -74,12 +93,22 @@ public final class ResourceConfig {
         return stageTimeoutMillis;
     }
 
+    public boolean isFeatureParallelEnabled() {
+        return featureParallelEnabled;
+    }
+
+    public boolean isClusteringParallelEnabled() {
+        return clusteringParallelEnabled;
+    }
+
     String toCanonicalString() {
         return ConfigTextUtils.token(maxParallelStrategies)
                 + ConfigTextUtils.token(maxParallelColumns)
                 + ConfigTextUtils.token(broadcastThresholdBytes)
                 + ConfigTextUtils.token(cacheStorageLevel)
                 + ConfigTextUtils.token(cacheThresholdBytes)
-                + ConfigTextUtils.token(stageTimeoutMillis);
+                + ConfigTextUtils.token(stageTimeoutMillis)
+                + ConfigTextUtils.token(featureParallelEnabled)
+                + ConfigTextUtils.token(clusteringParallelEnabled);
     }
 }

@@ -40,10 +40,25 @@ public final class ClusterStageHandler implements StageHandler {
         ArtifactVersion version = new ArtifactVersion(
                 context.getJob().getConfigVersion(), context.getJob().getSnapshotId(),
                 context.getStage().getStageId(), context.getStage().getAttemptId());
-        ClusteringBatchResult result = clusteringService.clusterAndSave(
-                context.getJob().getJobId(), (FeatureAssemblyResult) featureValue,
-                context.getConfig().getClusteringConfig(), context.getConfig().getRandomSeed(),
-                version);
+        ClusteringBatchResult result;
+        if (context.getConfig().getResourceConfig()
+                .isClusteringParallelEnabled()) {
+            result = clusteringService.clusterAndSaveParallel(
+                    context.getJob().getJobId(),
+                    (FeatureAssemblyResult) featureValue,
+                    context.getConfig().getClusteringConfig(),
+                    context.getConfig().getRandomSeed(), version,
+                    context.getConfig().getResourceConfig()
+                            .getMaxParallelColumns(),
+                    context.getConfig().getResourceConfig()
+                            .getStageTimeoutMillis());
+        } else {
+            result = clusteringService.clusterAndSave(
+                    context.getJob().getJobId(),
+                    (FeatureAssemblyResult) featureValue,
+                    context.getConfig().getClusteringConfig(),
+                    context.getConfig().getRandomSeed(), version);
+        }
         context.getAttributes().put(StageAttributeKeys.CLUSTERING_BATCH_RESULT, result);
         return result.getMetrics().getAssignmentCount() == 0L
                 ? StageResult.skipped("当前特征没有可用聚类成员") : StageResult.success();

@@ -5,7 +5,11 @@ import com.fiberhome.ml.raha.job.domain.JobRunResult;
 import com.fiberhome.ml.raha.job.domain.RahaJob;
 import com.fiberhome.ml.raha.job.execution.RahaJobOrchestrator;
 import com.fiberhome.ml.raha.job.stage.core.StageHandler;
+import com.fiberhome.ml.raha.job.stage.batch.ColumnBatchStageHandler;
 import com.fiberhome.ml.raha.repository.port.StageRepository;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatch;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchExecutionCoordinator;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -27,6 +31,8 @@ public final class RahaTaskApplicationService {
     private final StageRepository stageRepository;
     /** 可选最小任务请求工厂，默认运行时会自动提供。 */
     private final RahaTaskRequestFactory requestFactory;
+    /** 默认运行时提供的 driver 侧列批协调器。 */
+    private final ColumnBatchExecutionCoordinator columnBatchCoordinator;
 
     /**
      * 使用默认运行时装配创建任务应用服务。
@@ -48,6 +54,16 @@ public final class RahaTaskApplicationService {
                                       RahaWorkflowRegistry workflowRegistry,
                                       StageRepository stageRepository,
                                       RahaTaskRequestFactory requestFactory) {
+        this(jobOrchestrator, workflowRegistry, stageRepository,
+                requestFactory, null);
+    }
+
+    RahaTaskApplicationService(
+            RahaJobOrchestrator jobOrchestrator,
+            RahaWorkflowRegistry workflowRegistry,
+            StageRepository stageRepository,
+            RahaTaskRequestFactory requestFactory,
+            ColumnBatchExecutionCoordinator columnBatchCoordinator) {
         if (jobOrchestrator == null || workflowRegistry == null || stageRepository == null) {
             throw new IllegalArgumentException("统一任务应用服务依赖不能为空");
         }
@@ -55,6 +71,7 @@ public final class RahaTaskApplicationService {
         this.workflowRegistry = workflowRegistry;
         this.stageRepository = stageRepository;
         this.requestFactory = requestFactory;
+        this.columnBatchCoordinator = columnBatchCoordinator;
     }
 
     /**
@@ -65,7 +82,8 @@ public final class RahaTaskApplicationService {
     RahaTaskApplicationService(
             RahaTaskApplicationServiceFactory.DefaultComponents components) {
         this(components.getJobOrchestrator(), components.getWorkflowRegistry(),
-                components.getStageRepository(), components.getRequestFactory());
+                components.getStageRepository(), components.getRequestFactory(),
+                components.getColumnBatchCoordinator());
     }
 
     /**
@@ -93,6 +111,23 @@ public final class RahaTaskApplicationService {
         LOGGER.info("开始统一执行 Raha 任务，jobType={}，datasetId={}，forceRun={}",
                 request.getConfig().getJobType(), request.getConfig().getDatasetId(),
                 Boolean.valueOf(request.isForceRun()));
+        if (!request.isColumnBatchChild()
+                && request.getColumnBatchOptions().isEnabled()) {
+            if (columnBatchCoordinator == null) {
+                throw new IllegalStateException("当前运行时未装配列批协调器");
+            }
+            if (columnBatchCoordinator.shouldBatch(request)) {
+                return executeColumnBatches(request);
+            }
+        }
+        return executeSingle(request);
+    }
+
+    /**
+     * 执行不再拆分的普通任务或列批子任务。
+     */
+    private RahaTaskExecutionResult executeSingle(
+            RahaTaskExecutionRequest request) {
         RahaJob job = jobOrchestrator.submit(request.getConfig());
         if (job.getStatus() != JobStatus.CREATED) {
             // 相同幂等任务已经执行或正在执行时返回已有状态，禁止重复运行阶段。
@@ -112,6 +147,38 @@ public final class RahaTaskApplicationService {
         LOGGER.info("统一 Raha 任务执行完成，jobId={}，status={}，stageCount={}",
                 runResult.getJob().getJobId(), runResult.getJob().getStatus(),
                 runResult.getStages().size());
+        return RahaTaskExecutionResult.executed(runResult, resultSummary);
+    }
+
+    /**
+     * 创建父任务并在单个编排阶段中执行全部列批子任务。
+     */
+    private RahaTaskExecutionResult executeColumnBatches(
+            RahaTaskExecutionRequest request) {
+        RahaJob parentJob = jobOrchestrator.submit(request.getConfig());
+        if (parentJob.getStatus() != JobStatus.CREATED) {
+            LOGGER.info("复用已有列批父任务，parentJobId={}，status={}",
+                    parentJob.getJobId(), parentJob.getStatus());
+            return RahaTaskExecutionResult.reused(parentJob,
+                    stageRepository.findByJobId(parentJob.getJobId()), request,
+                    jobOrchestrator.findResultSummary(parentJob));
+        }
+        List<ColumnBatch> batches = columnBatchCoordinator.plan(
+                request, parentJob.getJobId());
+        LOGGER.info("列批父任务已创建，parentJobId={}，batchCount={}，"
+                        + "columnBatchSize={}",
+                parentJob.getJobId(), batches.size(),
+                request.getColumnBatchOptions().getColumnBatchSize());
+        StageHandler handler = new ColumnBatchStageHandler(request, batches,
+                columnBatchCoordinator, this::executeSingle);
+        JobRunResult runResult = jobOrchestrator.execute(parentJob,
+                request.getConfig(), Collections.singletonList(handler));
+        Map<String, Object> resultSummary =
+                RahaTaskResultSummaryBuilder.build(request, runResult);
+        jobOrchestrator.saveResultSummary(runResult.getJob(), resultSummary);
+        LOGGER.info("列批父任务执行完成，parentJobId={}，status={}，batchCount={}",
+                runResult.getJob().getJobId(), runResult.getJob().getStatus(),
+                batches.size());
         return RahaTaskExecutionResult.executed(runResult, resultSummary);
     }
 }

@@ -52,6 +52,11 @@ final class RahaTaskResultSummaryBuilder {
                 StageAttributeKeys.TRAIN_OUTPUT, RahaTrainOutput.class));
         appendDetectSummary(result, request, runResult, payload(attributes,
                 StageAttributeKeys.DETECT_OUTPUT, RahaDetectOutput.class));
+        Object batchSummary = attributes.get(
+                StageAttributeKeys.COLUMN_BATCH_SUMMARY);
+        if (batchSummary instanceof Map) {
+            result.putAll((Map<String, Object>) batchSummary);
+        }
         return result;
     }
 

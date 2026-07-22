@@ -247,6 +247,25 @@ public final class RahaJobConfig {
     }
 
     /**
+     * 创建只覆盖策略字段范围的任务配置副本。
+     *
+     * @param newStrategyConfig 当前列批策略配置
+     * @return 保留其他执行参数的新配置
+     */
+    public RahaJobConfig withStrategyConfig(
+            StrategyConfig newStrategyConfig) {
+        if (newStrategyConfig == null) {
+            throw new IllegalArgumentException("任务策略配置不能为空");
+        }
+        return new RahaJobConfig(jobType, datasetId, snapshotId,
+                inputReference, rowIdentityConfig, randomSeed,
+                newStrategyConfig, featureConfig, modelConfig,
+                clusteringConfig, samplingConfig, resourceConfig,
+                failureToleranceConfig, executionConfigFingerprint,
+                executionInputFingerprint);
+    }
+
+    /**
      * 生成用于配置版本计算的规范文本。
      *
      * <p>该文本只用于稳定摘要和版本比较，不应作为外部展示格式或持久化协议。</p>

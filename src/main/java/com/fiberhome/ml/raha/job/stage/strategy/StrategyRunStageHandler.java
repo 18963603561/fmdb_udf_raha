@@ -51,7 +51,9 @@ public final class StrategyRunStageHandler implements StageHandler {
                 context.getStage().getStageId(), context.getStage().getAttemptId());
         StrategyBatchResult result = executionService.execute(
                 context.getJob().getJobId(), context.getStage().getStageId(), dataset, plans,
-                context.getConfig().getStrategyConfig().getStrategyTimeoutMillis(), version);
+                context.getConfig().getStrategyConfig().getStrategyTimeoutMillis(), version,
+                context.getConfig().getResourceConfig().getMaxParallelStrategies(),
+                context.getConfig().getResourceConfig().getStageTimeoutMillis());
         context.getAttributes().put(StageAttributeKeys.STRATEGY_BATCH_RESULT, result);
         context.getAttributes().put(StageAttributeKeys.STRATEGY_HITS, result.getHits());
         if (result.getFailedCount() > 0L) {

@@ -6,6 +6,8 @@ package com.fiberhome.ml.raha.data.type;
 public enum StageType {
     /** 初始化任务和配置。 */
     INITIALIZE,
+    /** 在 driver 侧编排训练或检测字段子批次。 */
+    COLUMN_BATCH,
     /** 读取输入数据和快照。 */
     LOAD_DATA,
     /** 合并持久化 c1、标注批次和当前 o1，生成训练快照。 */

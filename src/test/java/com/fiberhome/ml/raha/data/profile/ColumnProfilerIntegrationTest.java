@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -88,6 +89,18 @@ class ColumnProfilerIntegrationTest {
         assertEquals(1L, note.getBlankCount());
         assertEquals(1, profiled.getProfiles().get("id").getMinLength());
         assertEquals(1, profiled.getProfiles().get("id").getMaxLength());
+    }
+
+    @Test
+    void shouldOnlyProfileDetectableColumnsForColumnBatchWorkflow() {
+        Map<String, ColumnProfile> profiles = new ColumnProfiler()
+                .profileDetectable(dataset());
+
+        assertEquals(3, profiles.size());
+        assertFalse(profiles.containsKey("id"));
+        assertTrue(profiles.containsKey("amount"));
+        assertTrue(profiles.containsKey("code"));
+        assertTrue(profiles.containsKey("note"));
     }
 
     private static RahaDataset dataset() {

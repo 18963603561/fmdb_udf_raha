@@ -118,7 +118,8 @@ public final class RahaUdfDriverApp {
         String request = readRequest(resolvedArgs[REQUEST_ARG_INDEX]);
         SparkSession spark = SparkSession.builder()
                 .appName("RahaUdfDriverApp-" + functionName)
-                .master(System.getProperty("raha.spark.master", "local[*]"))
+                .master(System.getProperty("raha.spark.master",
+                        System.getProperty("spark.master", "local[*]")))
                 .enableHiveSupport()
                 .getOrCreate();
         SparkSession.setActiveSession(spark);

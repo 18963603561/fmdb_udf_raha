@@ -42,10 +42,31 @@ public final class ColumnProfileService {
      * @return 绑定画像的新数据集
      */
     public RahaDataset profileAndSave(RahaDataset dataset, ArtifactVersion version) {
+        return profileAndSave(dataset, version, false);
+    }
+
+    /**
+     * 只画像并保存当前任务可检测字段。
+     *
+     * @param dataset 已加载数据集
+     * @param version 画像阶段版本
+     * @return 绑定当前字段画像的新数据集
+     */
+    public RahaDataset profileDetectableAndSave(
+            RahaDataset dataset,
+            ArtifactVersion version) {
+        return profileAndSave(dataset, version, true);
+    }
+
+    private RahaDataset profileAndSave(RahaDataset dataset,
+                                       ArtifactVersion version,
+                                       boolean detectableOnly) {
         if (dataset == null || version == null) {
             throw new IllegalArgumentException("数据集和画像版本不能为空");
         }
-        Map<String, ColumnProfile> profiles = columnProfiler.profile(dataset);
+        Map<String, ColumnProfile> profiles = detectableOnly
+                ? columnProfiler.profileDetectable(dataset)
+                : columnProfiler.profile(dataset);
         profileRepository.saveAll(dataset.getDatasetId(), dataset.getSnapshotId(),
                 profiles, version, clock.millis());
         LOGGER.info("列画像持久化完成，datasetId={}，snapshotId={}，profileCount={}",

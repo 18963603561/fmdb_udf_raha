@@ -63,7 +63,8 @@ public final class DetectionWorkflow extends AbstractRahaWorkflow {
         }
         List<StageHandler> handlers = preparationStages(request);
         handlers.add(new PublishedModelDetectionStageHandler(detectService,
-                request.getModelSetVersion(), request.getMissingModelPolicy()));
+                request.getModelSetVersion(), request.getMissingModelPolicy(),
+                request.getDetectionBatchIdOverride()));
         if (request.getEvaluator() != null) {
             handlers.add(new EvaluationStageHandler(request.getEvaluator()));
         }

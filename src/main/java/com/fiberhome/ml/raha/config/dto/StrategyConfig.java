@@ -123,6 +123,35 @@ public final class StrategyConfig {
         return strategyPriorities;
     }
 
+    /**
+     * 创建限制到当前列批的策略配置。
+     *
+     * <p>RVD 开启时仍只会在传入字段内部枚举字段对；关闭时会从策略族中移除 RVD，
+     * 防止外部默认配置意外突破列批边界。</p>
+     *
+     * @param columns 当前列批字段
+     * @param batchRvdEnabled 是否启用批内 RVD
+     * @return 列批策略配置
+     */
+    public StrategyConfig withColumnBatch(Set<String> columns,
+                                          boolean batchRvdEnabled) {
+        if (columns == null || columns.isEmpty()) {
+            throw new IllegalArgumentException("策略列批字段不能为空");
+        }
+        Set<StrategyFamily> families = strategyFamilies.isEmpty()
+                ? EnumSet.noneOf(StrategyFamily.class)
+                : EnumSet.copyOf(strategyFamilies);
+        if (batchRvdEnabled) {
+            families.add(StrategyFamily.RVD);
+        } else {
+            families.remove(StrategyFamily.RVD);
+        }
+        return new StrategyConfig(families, maxStrategyCount, columns,
+                excludedColumns, maxRvdColumnPairs, strategyTimeoutMillis,
+                strategyFilteringEnabled, includedStrategyTypes,
+                excludedStrategyTypes, strategyPriorities);
+    }
+
     String toCanonicalString() {
         return ConfigTextUtils.sortedTokens(strategyFamilies)
                 + ConfigTextUtils.token(maxStrategyCount)

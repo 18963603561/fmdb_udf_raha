@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.service.task;
 
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchOptions;
 import com.fiberhome.ml.raha.util.ValueUtils;
 
 /**
@@ -22,13 +23,16 @@ public final class TrainingRequestOptions {
     private final String requestedSnapshotId;
     /** 是否复用采样阶段固化的快照检查点。 */
     private final boolean reuseSnapshotCheckpoint;
+    /** 训练字段列批参数。 */
+    private final ColumnBatchOptions columnBatchOptions;
 
     public TrainingRequestOptions(boolean allowPartialAnnotation,
                                   String modelNamePrefix,
                                   LabelPropagationMethod propagationMethod,
                                   FmdbInputSpec inputOverride) {
         this(allowPartialAnnotation, modelNamePrefix, propagationMethod,
-                inputOverride, ExecutionOverrideOptions.DEFAULT);
+                inputOverride, ExecutionOverrideOptions.DEFAULT, null, false,
+                ColumnBatchOptions.disabled());
     }
 
     public TrainingRequestOptions(boolean allowPartialAnnotation,
@@ -37,7 +41,8 @@ public final class TrainingRequestOptions {
                                   FmdbInputSpec inputOverride,
                                   ExecutionOverrideOptions executionOverrideOptions) {
         this(allowPartialAnnotation, modelNamePrefix, propagationMethod,
-                inputOverride, executionOverrideOptions, null, false);
+                inputOverride, executionOverrideOptions, null, false,
+                ColumnBatchOptions.disabled());
     }
 
     public TrainingRequestOptions(boolean allowPartialAnnotation,
@@ -47,6 +52,19 @@ public final class TrainingRequestOptions {
                                   ExecutionOverrideOptions executionOverrideOptions,
                                   String requestedSnapshotId,
                                   boolean reuseSnapshotCheckpoint) {
+        this(allowPartialAnnotation, modelNamePrefix, propagationMethod,
+                inputOverride, executionOverrideOptions, requestedSnapshotId,
+                reuseSnapshotCheckpoint, ColumnBatchOptions.disabled());
+    }
+
+    public TrainingRequestOptions(boolean allowPartialAnnotation,
+                                  String modelNamePrefix,
+                                  LabelPropagationMethod propagationMethod,
+                                  FmdbInputSpec inputOverride,
+                                  ExecutionOverrideOptions executionOverrideOptions,
+                                  String requestedSnapshotId,
+                                  boolean reuseSnapshotCheckpoint,
+                                  ColumnBatchOptions columnBatchOptions) {
         this.allowPartialAnnotation = allowPartialAnnotation;
         this.modelNamePrefix = ValueUtils.requireNotBlank(
                 modelNamePrefix, "训练模型名称前缀");
@@ -59,6 +77,12 @@ public final class TrainingRequestOptions {
                 ? ExecutionOverrideOptions.DEFAULT : executionOverrideOptions;
         this.requestedSnapshotId = trimToNull(requestedSnapshotId);
         this.reuseSnapshotCheckpoint = reuseSnapshotCheckpoint;
+        this.columnBatchOptions = columnBatchOptions == null
+                ? ColumnBatchOptions.disabled() : columnBatchOptions;
+        if (reuseSnapshotCheckpoint && this.columnBatchOptions.isEnabled()) {
+            throw new IllegalArgumentException(
+                    "列批训练不能直接复用包含全字段特征的快照检查点");
+        }
     }
 
     /**
@@ -80,6 +104,7 @@ public final class TrainingRequestOptions {
     }
     public String getRequestedSnapshotId() { return requestedSnapshotId; }
     public boolean isReuseSnapshotCheckpoint() { return reuseSnapshotCheckpoint; }
+    public ColumnBatchOptions getColumnBatchOptions() { return columnBatchOptions; }
 
     private static String trimToNull(String value) {
         return value == null || value.trim().isEmpty() ? null : value.trim();

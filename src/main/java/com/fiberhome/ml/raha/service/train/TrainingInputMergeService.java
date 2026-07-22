@@ -193,8 +193,10 @@ public final class TrainingInputMergeService {
                 original.getColumns(), merged, original.getSchemaHash(),
                 Collections.emptyMap());
         // 合并后的集合必须重新画像，不能把 o1 或采样快照画像直接当作训练画像。
-        trainingDataset = trainingDataset.withProfiles(columnProfiler.profile(
-                trainingDataset));
+        trainingDataset = trainingDataset.withProfiles(
+                request.isColumnBatchChild()
+                        ? columnProfiler.profileDetectable(trainingDataset)
+                        : columnProfiler.profile(trainingDataset));
         List<CellLabel> labels = remapLabels(annotations, original.getDatasetId(),
                 trainingSnapshotId);
         Map<String, Object> context = context(request, original, samples, annotations,
@@ -293,8 +295,9 @@ public final class TrainingInputMergeService {
                     "ordinal")).intValue()
                     || column.isNullable() != Boolean.TRUE.equals(
                     definition.get("nullable"))
-                    || column.isDetectable() != Boolean.TRUE.equals(
-                    definition.get("detectable"))) {
+                    // 列批子任务可以收窄可检测字段，但不能启用采样时已禁用的字段。
+                    || (column.isDetectable()
+                    && !Boolean.TRUE.equals(definition.get("detectable")))) {
                 throw new IllegalArgumentException("c1 与 o1 字段模式或检测属性不兼容："
                         + column.getName());
             }

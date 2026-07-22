@@ -146,7 +146,9 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
             handlers.add(new ModelTrainingStageHandler(trainService,
                     request.getTrainingConfig(), request.getModelNamePrefix(),
                     request.getPropagationMethod(),
-                    request.getPropagationConfig()));
+                    request.getPropagationConfig(),
+                    request.getModelSetVersionOverride(),
+                    request.getModelCompatibilityVersionOverride()));
             if (request.getEvaluator() != null) {
                 handlers.add(new EvaluationStageHandler(request.getEvaluator()));
             }
@@ -163,7 +165,8 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
             // 合并必须紧随数据加载，确保画像及全部训练派生产物只处理新快照。
             handlers.add(1, new TrainingInputMergeStageHandler(inputMergeService,
                     request.getTrainingBatchReferences(),
-                    request.getRowIdentityConfig()));
+                    request.getRowIdentityConfig(),
+                    request.isColumnBatchChild()));
         }
         handlers.add(new ClusterStageHandler(clusteringService));
         handlers.add(new DirectLabelStageHandler(request.getLabels()));
@@ -171,7 +174,9 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
                 request.getPropagationMethod(), request.getPropagationConfig()));
         handlers.add(new ModelTrainingStageHandler(trainService,
                 request.getTrainingConfig(), request.getModelNamePrefix(),
-                request.getPropagationMethod(), request.getPropagationConfig()));
+                request.getPropagationMethod(), request.getPropagationConfig(),
+                request.getModelSetVersionOverride(),
+                request.getModelCompatibilityVersionOverride()));
         if (request.getEvaluator() != null) {
             handlers.add(new EvaluationStageHandler(request.getEvaluator()));
         }

@@ -77,22 +77,35 @@ public final class RowIdentityService {
                     hashColumn(source, keySchema, config));
         }
 
-        WindowSpec groupWindow = Window.partitionBy(
-                functions.col(RowIdentityColumns.ROW_ID));
-        List<Column> ordering = representativeOrdering(businessSchema);
-        WindowSpec representativeWindow = groupWindow.orderBy(
-                ordering.toArray(new Column[0]));
-        Dataset<Row> ranked = identified
-                .withColumn(RowIdentityColumns.DUPLICATE_COUNT,
-                        functions.count(functions.lit(1L)).over(groupWindow))
-                .withColumn(RowIdentityColumns.REPRESENTATIVE_ORDER,
-                        functions.row_number().over(representativeWindow));
-        Dataset<Row> deduplicated = ranked.filter(functions.col(
-                        RowIdentityColumns.REPRESENTATIVE_ORDER).equalTo(1))
-                .drop(RowIdentityColumns.REPRESENTATIVE_ORDER);
-        long logicalCount = deduplicated.count();
-        long conflictCount = config.getMode() == RowIdentityMode.SOURCE_KEY
-                ? countKeyConflicts(identified) : 0L;
+        long logicalCount = identified.select(
+                        functions.col(RowIdentityColumns.ROW_ID))
+                .distinct().count();
+        Dataset<Row> deduplicated;
+        long conflictCount;
+        // 业务键全局唯一时不构造宽表排序窗口，避免 Spark 约束推导随字段数急剧膨胀。
+        if (logicalCount == sourceCount) {
+            deduplicated = identified.withColumn(
+                    RowIdentityColumns.DUPLICATE_COUNT, functions.lit(1L));
+            conflictCount = 0L;
+            LOGGER.info("逻辑行标识全局唯一，跳过窗口去重，sourceRowCount={}",
+                    sourceCount);
+        } else {
+            WindowSpec groupWindow = Window.partitionBy(
+                    functions.col(RowIdentityColumns.ROW_ID));
+            List<Column> ordering = representativeOrdering(businessSchema);
+            WindowSpec representativeWindow = groupWindow.orderBy(
+                    ordering.toArray(new Column[0]));
+            Dataset<Row> ranked = identified
+                    .withColumn(RowIdentityColumns.DUPLICATE_COUNT,
+                            functions.count(functions.lit(1L)).over(groupWindow))
+                    .withColumn(RowIdentityColumns.REPRESENTATIVE_ORDER,
+                            functions.row_number().over(representativeWindow));
+            deduplicated = ranked.filter(functions.col(
+                            RowIdentityColumns.REPRESENTATIVE_ORDER).equalTo(1))
+                    .drop(RowIdentityColumns.REPRESENTATIVE_ORDER);
+            conflictCount = config.getMode() == RowIdentityMode.SOURCE_KEY
+                    ? countKeyConflicts(identified) : 0L;
+        }
         long discardedCount = sourceCount - logicalCount;
         RowIdentityMetrics metrics = new RowIdentityMetrics(sourceCount,
                 logicalCount, discardedCount, conflictCount);

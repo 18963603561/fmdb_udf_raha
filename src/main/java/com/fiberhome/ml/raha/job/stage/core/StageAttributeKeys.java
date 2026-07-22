@@ -7,6 +7,9 @@ package com.fiberhome.ml.raha.job.stage.core;
  */
 public final class StageAttributeKeys {
 
+    /** 父任务列批阶段写入的子任务轨迹和字段级汇总。 */
+    public static final String COLUMN_BATCH_SUMMARY = "columnBatchSummary";
+
     /** 步骤 1：数据加载阶段写入，表示已加载且只读的 Raha 数据集，供画像、策略和模型阶段复用。 */
     public static final String RAHA_DATASET = "rahaDataset";
     /** 步骤 1：数据加载阶段写入，表示输入数据快照元数据，供任务绑定快照和结果追溯使用。 */

@@ -195,6 +195,21 @@ public final class FmdbInputSpec {
     }
 
     /**
+     * 创建只处理指定字段的输入规格副本。
+     *
+     * @param columns 当前列批字段白名单
+     * @return 保留来源、版本和行身份的新输入规格
+     */
+    public FmdbInputSpec withIncludedColumns(Set<String> columns) {
+        if (columns == null || columns.isEmpty()) {
+            throw new IllegalArgumentException("FMDB 列批字段不能为空");
+        }
+        return new FmdbInputSpec(datasetId, inputReference, tableName, format,
+                rowIdentityConfig, snapshotId, sourceVersion, options, columns,
+                excludedColumns, sensitiveColumns);
+    }
+
+    /**
      * 转换为底层数据加载请求。
      *
      * @param fallbackIdentity 规格未明确声明时使用的行身份规则

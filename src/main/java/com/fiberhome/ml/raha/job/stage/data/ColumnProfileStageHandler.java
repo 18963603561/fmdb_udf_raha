@@ -16,12 +16,20 @@ public final class ColumnProfileStageHandler implements StageHandler {
 
     /** 列画像服务。 */
     private final ColumnProfileService profileService;
+    /** 是否只画像当前列批可检测字段。 */
+    private final boolean detectableOnly;
 
     public ColumnProfileStageHandler(ColumnProfileService profileService) {
+        this(profileService, false);
+    }
+
+    public ColumnProfileStageHandler(ColumnProfileService profileService,
+                                     boolean detectableOnly) {
         if (profileService == null) {
             throw new IllegalArgumentException("列画像服务不能为空");
         }
         this.profileService = profileService;
+        this.detectableOnly = detectableOnly;
     }
 
     @Override
@@ -40,7 +48,9 @@ public final class ColumnProfileStageHandler implements StageHandler {
         ArtifactVersion version = new ArtifactVersion(
                 context.getJob().getConfigVersion(), dataset.getSnapshotId(),
                 context.getStage().getStageId(), context.getStage().getAttemptId());
-        RahaDataset profiledDataset = profileService.profileAndSave(dataset, version);
+        RahaDataset profiledDataset = detectableOnly
+                ? profileService.profileDetectableAndSave(dataset, version)
+                : profileService.profileAndSave(dataset, version);
         context.getAttributes().put(StageAttributeKeys.RAHA_DATASET, profiledDataset);
         return StageResult.success();
     }

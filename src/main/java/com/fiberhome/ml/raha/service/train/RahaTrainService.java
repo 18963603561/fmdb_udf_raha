@@ -322,12 +322,21 @@ public final class RahaTrainService {
             ModelSourceKey modelSource = ModelSourceKey.fromDatasetAndTable(
                     request.getDataset().getDatasetId(),
                     request.getDataset().getTableName());
-            String modelSetVersion = ModelReadableVersioner.modelSetVersion(
-                    modelSource.getSourceName(), clock.millis(), request.getJobId());
-            LOGGER.info("生成可读模型集合版本，jobId={}，datasetId={}，"
-                            + "sourceName={}，modelSetVersion={}",
+            String modelSetVersion = request.getModelSetVersionOverride() == null
+                    ? ModelReadableVersioner.modelSetVersion(
+                    modelSource.getSourceName(), clock.millis(), request.getJobId())
+                    : request.getModelSetVersionOverride();
+            String modelCompatibilityVersion =
+                    request.getModelCompatibilityVersionOverride() == null
+                    ? planVersion
+                    : request.getModelCompatibilityVersionOverride();
+            LOGGER.info("确定模型集合公共版本，jobId={}，datasetId={}，"
+                            + "sourceName={}，modelSetVersion={}，"
+                            + "modelCompatibilityVersion={}，override={}",
                     request.getJobId(), request.getDataset().getDatasetId(),
-                    modelSource.getSourceName(), modelSetVersion);
+                    modelSource.getSourceName(), modelSetVersion,
+                    modelCompatibilityVersion,
+                    Boolean.valueOf(request.getModelSetVersionOverride() != null));
             Map<String, ColumnTrainingDataset> builtDatasetsForTraining = null;
             TrainingArtifactMaterializationResult materialization = null;
             if (mergeResult != null) {
@@ -339,7 +348,8 @@ public final class RahaTrainService {
                 builtDatasetsForTraining = builtDatasets;
                 materialization =
                         artifactMaterializationService.materialize(mergeResult, features,
-                        clustering, trainingPropagation, modelSetVersion, planVersion,
+                        clustering, trainingPropagation, modelSetVersion,
+                        modelCompatibilityVersion,
                         builtDatasets, profileJsonByColumn(request.getDataset()),
                         strategyPlanJsonByColumn(plans, strategyBatch));
                 LOGGER.debug("训练审计记录已提交，jobId={}，modelSetVersion={}",
@@ -362,6 +372,7 @@ public final class RahaTrainService {
                 trainingItems.add(new ParallelWorkItem<String, ColumnTrainingOutcome>(
                         entry.getKey(), () -> trainColumn(trainingRequest, trainingFeatures,
                         trainingPropagation, planVersion, modelSetVersion,
+                        modelCompatibilityVersion,
                         entry.getKey(), entry.getValue(), trainingDatasets)));
             }
             ParallelBatchResult<String, ColumnTrainingOutcome> parallelTraining =
@@ -389,11 +400,12 @@ public final class RahaTrainService {
                 }
             }
             RahaTrainOutput output = new RahaTrainOutput(plans, strategyBatch, trainingFeatures,
-                    clustering, propagation, trainingResults, candidates, planVersion,
+                    clustering, propagation, trainingResults, candidates,
+                    modelCompatibilityVersion,
                     modelSetVersion, materialization);
             long completedAt = clock.millis();
             Map<String, String> details = details(plans, strategyBatch, trainingFeatures,
-                    propagation, candidates, planVersion,
+                    propagation, candidates, modelCompatibilityVersion,
                     parallelTraining.getMaxObservedConcurrency());
             RahaServiceSummary summary = new RahaServiceSummary(startedAt, completedAt,
                     trainingFeatures.getDictionaries().size(), candidates.size(), skippedCount,
@@ -449,6 +461,7 @@ public final class RahaTrainService {
                                               LabelPropagationResult propagation,
                                               String planVersion,
                                               String modelSetVersion,
+                                              String modelCompatibilityVersion,
                                               String columnName,
                                               FeatureDictionary dictionary,
                                               Map<String, ColumnTrainingDataset> frozenDatasets) {
@@ -471,7 +484,7 @@ public final class RahaTrainService {
                 ModelReadableVersioner.modelName(request.getModelNamePrefix(),
                         modelSource.getSourceName(), columnName),
                 request.getDataset().getDatasetId(),
-                request.getDataset().getSchemaHash(), planVersion,
+                request.getDataset().getSchemaHash(), modelCompatibilityVersion,
                 modelSetVersion, modelSource.getSourceName(), trainingDataset,
                 request.getConfig().getModelConfig(), request.getTrainingConfig());
         ColumnModelTrainingResult trainingResult = trainer.train(trainingRequest);
@@ -485,7 +498,7 @@ public final class RahaTrainService {
                 request.getDataset().getSchemaHash(),
                 request.getTrainingMergeResult() == null ? request.getJobId()
                         : request.getTrainingMergeResult().getTrainingBatchId(),
-                ModelStatus.CANDIDATE, planVersion,
+                ModelStatus.CANDIDATE, modelCompatibilityVersion,
                 "direct-input-v1", trainingResult.getMetrics(), clock.millis(), null,
                 request.getConfig().getRowIdentityConfig());
         String modelPath = modelStore.save(

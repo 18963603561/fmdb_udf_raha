@@ -137,7 +137,9 @@ public final class RahaConfigFactory {
                 properties.getLong("raha.resource.broadcast-threshold-bytes"),
                 properties.getRequired("raha.resource.cache-storage-level"),
                 properties.getLong("raha.resource.cache-threshold-bytes"),
-                properties.getLong("raha.resource.stage-timeout-millis"));
+                properties.getLong("raha.resource.stage-timeout-millis"),
+                properties.getBoolean("raha.feature.parallel-enabled"),
+                properties.getBoolean("raha.clustering.parallel-enabled"));
     }
 
     public FailureToleranceConfig failureToleranceConfig() {

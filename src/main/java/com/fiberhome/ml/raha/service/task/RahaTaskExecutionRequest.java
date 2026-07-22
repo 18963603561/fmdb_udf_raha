@@ -11,6 +11,8 @@ import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
 import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
 import com.fiberhome.ml.raha.model.training.LogisticRegressionTrainingConfig;
 import com.fiberhome.ml.raha.service.train.TrainingBatchReference;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchContext;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchOptions;
 import com.fiberhome.ml.raha.util.HashUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.ArrayList;
@@ -65,6 +67,16 @@ public final class RahaTaskExecutionRequest {
     private final ExecutionFingerprint executionFingerprint;
     /** 是否从采样快照检查点恢复训练前置产物。 */
     private final boolean reuseSnapshotCheckpoint;
+    /** 父请求使用的列批执行参数。 */
+    private final ColumnBatchOptions columnBatchOptions;
+    /** 子请求所属列批上下文，父请求和普通请求为空。 */
+    private final ColumnBatchContext columnBatchContext;
+    /** 列批训练共享的模型集合版本。 */
+    private final String modelSetVersionOverride;
+    /** 列批训练共享的模型兼容计划版本。 */
+    private final String modelCompatibilityVersionOverride;
+    /** 列批检测共享的检测批次标识。 */
+    private final String detectionBatchIdOverride;
 
     private RahaTaskExecutionRequest(RahaJobConfig config,
                                      DataLoadRequest dataLoadRequest,
@@ -86,7 +98,8 @@ public final class RahaTaskExecutionRequest {
                 annotationBatchId, annotationPartitionMonth, rowIdentityConfig,
                 legacyBatchReferences(sampleBatchId, samplePartitionMonth,
                         annotationBatchId, annotationPartitionMonth),
-                null, MissingModelPolicy.PARTIAL, null, false);
+                null, MissingModelPolicy.PARTIAL, null, false,
+                ColumnBatchOptions.disabled(), null, null, null, null);
     }
 
     private RahaTaskExecutionRequest(RahaJobConfig config,
@@ -107,7 +120,12 @@ public final class RahaTaskExecutionRequest {
                                      String modelSetVersion,
                                      MissingModelPolicy missingModelPolicy,
                                      ExecutionFingerprint executionFingerprint,
-                                     boolean reuseSnapshotCheckpoint) {
+                                     boolean reuseSnapshotCheckpoint,
+                                     ColumnBatchOptions columnBatchOptions,
+                                     ColumnBatchContext columnBatchContext,
+                                     String modelSetVersionOverride,
+                                     String modelCompatibilityVersionOverride,
+                                     String detectionBatchIdOverride) {
         if (config == null || dataLoadRequest == null) {
             throw new IllegalArgumentException("任务配置和数据加载请求不能为空");
         }
@@ -138,6 +156,13 @@ public final class RahaTaskExecutionRequest {
                 ? defaultExecutionFingerprint(config)
                 : executionFingerprint;
         this.reuseSnapshotCheckpoint = reuseSnapshotCheckpoint;
+        this.columnBatchOptions = columnBatchOptions == null
+                ? ColumnBatchOptions.disabled() : columnBatchOptions;
+        this.columnBatchContext = columnBatchContext;
+        this.modelSetVersionOverride = trimToNull(modelSetVersionOverride);
+        this.modelCompatibilityVersionOverride = trimToNull(
+                modelCompatibilityVersionOverride);
+        this.detectionBatchIdOverride = trimToNull(detectionBatchIdOverride);
         validateByType();
     }
 
@@ -229,7 +254,8 @@ public final class RahaTaskExecutionRequest {
                 propagationMethod, propagationConfig, trainingConfig,
                 modelNamePrefix, 0, null, null, null, null, null, null,
                 Collections.<TrainingBatchReference>emptyList(), null,
-                MissingModelPolicy.FAIL, null, true);
+                MissingModelPolicy.FAIL, null, true,
+                ColumnBatchOptions.disabled(), null, null, null, null);
     }
 
     public static RahaTaskExecutionRequest training(
@@ -285,7 +311,8 @@ public final class RahaTaskExecutionRequest {
                 first.getSampleBatchId(), first.getSamplePartitionMonth(),
                 first.getAnnotationBatchId(),
                 first.getAnnotationPartitionMonth(), rowIdentityConfig,
-                references, null, MissingModelPolicy.FAIL, null, false);
+                references, null, MissingModelPolicy.FAIL, null, false,
+                ColumnBatchOptions.disabled(), null, null, null, null);
     }
 
     public static RahaTaskExecutionRequest detection(
@@ -321,7 +348,8 @@ public final class RahaTaskExecutionRequest {
                 Collections.<CellLabel>emptyList(), null, null, null, null,
                 0, null, null, null, null, null, null,
                 Collections.<TrainingBatchReference>emptyList(),
-                modelSetVersion, missingModelPolicy, null, false);
+                modelSetVersion, missingModelPolicy, null, false,
+                ColumnBatchOptions.disabled(), null, null, null, null);
     }
 
     public static RahaTaskExecutionRequest sampling(
@@ -372,6 +400,9 @@ public final class RahaTaskExecutionRequest {
             if (modelSetVersion != null) {
                 throw new IllegalArgumentException("训练任务不能指定检测模型集合");
             }
+            if (detectionBatchIdOverride != null) {
+                throw new IllegalArgumentException("训练任务不能指定检测批次覆盖");
+            }
             if (propagationMethod == null || propagationConfig == null
                     || trainingConfig == null) {
                 throw new IllegalArgumentException("训练任务缺少传播或模型训练配置");
@@ -394,7 +425,8 @@ public final class RahaTaskExecutionRequest {
             throw new IllegalArgumentException("仅训练任务可以引用 c1 和标注批次");
         }
         if (jobType == JobType.SAMPLING) {
-            if (modelSetVersion != null) {
+            if (modelSetVersion != null || modelSetVersionOverride != null
+                    || detectionBatchIdOverride != null) {
                 throw new IllegalArgumentException("采样任务不能指定检测模型集合");
             }
             if (samplingRound <= 0) {
@@ -408,6 +440,14 @@ public final class RahaTaskExecutionRequest {
         if (modelSetVersion != null
                 && config.getExecutionInputFingerprint() == null) {
             throw new IllegalArgumentException("显式模型集合必须进入任务执行输入指纹");
+        }
+        if (modelSetVersionOverride != null
+                || modelCompatibilityVersionOverride != null) {
+            throw new IllegalArgumentException("检测任务不能指定训练模型版本覆盖");
+        }
+        if (columnBatchContext != null && !columnBatchOptions.isEnabled()
+                && detectionBatchIdOverride == null) {
+            throw new IllegalArgumentException("检测列批子任务必须指定父检测批次");
         }
     }
 
@@ -443,6 +483,14 @@ public final class RahaTaskExecutionRequest {
     public String getForceRunId() { return executionFingerprint.getForceRunId(); }
     public String getRunNonce() { return executionFingerprint.getRunNonce(); }
     public boolean isReuseSnapshotCheckpoint() { return reuseSnapshotCheckpoint; }
+    public ColumnBatchOptions getColumnBatchOptions() { return columnBatchOptions; }
+    public ColumnBatchContext getColumnBatchContext() { return columnBatchContext; }
+    public String getModelSetVersionOverride() { return modelSetVersionOverride; }
+    public String getModelCompatibilityVersionOverride() {
+        return modelCompatibilityVersionOverride;
+    }
+    public String getDetectionBatchIdOverride() { return detectionBatchIdOverride; }
+    public boolean isColumnBatchChild() { return columnBatchContext != null; }
 
     /**
      * 创建包含请求指纹元数据的新请求副本。
@@ -461,7 +509,65 @@ public final class RahaTaskExecutionRequest {
                 samplePartitionMonth, annotationBatchId,
                 annotationPartitionMonth, rowIdentityConfig,
                 trainingBatchReferences, modelSetVersion, missingModelPolicy,
-                fingerprint, reuseSnapshotCheckpoint);
+                fingerprint, reuseSnapshotCheckpoint, columnBatchOptions,
+                columnBatchContext, modelSetVersionOverride,
+                modelCompatibilityVersionOverride, detectionBatchIdOverride);
+    }
+
+    /**
+     * 创建携带父级列批参数的新请求副本。
+     *
+     * @param options 列批执行参数
+     * @return 保留业务输入的新父请求
+     */
+    public RahaTaskExecutionRequest withColumnBatchOptions(
+            ColumnBatchOptions options) {
+        if (options == null) {
+            throw new IllegalArgumentException("列批执行参数不能为空");
+        }
+        return new RahaTaskExecutionRequest(config, dataLoadRequest, labels,
+                propagationMethod, propagationConfig, trainingConfig,
+                modelNamePrefix, samplingRound, evaluator, sampleBatchId,
+                samplePartitionMonth, annotationBatchId,
+                annotationPartitionMonth, rowIdentityConfig,
+                trainingBatchReferences, modelSetVersion, missingModelPolicy,
+                executionFingerprint, reuseSnapshotCheckpoint, options,
+                columnBatchContext, modelSetVersionOverride,
+                modelCompatibilityVersionOverride, detectionBatchIdOverride);
+    }
+
+    /**
+     * 创建限制到单个字段批次的子任务请求。
+     *
+     * @param childConfig 已写入子任务指纹和策略字段范围的配置
+     * @param childLoadRequest 已写入字段白名单的数据加载请求
+     * @param context 父子列批上下文
+     * @param trainingModelSetVersion 训练共享模型集合版本
+     * @param modelCompatibilityVersion 训练共享模型兼容计划版本
+     * @param detectionBatchId 检测共享父批次标识
+     * @return 禁止再次递归拆批的子任务请求
+     */
+    public RahaTaskExecutionRequest toColumnBatchChild(
+            RahaJobConfig childConfig,
+            DataLoadRequest childLoadRequest,
+            ColumnBatchContext context,
+            String trainingModelSetVersion,
+            String modelCompatibilityVersion,
+            String detectionBatchId) {
+        if (context == null) {
+            throw new IllegalArgumentException("列批子任务上下文不能为空");
+        }
+        ExecutionFingerprint childFingerprint = ExecutionFingerprint
+                .fromConfig(childConfig.getExecutionInputFingerprint());
+        return new RahaTaskExecutionRequest(childConfig, childLoadRequest,
+                labels, propagationMethod, propagationConfig, trainingConfig,
+                modelNamePrefix, samplingRound, evaluator, sampleBatchId,
+                samplePartitionMonth, annotationBatchId,
+                annotationPartitionMonth, rowIdentityConfig,
+                trainingBatchReferences, modelSetVersion, missingModelPolicy,
+                childFingerprint, false, ColumnBatchOptions.disabled(),
+                context, trainingModelSetVersion, modelCompatibilityVersion,
+                detectionBatchId);
     }
 
     /**
@@ -478,6 +584,23 @@ public final class RahaTaskExecutionRequest {
         result.put("snapshotId", config.getSnapshotId());
         result.put("reuseSnapshotCheckpoint",
                 Boolean.valueOf(reuseSnapshotCheckpoint));
+        result.put("columnBatchSize",
+                Integer.valueOf(columnBatchOptions.getColumnBatchSize()));
+        result.put("batchRvdEnabled",
+                Boolean.valueOf(columnBatchOptions.isBatchRvdEnabled()));
+        if (columnBatchContext != null) {
+            result.put("parentJobId", columnBatchContext.getParentJobId());
+            result.put("columnBatchId", columnBatchContext.getBatchId());
+            result.put("columnBatchIndex",
+                    Integer.valueOf(columnBatchContext.getBatchIndex()));
+            result.put("columnBatchColumns", columnBatchContext.getColumns());
+        }
+        if (modelSetVersionOverride != null) {
+            result.put("modelSetVersionOverride", modelSetVersionOverride);
+        }
+        if (detectionBatchIdOverride != null) {
+            result.put("detectionBatchIdOverride", detectionBatchIdOverride);
+        }
         if (modelSetVersion != null) {
             result.put("modelSetVersion", modelSetVersion);
         }

@@ -23,6 +23,8 @@ public final class TrainingMergeRequest {
     private final List<TrainingBatchReference> batchReferences;
     /** c1 身份键允许广播的最大估算字节数。 */
     private final long broadcastThresholdBytes;
+    /** 是否只画像列批当前可检测字段。 */
+    private final boolean columnBatchChild;
 
     public TrainingMergeRequest(String trainingBatchId,
                                 RahaDataset originalDataset,
@@ -47,7 +49,8 @@ public final class TrainingMergeRequest {
         this(trainingBatchId, originalDataset, rowIdentityConfig,
                 Collections.singletonList(new TrainingBatchReference(
                         sampleBatchId, samplePartitionMonth, annotationBatchId,
-                        annotationPartitionMonth)), broadcastThresholdBytes);
+                        annotationPartitionMonth)), broadcastThresholdBytes,
+                false);
     }
 
     public TrainingMergeRequest(String trainingBatchId,
@@ -55,6 +58,16 @@ public final class TrainingMergeRequest {
                                 RowIdentityConfig rowIdentityConfig,
                                 List<TrainingBatchReference> batchReferences,
                                 long broadcastThresholdBytes) {
+        this(trainingBatchId, originalDataset, rowIdentityConfig,
+                batchReferences, broadcastThresholdBytes, false);
+    }
+
+    public TrainingMergeRequest(String trainingBatchId,
+                                RahaDataset originalDataset,
+                                RowIdentityConfig rowIdentityConfig,
+                                List<TrainingBatchReference> batchReferences,
+                                long broadcastThresholdBytes,
+                                boolean columnBatchChild) {
         this.trainingBatchId = ValueUtils.requireNotBlank(
                 trainingBatchId, "训练批次标识");
         if (originalDataset == null || originalDataset.getDataFrame() == null
@@ -68,6 +81,7 @@ public final class TrainingMergeRequest {
             throw new IllegalArgumentException("c1 广播阈值必须大于零");
         }
         this.broadcastThresholdBytes = broadcastThresholdBytes;
+        this.columnBatchChild = columnBatchChild;
     }
 
     public String getTrainingBatchId() { return trainingBatchId; }
@@ -89,6 +103,7 @@ public final class TrainingMergeRequest {
         return batchReferences.get(0).getAnnotationPartitionMonth();
     }
     public long getBroadcastThresholdBytes() { return broadcastThresholdBytes; }
+    public boolean isColumnBatchChild() { return columnBatchChild; }
 
     private static List<TrainingBatchReference> immutableReferences(
             List<TrainingBatchReference> values) {

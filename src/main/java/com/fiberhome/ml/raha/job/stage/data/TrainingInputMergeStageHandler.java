@@ -26,6 +26,8 @@ public final class TrainingInputMergeStageHandler implements StageHandler {
     private final List<TrainingBatchReference> batchReferences;
     /** c1 和 o1 共用的行身份配置。 */
     private final RowIdentityConfig rowIdentityConfig;
+    /** 是否只处理当前列批可检测字段。 */
+    private final boolean columnBatchChild;
 
     public TrainingInputMergeStageHandler(
             TrainingInputMergeService mergeService,
@@ -37,13 +39,21 @@ public final class TrainingInputMergeStageHandler implements StageHandler {
         this(mergeService, Collections.singletonList(
                 new TrainingBatchReference(sampleBatchId, samplePartitionMonth,
                         annotationBatchId, annotationPartitionMonth)),
-                rowIdentityConfig);
+                rowIdentityConfig, false);
     }
 
     public TrainingInputMergeStageHandler(
             TrainingInputMergeService mergeService,
             List<TrainingBatchReference> batchReferences,
             RowIdentityConfig rowIdentityConfig) {
+        this(mergeService, batchReferences, rowIdentityConfig, false);
+    }
+
+    public TrainingInputMergeStageHandler(
+            TrainingInputMergeService mergeService,
+            List<TrainingBatchReference> batchReferences,
+            RowIdentityConfig rowIdentityConfig,
+            boolean columnBatchChild) {
         if (mergeService == null || batchReferences == null
                 || batchReferences.isEmpty() || rowIdentityConfig == null) {
             throw new IllegalArgumentException("训练合并阶段依赖和批次引用不能为空");
@@ -52,6 +62,7 @@ public final class TrainingInputMergeStageHandler implements StageHandler {
         this.batchReferences = Collections.unmodifiableList(
                 new ArrayList<TrainingBatchReference>(batchReferences));
         this.rowIdentityConfig = rowIdentityConfig;
+        this.columnBatchChild = columnBatchChild;
     }
 
     @Override
@@ -69,7 +80,7 @@ public final class TrainingInputMergeStageHandler implements StageHandler {
         TrainingMergeResult result = mergeService.merge(new TrainingMergeRequest(
                 context.getJob().getJobId(), (RahaDataset) value, rowIdentityConfig,
                 batchReferences, context.getConfig().getResourceConfig()
-                        .getBroadcastThresholdBytes()));
+                        .getBroadcastThresholdBytes(), columnBatchChild));
         context.getAttributes().put(StageAttributeKeys.RAHA_DATASET,
                 result.getDataset());
         context.getAttributes().put(StageAttributeKeys.CELL_LABELS,

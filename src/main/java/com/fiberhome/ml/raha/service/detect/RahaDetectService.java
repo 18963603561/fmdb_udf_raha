@@ -143,7 +143,8 @@ public final class RahaDetectService {
             long writtenErrorCount = 0L;
             if (!results.isEmpty() && status != JobStatus.FAILED) {
                 writtenErrorCount = repository.saveAll(new DetectionResultSaveContext(
-                                request.getJobId(), request.getDataset(),
+                                request.getJobId(), request.getDetectionBatchId(),
+                                request.getDataset(),
                                 request.getModelSetVersion(),
                                 modelVersions.values()), results,
                         request.getArtifactVersion(), clock.millis());
@@ -152,7 +153,7 @@ public final class RahaDetectService {
             details.put("detectedCellCount", String.valueOf(results.size()));
             details.put("errorCellCount", String.valueOf(errorCellCount));
             details.put("writtenErrorCount", String.valueOf(writtenErrorCount));
-            details.put("detectionBatchId", request.getJobId());
+            details.put("detectionBatchId", request.getDetectionBatchId());
             details.put("modelVersions", modelVersions.toString());
             details.put("modelSetVersion", String.valueOf(
                     request.getModelSetVersion()));
@@ -167,7 +168,8 @@ public final class RahaDetectService {
                     request.getJobId(), status, results.size(), failedColumns.size());
             return new RahaServiceResult<RahaDetectOutput>(request.getJobId(),
                     JobType.DETECTION, status,
-                    "repository://detection-result/" + request.getJobId(), summary,
+                    "repository://detection-result/"
+                            + request.getDetectionBatchId(), summary,
                     output, errorCode, errorMessage);
         } catch (RuntimeException exception) {
             // 检测结果事务保存等任务级异常必须转换为统一失败结果。

@@ -12,8 +12,10 @@ import java.util.List;
  */
 public final class DetectionResultSaveContext {
 
-    /** 检测任务和批次标识。 */
+    /** 实际产生检测结果的子任务标识。 */
     private final String jobId;
+    /** 最终结果归属的父级检测批次标识。 */
+    private final String detectionBatchId;
     /** 包含可信原始行和输入引用的数据集。 */
     private final RahaDataset dataset;
     /** 当前检测实际使用的列模型版本。 */
@@ -24,14 +26,24 @@ public final class DetectionResultSaveContext {
     public DetectionResultSaveContext(String jobId,
                                       RahaDataset dataset,
                                       Collection<String> modelVersions) {
-        this(jobId, dataset, null, modelVersions);
+        this(jobId, jobId, dataset, null, modelVersions);
     }
 
     public DetectionResultSaveContext(String jobId,
                                       RahaDataset dataset,
                                       String modelSetVersion,
                                       Collection<String> modelVersions) {
+        this(jobId, jobId, dataset, modelSetVersion, modelVersions);
+    }
+
+    public DetectionResultSaveContext(String jobId,
+                                      String detectionBatchId,
+                                      RahaDataset dataset,
+                                      String modelSetVersion,
+                                      Collection<String> modelVersions) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "检测任务标识");
+        this.detectionBatchId = ValueUtils.requireNotBlank(
+                detectionBatchId, "检测批次标识");
         if (dataset == null || dataset.getDataFrame() == null
                 || modelVersions == null || modelVersions.isEmpty()) {
             throw new IllegalArgumentException("检测数据集和模型版本不能为空");
@@ -53,6 +65,10 @@ public final class DetectionResultSaveContext {
 
     public RahaDataset getDataset() {
         return dataset;
+    }
+
+    public String getDetectionBatchId() {
+        return detectionBatchId;
     }
 
     public List<String> getModelVersions() {

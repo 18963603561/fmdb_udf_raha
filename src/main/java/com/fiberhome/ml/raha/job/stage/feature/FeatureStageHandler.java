@@ -48,10 +48,25 @@ public final class FeatureStageHandler implements StageHandler {
         ArtifactVersion version = new ArtifactVersion(
                 context.getJob().getConfigVersion(), dataset.getSnapshotId(),
                 context.getStage().getStageId(), context.getStage().getAttemptId());
-        FeatureAssemblyResult result = featureService.assembleAndSave(
-                context.getJob().getJobId(), dataset,
-                (List<StrategyPlan>) planValue, (List<StrategyHit>) hitValue,
-                context.getConfig().getFeatureConfig(), version);
+        FeatureAssemblyResult result;
+        if (context.getConfig().getResourceConfig()
+                .isFeatureParallelEnabled()) {
+            result = featureService.assembleAndSaveParallel(
+                    context.getJob().getJobId(), dataset,
+                    (List<StrategyPlan>) planValue,
+                    (List<StrategyHit>) hitValue,
+                    context.getConfig().getFeatureConfig(), version,
+                    context.getConfig().getResourceConfig()
+                            .getMaxParallelColumns(),
+                    context.getConfig().getResourceConfig()
+                            .getStageTimeoutMillis());
+        } else {
+            result = featureService.assembleAndSave(
+                    context.getJob().getJobId(), dataset,
+                    (List<StrategyPlan>) planValue,
+                    (List<StrategyHit>) hitValue,
+                    context.getConfig().getFeatureConfig(), version);
+        }
         context.getAttributes().put(StageAttributeKeys.FEATURE_ASSEMBLY_RESULT, result);
         return result.getRows().isEmpty()
                 ? StageResult.skipped("当前数据没有可区分特征") : StageResult.success();

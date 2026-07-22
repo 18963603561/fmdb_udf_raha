@@ -48,6 +48,7 @@ import com.fiberhome.ml.raha.service.task.RahaTaskExecutionResult;
 import com.fiberhome.ml.raha.service.task.RahaTaskRequestFactory;
 import com.fiberhome.ml.raha.service.task.SamplingRequestOptions;
 import com.fiberhome.ml.raha.service.task.TrainingRequestOptions;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchOptions;
 import com.fiberhome.ml.raha.service.train.RahaTrainOutput;
 import com.fiberhome.ml.raha.util.ReadableIdUtils;
 import java.io.IOException;
@@ -274,8 +275,15 @@ public final class RahaDetectionUdfService {
         }
 
         String requestedSnapshotId = parser.optional("snapshotId");
+        ColumnBatchOptions columnBatchOptions = columnBatchOptions(parser);
         boolean reuseSnapshotCheckpoint = requestedSnapshotId != null
                 && trainingInputMissing(parser);
+        if (reuseSnapshotCheckpoint && columnBatchOptions.isEnabled()) {
+            // 全字段检查点不能直接拆成列批，改为从采样批次恢复原始输入后重新执行前置阶段。
+            reuseSnapshotCheckpoint = false;
+            LOGGER.info("列批训练关闭全字段快照检查点复用，sampleBatchId={}，snapshotId={}",
+                    sampleBatchId, requestedSnapshotId);
+        }
         if (reuseSnapshotCheckpoint
                 && !requestedSnapshotId.equals(sampleBatch.getSnapshotId())) {
             return RahaUdfRows.single(failedBase("SNAPSHOT_MISMATCH",
@@ -288,7 +296,7 @@ public final class RahaDetectionUdfService {
                 allowPartial, parser.optional("modelNamePrefix", "raha"),
                 LabelPropagationMethod.HOMOGENEITY, inputOverride,
                 parser.executionOverrideOptions(), requestedSnapshotId,
-                reuseSnapshotCheckpoint);
+                reuseSnapshotCheckpoint, columnBatchOptions);
         RahaTaskExecutionRequest taskRequest = requestFactory.training(
                 Collections.singletonList(sampleBatchId), options);
         RahaTaskExecutionResult taskResult = taskService.execute(taskRequest);
@@ -318,7 +326,8 @@ public final class RahaDetectionUdfService {
                 input.getDatasetId(), modelSetVersion, policy);
         RahaTaskExecutionRequest taskRequest = requestFactory.detection(
                 input, modelSetVersion, new DetectionRequestOptions(policy,
-                        parser.executionOverrideOptions()));
+                        parser.executionOverrideOptions(),
+                        columnBatchOptions(parser)));
         String resolvedModelSetVersion = taskRequest.getModelSetVersion();
         RahaTaskExecutionResult taskResult = taskService.execute(taskRequest);
         RahaDetectOutput output = taskResult.getPayload(RahaDetectOutput.class);
@@ -338,6 +347,12 @@ public final class RahaDetectionUdfService {
         row.put("fieldCount", snapshot == null ? null
                 : Integer.valueOf(snapshot.getColumnCount()));
         row.put("validFieldCount", Integer.valueOf(validFieldCount(dataset)));
+        Object targetColumnCount = taskResult.getResultSummary().get(
+                "targetColumnCount");
+        if (targetColumnCount instanceof Number) {
+            row.put("validFieldCount", Integer.valueOf(
+                    ((Number) targetColumnCount).intValue()));
+        }
         row.put("modelFieldCount",
                 Integer.valueOf(output.getModelVersions().size()));
         row.put("failedFieldCount",
@@ -1064,5 +1079,44 @@ public final class RahaDetectionUdfService {
         String value = RahaDefaultConfigProvider.properties().asMap().get(key);
         return value == null || value.trim().isEmpty()
                 ? defaultValue : value.trim();
+    }
+
+    /**
+     * 从 UDF 参数和默认配置创建列批执行参数。
+     */
+    private static ColumnBatchOptions columnBatchOptions(
+            RahaUdfRequestParser parser) {
+        int batchSize = parser.intValue("columnBatchSize",
+                configInt("raha.column-batch.size", 10));
+        int maxParallel = parser.intValue("maxParallelColumnBatches",
+                configInt("raha.column-batch.max-parallel", 1));
+        boolean rvdEnabled = parser.bool("batchRvdEnabled",
+                configBoolean("raha.column-batch.rvd.enabled", false));
+        boolean failFast = parser.bool("failFastColumnBatch",
+                configBoolean("raha.column-batch.fail-fast", false));
+        return new ColumnBatchOptions(batchSize, maxParallel,
+                rvdEnabled, failFast);
+    }
+
+    private static int configInt(String key, int defaultValue) {
+        String value = configValue(key, String.valueOf(defaultValue));
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            throw new RahaUdfException("INVALID_CONFIGURATION",
+                    key + " 必须为整数", exception);
+        }
+    }
+
+    private static boolean configBoolean(String key, boolean defaultValue) {
+        String value = configValue(key, String.valueOf(defaultValue));
+        if ("true".equalsIgnoreCase(value)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(value)) {
+            return false;
+        }
+        throw new RahaUdfException("INVALID_CONFIGURATION",
+                key + " 必须为 true 或 false");
     }
 }

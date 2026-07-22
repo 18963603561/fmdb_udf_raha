@@ -278,7 +278,8 @@ public final class RahaTaskRequestFactory {
                 configFactory.logisticRegressionTrainingConfig(),
                 options.getModelNamePrefix(), references,
                 trainingInput.identity)
-                .withExecutionFingerprint(batchFingerprint);
+                .withExecutionFingerprint(batchFingerprint)
+                .withColumnBatchOptions(options.getColumnBatchOptions());
         LOGGER.info("最小训练请求解析完成，datasetId={}，batchCount={}，"
                         + "inputReference={}，identityMode={}",
                 trainingInput.spec.getDatasetId(), references.size(),
@@ -443,7 +444,8 @@ public final class RahaTaskRequestFactory {
         DataLoadRequest loadRequest = input.toDataLoadRequest(identity);
         ExecutionFingerprint fingerprint = inputFingerprint(
                 "detection", input, modelSetVersion + "|"
-                        + options.getMissingModelPolicy(),
+                        + options.getMissingModelPolicy() + "|"
+                        + options.getColumnBatchOptions().toCanonicalString(),
                 options.getExecutionOverrideOptions());
         RahaJobConfig config = configFactory.jobConfig(JobType.DETECTION,
                 manifest.getDatasetId(), input.getInputReference(), identity)
@@ -458,7 +460,8 @@ public final class RahaTaskRequestFactory {
                 options.getMissingModelPolicy());
         return RahaTaskExecutionRequest.detection(config, loadRequest,
                 modelSetVersion, options.getMissingModelPolicy())
-                .withExecutionFingerprint(fingerprint);
+                .withExecutionFingerprint(fingerprint)
+                .withColumnBatchOptions(options.getColumnBatchOptions());
     }
 
     /**
@@ -797,6 +800,7 @@ public final class RahaTaskRequestFactory {
         appendToken(source, canonicalInput(input));
         appendToken(source, options.getPropagationMethod());
         appendToken(source, options.getModelNamePrefix());
+        appendToken(source, options.getColumnBatchOptions().toCanonicalString());
         return ExecutionFingerprint.fromStableSource(source.toString(),
                 options.getExecutionOverrideOptions());
     }

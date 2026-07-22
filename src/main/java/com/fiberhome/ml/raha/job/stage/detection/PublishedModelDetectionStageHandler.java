@@ -26,15 +26,25 @@ public final class PublishedModelDetectionStageHandler implements StageHandler {
     private final String modelSetVersion;
     /** 字段模型缺失或不兼容时的处理策略。 */
     private final MissingModelPolicy missingModelPolicy;
+    /** 父级列批检测共享的检测批次标识。 */
+    private final String detectionBatchIdOverride;
 
     public PublishedModelDetectionStageHandler(RahaDetectService detectService) {
-        this(detectService, null, MissingModelPolicy.PARTIAL);
+        this(detectService, null, MissingModelPolicy.PARTIAL, null);
     }
 
     public PublishedModelDetectionStageHandler(
             RahaDetectService detectService,
             String modelSetVersion,
             MissingModelPolicy missingModelPolicy) {
+        this(detectService, modelSetVersion, missingModelPolicy, null);
+    }
+
+    public PublishedModelDetectionStageHandler(
+            RahaDetectService detectService,
+            String modelSetVersion,
+            MissingModelPolicy missingModelPolicy,
+            String detectionBatchIdOverride) {
         if (detectService == null) {
             throw new IllegalArgumentException("已发布模型检测服务不能为空");
         }
@@ -44,6 +54,7 @@ public final class PublishedModelDetectionStageHandler implements StageHandler {
         this.detectService = detectService;
         this.modelSetVersion = modelSetVersion;
         this.missingModelPolicy = missingModelPolicy;
+        this.detectionBatchIdOverride = detectionBatchIdOverride;
     }
 
     @Override
@@ -73,7 +84,8 @@ public final class PublishedModelDetectionStageHandler implements StageHandler {
                         (RahaDataset) datasetValue, (FeatureAssemblyResult) featureValue,
                         (String) planVersionValue, version,
                         context.getConfig().getResourceConfig(),
-                        modelSetVersion, missingModelPolicy));
+                        modelSetVersion, missingModelPolicy,
+                        detectionBatchIdOverride));
         context.getAttributes().put(StageAttributeKeys.DETECT_SERVICE_RESULT, result);
         if (result.getPayload() != null) {
             context.getAttributes().put(StageAttributeKeys.DETECT_OUTPUT, result.getPayload());

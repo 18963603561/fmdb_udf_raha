@@ -57,6 +57,10 @@ public final class RahaTrainRequest {
     private final RowIdentityConfig rowIdentityConfig;
     /** 已在工作流画像前完成的训练合并结果。 */
     private final TrainingMergeResult trainingMergeResult;
+    /** 列批训练共享的模型集合版本，为空时由服务生成。 */
+    private final String modelSetVersionOverride;
+    /** 列批模型集合共享的兼容计划版本，为空时使用实际策略计划版本。 */
+    private final String modelCompatibilityVersionOverride;
 
     public RahaTrainRequest(String jobId,
                             String stageId,
@@ -70,7 +74,8 @@ public final class RahaTrainRequest {
                             ArtifactVersion artifactVersion) {
         this(jobId, stageId, dataset, config, directLabels, propagationMethod,
                 propagationConfig, trainingConfig, modelNamePrefix,
-                artifactVersion, null, null, null, null, null, null, null, null);
+                artifactVersion, null, null, null, null, null, null, null, null,
+                null, null);
     }
 
     public RahaTrainRequest(String jobId,
@@ -87,7 +92,7 @@ public final class RahaTrainRequest {
         this(jobId, stageId, dataset, config, directLabels, propagationMethod,
                 propagationConfig, trainingConfig, modelNamePrefix,
                 artifactVersion, preparedFeatures, null, null, null, null, null, null,
-                null);
+                null, null, null);
     }
 
     public RahaTrainRequest(String jobId,
@@ -105,7 +110,7 @@ public final class RahaTrainRequest {
         this(jobId, stageId, dataset, config, directLabels, propagationMethod,
                 propagationConfig, trainingConfig, modelNamePrefix, artifactVersion,
                 preparedFeatures, preparedPropagation, null, null, null, null, null,
-                null);
+                null, null, null);
     }
 
     /**
@@ -127,7 +132,35 @@ public final class RahaTrainRequest {
         this(jobId, stageId, dataset, config, directLabels, propagationMethod,
                 propagationConfig, trainingConfig, modelNamePrefix, artifactVersion,
                 preparedFeatures, preparedPropagation, null, null, null, null, null,
-                trainingMergeResult);
+                trainingMergeResult, null, null);
+    }
+
+    /**
+     * 使用工作流产物和父级模型版本执行列批训练。
+     *
+     * @param modelSetVersionOverride 父任务生成的模型集合版本
+     * @param modelCompatibilityVersionOverride 父任务生成的模型兼容计划版本
+     */
+    public RahaTrainRequest(String jobId,
+                            String stageId,
+                            RahaDataset dataset,
+                            RahaJobConfig config,
+                            List<CellLabel> directLabels,
+                            LabelPropagationMethod propagationMethod,
+                            LabelPropagationConfig propagationConfig,
+                            LogisticRegressionTrainingConfig trainingConfig,
+                            String modelNamePrefix,
+                            ArtifactVersion artifactVersion,
+                            RahaFeaturePreparationResult preparedFeatures,
+                            LabelPropagationResult preparedPropagation,
+                            TrainingMergeResult trainingMergeResult,
+                            String modelSetVersionOverride,
+                            String modelCompatibilityVersionOverride) {
+        this(jobId, stageId, dataset, config, directLabels, propagationMethod,
+                propagationConfig, trainingConfig, modelNamePrefix,
+                artifactVersion, preparedFeatures, preparedPropagation,
+                null, null, null, null, null, trainingMergeResult,
+                modelSetVersionOverride, modelCompatibilityVersionOverride);
     }
 
     /**
@@ -151,7 +184,8 @@ public final class RahaTrainRequest {
         this(jobId, stageId, dataset, config, directLabels, propagationMethod,
                 propagationConfig, trainingConfig, modelNamePrefix, artifactVersion,
                 null, null, sampleBatchId, samplePartitionMonth,
-                annotationBatchId, annotationPartitionMonth, rowIdentityConfig, null);
+                annotationBatchId, annotationPartitionMonth, rowIdentityConfig,
+                null, null, null);
     }
 
     private RahaTrainRequest(String jobId,
@@ -171,7 +205,9 @@ public final class RahaTrainRequest {
                              String annotationBatchId,
                              String annotationPartitionMonth,
                              RowIdentityConfig rowIdentityConfig,
-                             TrainingMergeResult trainingMergeResult) {
+                             TrainingMergeResult trainingMergeResult,
+                             String modelSetVersionOverride,
+                             String modelCompatibilityVersionOverride) {
         this.jobId = ValueUtils.requireNotBlank(jobId, "训练任务标识");
         this.stageId = ValueUtils.requireNotBlank(stageId, "训练阶段标识");
         this.modelNamePrefix = ValueUtils.requireNotBlank(modelNamePrefix, "模型名称前缀");
@@ -240,6 +276,9 @@ public final class RahaTrainRequest {
             throw new IllegalArgumentException("已合并训练请求不能再次携带批次引用");
         }
         this.trainingMergeResult = trainingMergeResult;
+        this.modelSetVersionOverride = trimToNull(modelSetVersionOverride);
+        this.modelCompatibilityVersionOverride = trimToNull(
+                modelCompatibilityVersionOverride);
     }
 
     public String getJobId() { return jobId; }
@@ -260,6 +299,10 @@ public final class RahaTrainRequest {
     public String getAnnotationPartitionMonth() { return annotationPartitionMonth; }
     public RowIdentityConfig getRowIdentityConfig() { return rowIdentityConfig; }
     public TrainingMergeResult getTrainingMergeResult() { return trainingMergeResult; }
+    public String getModelSetVersionOverride() { return modelSetVersionOverride; }
+    public String getModelCompatibilityVersionOverride() {
+        return modelCompatibilityVersionOverride;
+    }
 
     public boolean hasPersistedInput() {
         return sampleBatchId != null;
@@ -277,7 +320,8 @@ public final class RahaTrainRequest {
         return new RahaTrainRequest(jobId, stageId, mergedDataset, config,
                 mergedLabels, propagationMethod, propagationConfig, trainingConfig,
                 modelNamePrefix, artifactVersion, null, null, null, null, null,
-                null, null, null);
+                null, null, null, modelSetVersionOverride,
+                modelCompatibilityVersionOverride);
     }
 
     /** 返回携带完整合并血缘的请求，供训练产物冻结使用。 */
@@ -291,6 +335,11 @@ public final class RahaTrainRequest {
         return new RahaTrainRequest(jobId, stageId, merged.getDataset(), config,
                 merged.getDirectLabels(), propagationMethod, propagationConfig,
                 trainingConfig, modelNamePrefix, artifactVersion, null, null,
-                null, null, null, null, null, merged);
+                null, null, null, null, null, merged,
+                modelSetVersionOverride, modelCompatibilityVersionOverride);
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 }

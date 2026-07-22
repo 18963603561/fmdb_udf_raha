@@ -100,10 +100,13 @@ public final class FmdbDetectionResultRepository
         validateModelSetVersion(modelSetVersion,
                 context.getDataset().getDatasetId(), context.getModelVersions());
         FmdbDetectionWriteContext writeContext = new FmdbDetectionWriteContext(
-                context.getJobId(), context.getDataset().getTableName(),
+                context.getDetectionBatchId(),
+                context.getDataset().getTableName(),
                 modelSetVersion, trustedRows(context.getDataset()));
-        LOGGER.info("开始通过仓储写入 FMDB 检测错误，jobId={}，resultCount={}",
-                context.getJobId(), results.size());
+        LOGGER.info("开始通过仓储写入 FMDB 检测错误，jobId={}，"
+                        + "detectionBatchId={}，resultCount={}",
+                context.getJobId(), context.getDetectionBatchId(),
+                results.size());
         try {
             return resultWriter.writeDetectionResults(tableName, writeContext, results);
         } catch (RuntimeException exception) {

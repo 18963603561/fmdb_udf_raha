@@ -141,6 +141,24 @@ public final class DataLoadRequest {
         return sourceVersion;
     }
 
+    /**
+     * 创建只允许指定字段参与检测和训练的请求副本。
+     *
+     * <p>物理输入和完整模式保持不变，白名单只改变字段的可检测属性，
+     * 因而所有列批仍共享同一个模式哈希和行身份规则。</p>
+     *
+     * @param columns 当前列批字段
+     * @return 字段范围受限的新加载请求
+     */
+    public DataLoadRequest withIncludedColumns(Set<String> columns) {
+        if (columns == null || columns.isEmpty()) {
+            throw new IllegalArgumentException("列批字段白名单不能为空");
+        }
+        return new DataLoadRequest(datasetId, inputReference, sourceReference,
+                tableName, rowIdentityConfig, format, options, columns,
+                excludedColumns, sensitiveColumns, snapshotId, sourceVersion);
+    }
+
     private static Map<String, String> immutableMap(Map<String, String> values) {
         if (values == null || values.isEmpty()) {
             return Collections.emptyMap();

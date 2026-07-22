@@ -102,6 +102,9 @@ import com.fiberhome.ml.raha.service.sample.RahaSampleService;
 import com.fiberhome.ml.raha.service.train.RahaTrainService;
 import com.fiberhome.ml.raha.service.train.TrainingArtifactMaterializationService;
 import com.fiberhome.ml.raha.service.train.TrainingInputMergeService;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchExecutionCoordinator;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchPlanner;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchSchemaResolver;
 import com.fiberhome.ml.raha.job.stage.model.ResultPersistenceVerifier;
 import com.fiberhome.ml.raha.strategy.api.StrategyRegistry;
 import com.fiberhome.ml.raha.strategy.execution.StrategyExecutionService;
@@ -416,8 +419,13 @@ public final class RahaTaskApplicationServiceFactory {
                 repository, stageRepository, infrastructure);
         LOGGER.info("Raha 默认运行时创建完成，storageMode={}，workflowCount={}",
                 storageMode, 3);
+        ColumnBatchExecutionCoordinator columnBatchCoordinator =
+                new ColumnBatchExecutionCoordinator(
+                        new ColumnBatchSchemaResolver(sparkSession),
+                        new ColumnBatchPlanner(), infrastructure.getClock());
         return new DefaultComponents(orchestrator, workflowRegistry,
-                runtimeRepositories, taskServices.getRequestFactory());
+                runtimeRepositories, taskServices.getRequestFactory(),
+                columnBatchCoordinator);
     }
 
     /**
@@ -1331,18 +1339,23 @@ public final class RahaTaskApplicationServiceFactory {
         private final RuntimeRepositories runtimeRepositories;
         /** 与默认工作流共享仓储的最小任务请求工厂。 */
         private final RahaTaskRequestFactory requestFactory;
+        /** driver 侧训练和检测列批协调器。 */
+        private final ColumnBatchExecutionCoordinator columnBatchCoordinator;
 
         private DefaultComponents(RahaJobOrchestrator jobOrchestrator,
                                   RahaWorkflowRegistry workflowRegistry,
                                   RuntimeRepositories runtimeRepositories,
-                                  RahaTaskRequestFactory requestFactory) {
-            if (requestFactory == null) {
+                                  RahaTaskRequestFactory requestFactory,
+                                  ColumnBatchExecutionCoordinator
+                                          columnBatchCoordinator) {
+            if (requestFactory == null || columnBatchCoordinator == null) {
                 throw new IllegalArgumentException("默认最小任务请求工厂不能为空");
             }
             this.jobOrchestrator = jobOrchestrator;
             this.workflowRegistry = workflowRegistry;
             this.runtimeRepositories = runtimeRepositories;
             this.requestFactory = requestFactory;
+            this.columnBatchCoordinator = columnBatchCoordinator;
         }
 
         /**
@@ -1388,6 +1401,15 @@ public final class RahaTaskApplicationServiceFactory {
          */
         RahaTaskRequestFactory getRequestFactory() {
             return requestFactory;
+        }
+
+        /**
+         * 获取默认 driver 侧列批协调器。
+         *
+         * @return 列批协调器
+         */
+        ColumnBatchExecutionCoordinator getColumnBatchCoordinator() {
+            return columnBatchCoordinator;
         }
     }
 }
