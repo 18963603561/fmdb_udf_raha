@@ -9,14 +9,16 @@ import java.util.Map;
 /**
  * 聚类提供方解析器。
  *
- * <p>统一把配置中的 provider 解析为实际聚类实现，并把 AUTO、空值和别名收敛到默认的
- * Smile 层次聚类实现。</p>
+ * <p>统一把配置中的 provider 解析为实际聚类实现。AUTO 会保留为自动路由模式，
+ * 由聚类器在运行时按单列样本量选择 Smile 精确路径或可扩展近似路径。</p>
  */
 public final class ClusteringProviderResolver {
 
-    /** 默认使用的 Smile 聚类提供方。 */
-    public static final String DEFAULT_PROVIDER = "SmileHierarchicalColumnClusterer";
+    /** 默认使用的自动聚类提供方。 */
+    public static final String DEFAULT_PROVIDER = "AUTO";
 
+    /** 自动路由聚类提供方。 */
+    private static final String AUTO_PROVIDER = "AUTO";
     /** 解析后的层次聚类提供方。 */
     private static final String HIERARCHICAL_PROVIDER = "HierarchicalColumnClusterer";
     /** 解析后的可扩展聚类提供方。 */
@@ -32,7 +34,7 @@ public final class ClusteringProviderResolver {
         Map<String, String> aliases = new HashMap<String, String>();
         registerAlias(aliases, null, DEFAULT_PROVIDER);
         registerAlias(aliases, "", DEFAULT_PROVIDER);
-        registerAlias(aliases, "AUTO", DEFAULT_PROVIDER);
+        registerAlias(aliases, AUTO_PROVIDER, AUTO_PROVIDER);
         registerAlias(aliases, HIERARCHICAL_PROVIDER, HIERARCHICAL_PROVIDER);
         registerAlias(aliases, SCALABLE_PROVIDER, SCALABLE_PROVIDER);
         registerAlias(aliases, SMILE_HIERARCHICAL_PROVIDER, SMILE_HIERARCHICAL_PROVIDER);
@@ -58,7 +60,8 @@ public final class ClusteringProviderResolver {
     /**
      * 把 provider 收敛为规范化名称。
      *
-     * <p>空值、空串和 AUTO 都会归一到默认的 Smile 实现，以便配置指纹和运行行为一致。</p>
+     * <p>空值和空串会归一到默认 AUTO；AUTO 会保留为独立模式，
+     * 以便配置指纹能够体现自动路由语义。</p>
      *
      * @param provider 配置中的聚类提供方
      * @return 规范化后的 provider
@@ -84,6 +87,9 @@ public final class ClusteringProviderResolver {
             throw new IllegalArgumentException("聚类提供方解析依赖不能为空");
         }
         String canonical = canonicalProvider(provider);
+        if (AUTO_PROVIDER.equals(canonical)) {
+            return new AutoColumnClusterer(versioner, clock);
+        }
         if (HIERARCHICAL_PROVIDER.equals(canonical)) {
             return new HierarchicalColumnClusterer(versioner, clock);
         }

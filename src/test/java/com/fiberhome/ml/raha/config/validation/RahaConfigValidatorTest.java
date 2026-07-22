@@ -42,7 +42,7 @@ class RahaConfigValidatorTest {
                 RowIdentityConfig.sourceKey("id"));
 
         assertDoesNotThrow(() -> validator.validate(config));
-        assertEquals("SmileHierarchicalColumnClusterer",
+        assertEquals("AUTO",
                 config.getClusteringConfig().getProvider());
     }
 
