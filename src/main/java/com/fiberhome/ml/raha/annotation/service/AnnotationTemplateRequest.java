@@ -14,6 +14,8 @@ public final class AnnotationTemplateRequest {
     private final String samplePartitionMonth;
     /** c1 采样批次。 */
     private final String sampleBatchId;
+    /** 采样快照标识，用于生成训练请求示例。 */
+    private final String snapshotId;
     /** 模板输出路径。 */
     private final Path outputPath;
 
@@ -21,11 +23,21 @@ public final class AnnotationTemplateRequest {
                                      String samplePartitionMonth,
                                      String sampleBatchId,
                                      Path outputPath) {
+        this(datasetId, samplePartitionMonth, sampleBatchId, null, outputPath);
+    }
+
+    public AnnotationTemplateRequest(String datasetId,
+                                     String samplePartitionMonth,
+                                     String sampleBatchId,
+                                     String snapshotId,
+                                     Path outputPath) {
         this.datasetId = ValueUtils.requireNotBlank(datasetId, "模板数据集标识");
         this.samplePartitionMonth = ValueUtils.requireNotBlank(
                 samplePartitionMonth, "模板采样月分区");
         this.sampleBatchId = ValueUtils.requireNotBlank(
                 sampleBatchId, "模板采样批次");
+        this.snapshotId = snapshotId == null || snapshotId.trim().isEmpty()
+                ? null : snapshotId.trim();
         if (outputPath == null) {
             throw new IllegalArgumentException("模板输出路径不能为空");
         }
@@ -35,5 +47,6 @@ public final class AnnotationTemplateRequest {
     public String getDatasetId() { return datasetId; }
     public String getSamplePartitionMonth() { return samplePartitionMonth; }
     public String getSampleBatchId() { return sampleBatchId; }
+    public String getSnapshotId() { return snapshotId; }
     public Path getOutputPath() { return outputPath; }
 }

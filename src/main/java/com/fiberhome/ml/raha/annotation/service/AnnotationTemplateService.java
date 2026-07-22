@@ -55,7 +55,20 @@ public final class AnnotationTemplateService {
         }
         return workbookAdapter.exportTemplate(request.getOutputPath(),
                 request.getDatasetId(), request.getSamplePartitionMonth(),
-                request.getSampleBatchId(), rows,
+                request.getSampleBatchId(), snapshotId(request, rows), rows,
                 Math.max(1L, clock.millis()));
+    }
+
+    private static String snapshotId(AnnotationTemplateRequest request,
+                                     List<SampleAnnotationRow> rows) {
+        String requested = request.getSnapshotId();
+        if (requested != null && !requested.trim().isEmpty()) {
+            return requested.trim();
+        }
+        Object value = rows.get(0).getSamplingContext().get("snapshotId");
+        if (value == null || String.valueOf(value).trim().isEmpty()) {
+            throw new IllegalStateException("标注模板缺少采样快照标识");
+        }
+        return String.valueOf(value).trim();
     }
 }

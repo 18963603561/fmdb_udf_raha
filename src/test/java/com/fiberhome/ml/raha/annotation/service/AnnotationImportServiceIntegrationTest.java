@@ -27,6 +27,7 @@ import java.util.Optional;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.SheetVisibility;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.PaneInformation;
 import org.junit.jupiter.api.AfterAll;
@@ -74,6 +75,39 @@ class AnnotationImportServiceIntegrationTest {
             assertTrue(pane.isFreezePane());
             assertEquals(7, pane.getVerticalSplitPosition());
             assertEquals(1, pane.getHorizontalSplitPosition());
+        }
+    }
+
+    @Test
+    void shouldExposeSystemInfoAndTrainingInstructions() throws Exception {
+        AnnotationWorkbookAdapter adapter = new AnnotationWorkbookAdapter(
+                AnnotationExcelConfig.defaults());
+        Path source = temporaryDirectory.resolve("training-instruction.xls");
+
+        adapter.exportTemplate(source, "dataset-1", "2026-07", "sample-1",
+                "snapshot-1", sampleRows(), 1700000000000L);
+
+        try (java.io.InputStream input = java.nio.file.Files.newInputStream(source);
+             Workbook workbook = new HSSFWorkbook(input)) {
+            int systemIndex = workbook.getSheetIndex(
+                    AnnotationWorkbookAdapter.SYSTEM_SHEET);
+            assertEquals(SheetVisibility.VISIBLE,
+                    workbook.getSheetVisibility(systemIndex));
+            Sheet system = workbook.getSheetAt(systemIndex);
+            assertEquals("snapshot-1", systemValue(system, "snapshotId"));
+
+            Sheet instruction = workbook.getSheet(
+                    AnnotationWorkbookAdapter.TRAINING_INSTRUCTION_SHEET);
+            assertNotNull(instruction);
+            String request = instruction.getRow(1).getCell(1)
+                    .getStringCellValue();
+            String udf = instruction.getRow(2).getCell(1)
+                    .getStringCellValue();
+            assertTrue(request.contains("\"sampleBatchId\":\"sample-1\""));
+            assertTrue(request.contains("\"snapshotId\":\"snapshot-1\""));
+            assertTrue(request.contains("\"forceRunId\":\"t1\""));
+            assertTrue(udf.contains("SELECT F_DW_DETTRAIN('"));
+            assertTrue(udf.contains("forceRunId=t1"));
         }
     }
 
@@ -305,6 +339,15 @@ class AnnotationImportServiceIntegrationTest {
             if (key.equals(row.getCell(0).getStringCellValue())) {
                 row.getCell(1).setCellValue(value);
                 return;
+            }
+        }
+        throw new IllegalStateException("测试系统信息缺少字段：" + key);
+    }
+
+    private static String systemValue(Sheet sheet, String key) {
+        for (Row row : sheet) {
+            if (key.equals(row.getCell(0).getStringCellValue())) {
+                return row.getCell(1).getStringCellValue();
             }
         }
         throw new IllegalStateException("测试系统信息缺少字段：" + key);

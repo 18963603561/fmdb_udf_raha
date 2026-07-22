@@ -185,7 +185,8 @@ public final class RahaDetectionUdfService {
         Path excelPath = workDir.resolve(excelName);
         annotationTemplateService.exportTemplate(new AnnotationTemplateRequest(
                 sampleBatch.getDatasetId(), sampleBatch.getPartitionMonth(),
-                sampleBatch.getSampleBatchId(), excelPath));
+                sampleBatch.getSampleBatchId(), sampleBatch.getSnapshotId(),
+                excelPath));
 
         Map<String, Object> row = successBase(parser, input, snapshot);
         enrichExecutionMetadata(row, taskResult);

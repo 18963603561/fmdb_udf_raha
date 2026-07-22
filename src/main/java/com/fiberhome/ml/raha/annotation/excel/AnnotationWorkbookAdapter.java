@@ -34,7 +34,6 @@ import org.apache.poi.ss.usermodel.PatternFormatting;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.SheetConditionalFormatting;
-import org.apache.poi.ss.usermodel.SheetVisibility;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
@@ -53,9 +52,11 @@ public final class AnnotationWorkbookAdapter {
     public static final String DATA_SHEET = "标注数据";
     /** 用户填写规则工作表。 */
     public static final String INSTRUCTION_SHEET = "标注说明";
+    /** 训练闭环说明工作表。 */
+    public static final String TRAINING_INSTRUCTION_SHEET = "训练说明";
     /** 导入错误回写工作表。 */
     public static final String VALIDATION_SHEET = "导入校验";
-    /** 隐藏模板元数据工作表。 */
+    /** 模板元数据工作表，测试截断场景下保持可见便于复制训练参数。 */
     public static final String SYSTEM_SHEET = "系统信息";
     /** 模板保护口令只用于防止误编辑，不作为安全边界。 */
     private static final String PROTECTION_PASSWORD = "raha-template";
@@ -79,7 +80,7 @@ public final class AnnotationWorkbookAdapter {
     }
 
     /**
-     * 从 c1 最小投影视图生成四工作表标注模板。
+     * 从 c1 最小投影视图生成包含标注、训练说明和系统信息的标注模板。
      */
     public Path exportTemplate(Path outputPath,
                                String datasetId,
@@ -87,8 +88,20 @@ public final class AnnotationWorkbookAdapter {
                                String sampleBatchId,
                                List<SampleAnnotationRow> rows,
                                long exportedAt) {
+        return exportTemplate(outputPath, datasetId, samplePartitionMonth,
+                sampleBatchId, snapshotId(rows), rows, exportedAt);
+    }
+
+    public Path exportTemplate(Path outputPath,
+                               String datasetId,
+                               String samplePartitionMonth,
+                               String sampleBatchId,
+                               String snapshotId,
+                               List<SampleAnnotationRow> rows,
+                               long exportedAt) {
         if (outputPath == null || datasetId == null || sampleBatchId == null
-                || samplePartitionMonth == null || rows == null || rows.isEmpty()
+                || snapshotId == null || samplePartitionMonth == null
+                || rows == null || rows.isEmpty()
                 || rows.size() > config.getMaximumRowCount() || exportedAt <= 0L) {
             throw new IllegalArgumentException("Excel 模板输入、行数和时间必须有效");
         }
@@ -102,9 +115,12 @@ public final class AnnotationWorkbookAdapter {
         try {
             createDataSheet(workbook, rows, columns);
             createInstructionSheet(workbook);
+            createTrainingInstructionSheet(workbook, sampleBatchId,
+                    snapshotId.trim());
             createValidationSheet(workbook);
             createSystemSheet(workbook, datasetId, samplePartitionMonth,
-                    sampleBatchId, columns, rows.size(), exportedAt);
+                    sampleBatchId, snapshotId.trim(), columns, rows.size(),
+                    exportedAt);
             writeWorkbook(workbook, target);
             LOGGER.info("Excel 标注模板导出完成，sampleBatchId={}，recordCount={}，"
                             + "fileName={}", sampleBatchId, rows.size(),
@@ -271,6 +287,50 @@ public final class AnnotationWorkbookAdapter {
         sheet.protectSheet(PROTECTION_PASSWORD);
     }
 
+    private static void createTrainingInstructionSheet(Workbook workbook,
+                                                       String sampleBatchId,
+                                                       String snapshotId) {
+        Sheet sheet = workbook.createSheet(TRAINING_INSTRUCTION_SHEET);
+        String annotationDir = "/fmdb/raha/annotation-upload";
+        String requestJson = "{"
+                + "\"sampleBatchId\":\"" + sampleBatchId + "\","
+                + "\"snapshotId\":\"" + snapshotId + "\","
+                + "\"annotationDir\":\"" + annotationDir + "\","
+                + "\"forceRun\":true,"
+                + "\"forceRunId\":\"t1\""
+                + "}";
+        String udfArgs = "sampleBatchId=" + sampleBatchId
+                + "&snapshotId=" + snapshotId
+                + "&annotationDir=" + annotationDir
+                + "&forceRun=true&forceRunId=t1";
+        List<List<String>> rows = Arrays.asList(
+                Arrays.asList("项目", "内容"),
+                Arrays.asList("训练请求模板", requestJson),
+                Arrays.asList("SQL UDF 调用示例",
+                        "SELECT F_DW_DETTRAIN('" + udfArgs + "');"),
+                Arrays.asList("标注上传目录", annotationDir),
+                Arrays.asList("本地测试目录",
+                        "datasets/person_info/annotation-upload"),
+                Arrays.asList("文件名匹配规则",
+                        "训练按 sampleBatchId 匹配前缀，@ 会替换为 _"),
+                Arrays.asList("匹配前缀",
+                        "raha-annotation_" + safeSampleBatchToken(
+                                sampleBatchId) + "_"),
+                Arrays.asList("注意事项",
+                        "不要把未标注原始模板放到 annotationDir，避免选到未标注文件"),
+                Arrays.asList("检查点复用",
+                        "复用采样检查点训练时不要传 sourceType、datasetId、sqlText、tableName")
+        );
+        CellStyle header = headerStyle(workbook);
+        for (int index = 0; index < rows.size(); index++) {
+            writeRow(sheet.createRow(index), rows.get(index),
+                    index == 0 ? header : null);
+        }
+        sheet.setColumnWidth(0, 24 * 256);
+        sheet.setColumnWidth(1, 120 * 256);
+        sheet.createFreezePane(0, 1);
+    }
+
     private static void createValidationSheet(Workbook workbook) {
         Sheet sheet = workbook.createSheet(VALIDATION_SHEET);
         writeRow(sheet.createRow(0), Arrays.asList(
@@ -283,6 +343,7 @@ public final class AnnotationWorkbookAdapter {
                                           String datasetId,
                                           String samplePartitionMonth,
                                           String sampleBatchId,
+                                          String snapshotId,
                                           TemplateColumns columns,
                                           int recordCount,
                                           long exportedAt) {
@@ -292,6 +353,7 @@ public final class AnnotationWorkbookAdapter {
         values.put("datasetId", datasetId);
         values.put("samplePartitionMonth", samplePartitionMonth);
         values.put("sampleBatchId", sampleBatchId);
+        values.put("snapshotId", snapshotId);
         values.put("schemaHash", columns.schemaHash);
         values.put("exportedAt", String.valueOf(exportedAt));
         values.put("recordCount", String.valueOf(recordCount));
@@ -302,8 +364,8 @@ public final class AnnotationWorkbookAdapter {
             writeRow(sheet.createRow(rowIndex++), Arrays.asList(
                     entry.getKey(), entry.getValue()), null);
         }
-        workbook.setSheetVisibility(workbook.getSheetIndex(sheet),
-                SheetVisibility.VERY_HIDDEN);
+        sheet.setColumnWidth(0, 28 * 256);
+        sheet.setColumnWidth(1, 96 * 256);
     }
 
     @SuppressWarnings("unchecked")
@@ -595,6 +657,26 @@ public final class AnnotationWorkbookAdapter {
                 sheet.removeRow(row);
             }
         }
+    }
+
+    private static String snapshotId(List<SampleAnnotationRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            throw new IllegalArgumentException("标注模板缺少采样行");
+        }
+        Object value = rows.get(0).getSamplingContext().get("snapshotId");
+        if (value == null || String.valueOf(value).trim().isEmpty()) {
+            throw new IllegalArgumentException("标注模板缺少采样快照标识");
+        }
+        return String.valueOf(value).trim();
+    }
+
+    private static String safeSampleBatchToken(String sampleBatchId) {
+        String text = sampleBatchId == null || sampleBatchId.trim().isEmpty()
+                ? "unknown" : sampleBatchId.trim();
+        text = text.replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
+        text = text.replaceAll("_+", "_");
+        text = text.replaceAll("[^a-zA-Z0-9._\\-]", "_");
+        return text.isEmpty() ? "unknown" : text;
     }
 
     private static String listJson(List<String> values) {
