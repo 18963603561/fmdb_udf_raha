@@ -27,10 +27,13 @@ class FmdbPersistenceConfigTest {
         assertTrue(config.getSchemaResource().endsWith("raha-fmdb-schema.sql"));
         assertTrue(config.shouldPersist(FmdbPhysicalTable.SAMPLE_RECORD));
         assertTrue(config.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT));
+        assertFalse(config.shouldPersist(
+                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT));
         assertFalse(config.shouldPersist(FmdbPhysicalTable.TRAINING_CELL));
+        assertFalse(config.shouldPersist(FmdbPhysicalTable.TRAINING_EXAMPLE));
         assertTrue(config.shouldPersist(FmdbPhysicalTable.JOB_STAGE_ATTEMPT));
-        assertTrue(config.shouldPersist(FmdbColumnArtifact.PROFILE));
-        assertTrue(config.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY));
+        assertFalse(config.shouldPersist(FmdbColumnArtifact.PROFILE));
+        assertFalse(config.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY));
         assertFalse(config.shouldPersist(FmdbColumnArtifact.CLUSTER_SUMMARY));
         assertFalse(config.shouldPersist(FmdbColumnArtifact.PROPAGATION_SUMMARY));
         assertEquals(FmdbWriteMode.DIRECT_APPEND, config.getWriteMode());
@@ -72,14 +75,15 @@ class FmdbPersistenceConfigTest {
 
     @Test
     void shouldRejectMissingModelDependencies() {
-        assertThrows(RahaConfigurationException.class,
-                () -> FmdbPersistenceConfig.builder()
-                        .table(FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT, false)
-                        .build());
-        assertThrows(RahaConfigurationException.class,
-                () -> FmdbPersistenceConfig.builder()
-                        .columnArtifact(FmdbColumnArtifact.FEATURE_DICTIONARY, false)
-                        .build());
+        FmdbPersistenceConfig modelOnly = FmdbPersistenceConfig.builder()
+                .table(FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT, false)
+                .table(FmdbPhysicalTable.TRAINING_CELL, false)
+                .table(FmdbPhysicalTable.TRAINING_EXAMPLE, false)
+                .columnArtifact(FmdbColumnArtifact.FEATURE_DICTIONARY, false)
+                .build();
+        assertTrue(modelOnly.shouldPersist(FmdbPhysicalTable.MODEL_ARTIFACT));
+        assertFalse(modelOnly.shouldPersist(
+                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT));
         assertThrows(RahaConfigurationException.class,
                 () -> FmdbPersistenceConfig.builder()
                         .table(FmdbPhysicalTable.JOB_RUN, false)

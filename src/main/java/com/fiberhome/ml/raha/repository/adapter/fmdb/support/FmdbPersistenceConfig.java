@@ -159,20 +159,6 @@ public final class FmdbPersistenceConfig {
         }
         requireTableDependency(FmdbPhysicalTable.ANNOTATION_RECORD,
                 FmdbPhysicalTable.SAMPLE_RECORD);
-        requireTableDependency(FmdbPhysicalTable.TRAINING_CELL,
-                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT);
-        requireArtifactDependency(FmdbPhysicalTable.TRAINING_CELL,
-                FmdbColumnArtifact.FEATURE_DICTIONARY);
-        requireTableDependency(FmdbPhysicalTable.TRAINING_EXAMPLE,
-                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT);
-        requireArtifactDependency(FmdbPhysicalTable.TRAINING_EXAMPLE,
-                FmdbColumnArtifact.FEATURE_DICTIONARY);
-        requireTableDependency(FmdbPhysicalTable.MODEL_ARTIFACT,
-                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT);
-        requireArtifactDependency(FmdbPhysicalTable.MODEL_ARTIFACT,
-                FmdbColumnArtifact.STRATEGY_PLAN);
-        requireArtifactDependency(FmdbPhysicalTable.MODEL_ARTIFACT,
-                FmdbColumnArtifact.FEATURE_DICTIONARY);
         requireTableDependency(FmdbPhysicalTable.JOB_STAGE_ATTEMPT,
                 FmdbPhysicalTable.JOB_RUN);
     }
@@ -275,7 +261,9 @@ public final class FmdbPersistenceConfig {
             for (FmdbPhysicalTable table : FmdbPhysicalTable.values()) {
                 tableSwitches.put(table, true);
             }
+            tableSwitches.put(FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT, false);
             tableSwitches.put(FmdbPhysicalTable.TRAINING_CELL, false);
+            tableSwitches.put(FmdbPhysicalTable.TRAINING_EXAMPLE, false);
             for (FmdbColumnArtifact artifact : FmdbColumnArtifact.values()) {
                 columnArtifactSwitches.put(artifact, true);
             }

@@ -219,11 +219,10 @@ class FmdbAdapterIntegrationTest {
                 FmdbPersistenceConfig.fromDefaults());
 
         ColumnModelArtifact loadedModel = restarted.load(modelPath);
-        FeatureDictionary loadedDictionary = restarted.loadDictionary(dictionary.getVersion());
         assertEquals(artifact.getModelVersion(), loadedModel.getModelVersion());
         assertEquals(artifact.getCoefficients(), loadedModel.getCoefficients());
-        assertEquals(dictionary.getVersion(), loadedDictionary.getVersion());
-        assertEquals(2, loadedDictionary.getDefinitions().size());
+        assertThrows(UnsupportedOperationException.class,
+                () -> restarted.loadDictionary(dictionary.getVersion()));
 
         assertEquals(modelPath, restarted.save(artifact, modelContext()));
         assertEquals(1L, gateway.read(MODEL_TABLE).count());

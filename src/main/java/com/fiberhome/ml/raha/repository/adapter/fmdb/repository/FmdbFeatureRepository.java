@@ -99,22 +99,9 @@ public final class FmdbFeatureRepository implements FeatureRepository {
         if (pending != null) {
             return Optional.of(pending);
         }
-        if (!persistenceConfig.shouldPersist(
-                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT)
-                || !tableGateway.tableExists(columnArtifactTable)) {
-            return Optional.empty();
-        }
-        List<Row> rows = tableGateway.read(columnArtifactTable,
-                java.util.Arrays.asList("feature_dictionary_json", "created_at"),
-                functions.col("training_batch_id").equalTo(jobId)
-                        .and(functions.col("column_name").equalTo(columnName))
-                        .and(functions.col("feature_dictionary_json").isNotNull()))
-                .orderBy(functions.col("created_at").desc()).limit(1).collectAsList();
-        LOGGER.debug("FMDB 特征字典恢复完成，jobId={}，columnName={}，found={}",
-                jobId, columnName, !rows.isEmpty());
-        return rows.isEmpty() ? Optional.empty()
-                : Optional.of(FmdbFeatureDictionaryCodec.read(
-                (String) rows.get(0).getAs("feature_dictionary_json")));
+        LOGGER.debug("训练特征字典仅使用当前任务缓存，未命中缓存，jobId={}，columnName={}",
+                jobId, columnName);
+        return Optional.empty();
     }
 
     @Override
@@ -125,37 +112,9 @@ public final class FmdbFeatureRepository implements FeatureRepository {
         if (pending != null) {
             return pending;
         }
-        if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.TRAINING_CELL)
-                || !tableGateway.tableExists(trainingCellTable)) {
-            return Collections.emptyList();
-        }
-        List<Row> rows = tableGateway.read(trainingCellTable,
-                java.util.Arrays.asList("dataset_id", "training_snapshot_id",
-                        "row_id", "column_name", "cell_id", "cell_value",
-                        "feature_dictionary_version", "feature_vector_json",
-                        "feature_summary_json"),
-                functions.col("training_batch_id").equalTo(jobId)
-                        .and(functions.col("column_name").equalTo(columnName)))
-                .collectAsList();
-        List<SparseFeatureRow> result = new ArrayList<SparseFeatureRow>(rows.size());
-        for (Row row : rows) {
-            String value = row.getAs("cell_value");
-            CellCoordinate coordinate = new CellCoordinate(
-                    (String) row.getAs("dataset_id"),
-                    (String) row.getAs("training_snapshot_id"),
-                    (String) row.getAs("row_id"),
-                    (String) row.getAs("column_name"));
-            String valueHash = HashUtils.md5Hex(value == null ? "<null>" : value);
-            result.add(new SparseFeatureRow((String) row.getAs("cell_id"),
-                    coordinate.getColumnName(), coordinate, valueHash, null,
-                    (String) row.getAs("feature_dictionary_version"),
-                    featureValues((String) row.getAs("feature_vector_json")),
-                    stringValues((String) row.getAs("feature_summary_json"))));
-        }
-        Collections.sort(result, Comparator.comparing(SparseFeatureRow::getCellId));
-        LOGGER.debug("FMDB 特征向量恢复完成，jobId={}，columnName={}，rowCount={}",
-                jobId, columnName, result.size());
-        return Collections.unmodifiableList(result);
+        LOGGER.debug("训练特征向量仅使用当前任务缓存，未命中缓存，jobId={}，columnName={}",
+                jobId, columnName);
+        return Collections.emptyList();
     }
 
     private static Map<Integer, Double> featureValues(String json) {

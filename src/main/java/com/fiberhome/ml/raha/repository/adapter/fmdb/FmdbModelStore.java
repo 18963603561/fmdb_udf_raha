@@ -165,39 +165,13 @@ public final class FmdbModelStore implements ColumnModelStore {
     }
 
     /**
-     * 从训练列级产物表按不可变版本加载特征字典。
+     * 训练列级产物表只作为审计记录，不再支持恢复特征字典。
      */
     public FeatureDictionary loadDictionary(String dictionaryVersion) {
         String version = ValueUtils.requireNotBlank(
                 dictionaryVersion, "FMDB 特征字典版本");
-        FeatureDictionary cached = dictionaryCache.get(version);
-        if (cached != null) {
-            return cached;
-        }
-        if (!persistenceConfig.shouldPersist(FmdbColumnArtifact.FEATURE_DICTIONARY)) {
-            throw new IllegalStateException("FMDB 特征字典入库已关闭且当前缓存不存在字典："
-                    + version);
-        }
-        if (!tableGateway.tableExists(columnArtifactTable)) {
-            throw new IllegalStateException("FMDB 训练列级产物表不存在："
-                    + columnArtifactTable);
-        }
-        List<Row> rows = tableGateway.read(columnArtifactTable,
-                        Arrays.asList("feature_dictionary_version",
-                                "feature_dictionary_json", "created_at"),
-                        functions.col("feature_dictionary_version").equalTo(version))
-                .orderBy(functions.col("created_at").desc()).limit(2).collectAsList();
-        if (rows.isEmpty()) {
-            throw new IllegalStateException("FMDB 中不存在特征字典版本：" + version);
-        }
-        FeatureDictionary dictionary = FmdbFeatureDictionaryCodec.read(
-                (String) rows.get(0).getAs("feature_dictionary_json"));
-        if (!version.equals(dictionary.getVersion())) {
-            throw new IllegalStateException("FMDB 特征字典版本与 JSON 内容不一致："
-                    + version);
-        }
-        dictionaryCache.put(version, dictionary);
-        return dictionary;
+        throw new UnsupportedOperationException(
+                "训练列级产物表仅作为审计记录，不再支持按版本恢复特征字典：" + version);
     }
 
     private ColumnModelArtifact findModel(String version) {

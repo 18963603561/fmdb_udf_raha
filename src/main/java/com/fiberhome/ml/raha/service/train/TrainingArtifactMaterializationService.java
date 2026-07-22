@@ -106,6 +106,17 @@ public final class TrainingArtifactMaterializationService {
         if (createdAt <= 0L) {
             throw new IllegalStateException("训练物化时钟必须返回正时间");
         }
+        boolean persistColumnArtifact = repository.isColumnArtifactPersistenceEnabled();
+        boolean persistTrainingCell = repository.isTrainingCellPersistenceEnabled();
+        boolean persistTrainingExample = repository.isTrainingExamplePersistenceEnabled();
+        long partitionTime = createdAt;
+        String partitionMonth = FmdbPartitionUtils.month(partitionTime);
+        if (!persistColumnArtifact && !persistTrainingCell && !persistTrainingExample) {
+            LOGGER.debug("训练审计记录默认关闭，跳过训练产物记录构造，trainingBatchId={}",
+                    merge.getTrainingBatchId());
+            return new TrainingArtifactMaterializationResult(0L, 0L, 0L,
+                    0, 0, partitionMonth, modelSet);
+        }
         Map<String, Map<String, Object>> rowValues = trustedRows(merge);
         Map<String, CellLabel> directLabels = new HashMap<String, CellLabel>();
         Map<String, CellLabel> propagatedLabels = new HashMap<String, CellLabel>();
@@ -124,8 +135,6 @@ public final class TrainingArtifactMaterializationService {
         List<FmdbTrainingCellRecord> cells = new ArrayList<FmdbTrainingCellRecord>();
         List<FmdbTrainingExampleRecord> examples =
                 new ArrayList<FmdbTrainingExampleRecord>();
-        long partitionTime = createdAt;
-        String partitionMonth = FmdbPartitionUtils.month(partitionTime);
         for (SparseFeatureRow row : features.getRows()) {
             CellCoordinate coordinate = row.getCoordinate();
             if (coordinate == null || !merge.getTrainingSnapshotId().equals(
@@ -162,7 +171,9 @@ public final class TrainingArtifactMaterializationService {
                     propagated == null ? null : propagated.getLabel(), source,
                     direct == null && propagated == null ? null : annotationBatchId,
                     weight, createdAt);
-            cells.add(cell);
+            if (persistTrainingCell) {
+                cells.add(cell);
+            }
             CellLabel selected = direct == null ? propagated : direct;
             ColumnTrainingExample frozen = frozenByColumn.get(row.getColumnName())
                     == null ? null : frozenByColumn.get(row.getColumnName()).get(row.getCellId());
@@ -172,7 +183,7 @@ public final class TrainingArtifactMaterializationService {
                 // 特征行没有进入最终训练集是允许的，但不应被误写入训练样本表。
                 continue;
             }
-            if (frozenTrainingDatasets == null && selected != null) {
+            if (persistTrainingExample && frozenTrainingDatasets == null && selected != null) {
                 examples.add(new FmdbTrainingExampleRecord(modelSet,
                         merge.getTrainingBatchId(), merge.getDataset().getDatasetId(),
                         coordinate.getRowId(), row.getColumnName(), row.getCellId(),
@@ -182,7 +193,7 @@ public final class TrainingArtifactMaterializationService {
                         annotationBatchId, selected.getSampleWeight(),
                         cluster == null ? null : cluster.getClusterId(), createdAt,
                         partitionMonth));
-            } else if (frozen != null) {
+            } else if (persistTrainingExample && frozen != null) {
                 examples.add(new FmdbTrainingExampleRecord(modelSet,
                         merge.getTrainingBatchId(), merge.getDataset().getDatasetId(),
                         coordinate.getRowId(), row.getColumnName(), row.getCellId(),
@@ -195,54 +206,18 @@ public final class TrainingArtifactMaterializationService {
                         partitionMonth));
             }
         }
-        List<FmdbTrainingColumnArtifactRecord> artifacts = columnArtifacts(
-                merge, features, clustering, propagation, modelSet, strategyPlanVersion,
-                profileJsonByColumn, strategyPlanJsonByColumn, createdAt);
+        List<FmdbTrainingColumnArtifactRecord> artifacts = persistColumnArtifact
+                ? columnArtifacts(merge, features, clustering, propagation, modelSet,
+                strategyPlanVersion, profileJsonByColumn, strategyPlanJsonByColumn,
+                createdAt)
+                : Collections.<FmdbTrainingColumnArtifactRecord>emptyList();
         long artifactWritten = repository.saveColumnArtifacts(artifacts);
         long cellWritten = repository.saveTrainingCells(cells);
         long exampleWritten = repository.saveTrainingExamples(examples);
-        assertPersisted("训练列级产物", artifacts.size(),
-                repository.countColumnArtifacts(merge.getDataset().getDatasetId(),
-                        merge.getTrainingBatchId()),
-                repository.isColumnArtifactPersistenceEnabled());
-        assertPersisted("训练单元格", cells.size(),
-                repository.countTrainingCells(merge.getDataset().getDatasetId(),
-                        merge.getTrainingBatchId()),
-                repository.isTrainingCellPersistenceEnabled());
-        assertPersisted("训练样本", examples.size(),
-                repository.countTrainingExamples(merge.getDataset().getDatasetId(),
-                        partitionMonth, modelSet),
-                repository.isTrainingExamplePersistenceEnabled());
-        LOGGER.info("训练产物物化完成，trainingBatchId={}，columnCount={}，"
-                        + "cellCount={}，exampleCount={}", merge.getTrainingBatchId(),
-                artifacts.size(), cells.size(), examples.size());
+        LOGGER.info("训练审计记录写入完成，trainingBatchId={}，columnRecordCount={}，cellRecordCount={}，exampleRecordCount={}",
+                merge.getTrainingBatchId(), artifacts.size(), cells.size(), examples.size());
         return new TrainingArtifactMaterializationResult(artifactWritten, cellWritten,
                 exampleWritten, cells.size(), examples.size(), partitionMonth, modelSet);
-    }
-
-    /** 判断最终训练样本是否已开启物理持久化。 */
-    public boolean isTrainingExamplePersistenceEnabled() {
-        return repository.isTrainingExamplePersistenceEnabled();
-    }
-
-    /** 从最终训练样本表按模型集合恢复一个字段的训练数据。 */
-    public ColumnTrainingDataset loadFrozenTrainingDataset(
-            String datasetId,
-            String partitionMonth,
-            String modelSetVersion,
-            String columnName,
-            String featureDictionaryVersion,
-            int featureDimension) {
-        return repository.loadFrozenTrainingDataset(datasetId, partitionMonth,
-                modelSetVersion, columnName, featureDictionaryVersion, featureDimension);
-    }
-
-    private static void assertPersisted(String name, int expected, long actual,
-                                        boolean enabled) {
-        if (enabled && expected != actual) {
-            throw new IllegalStateException(name + "物理记录数量不一致，expected="
-                    + expected + "，actual=" + actual);
-        }
     }
 
     private static Map<String, Map<String, ColumnTrainingExample>> indexFrozenExamples(

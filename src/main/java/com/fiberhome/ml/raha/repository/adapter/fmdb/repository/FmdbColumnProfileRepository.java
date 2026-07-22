@@ -130,38 +130,9 @@ public final class FmdbColumnProfileRepository
                                                  String snapshotId) {
         String validatedDataset = ValueUtils.requireNotBlank(datasetId, "数据集标识");
         String validatedSnapshot = ValueUtils.requireNotBlank(snapshotId, "快照标识");
-        if (!persistenceConfig.shouldPersist(
-                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT)
-                || !tableGateway.tableExists(tableName)) {
-            return Collections.emptyList();
-        }
-        LOGGER.debug("开始从 FMDB 恢复训练列画像，datasetId={}，snapshotId={}",
+        LOGGER.debug("训练列画像仅使用当前任务缓存，未命中缓存，datasetId={}，snapshotId={}",
                 validatedDataset, validatedSnapshot);
-        List<Row> rows = tableGateway.read(tableName,
-                java.util.Arrays.asList("column_name", "training_context_json",
-                        "profile_json", "created_at"),
-                functions.col("dataset_id").equalTo(validatedDataset)
-                        .and(functions.col("profile_json").isNotNull()))
-                .collectAsList();
-        Map<String, Row> latest = new LinkedHashMap<String, Row>();
-        for (Row row : rows) {
-            Map<String, Object> context = FmdbJsonCodec.readObject(
-                    (String) row.getAs("training_context_json"));
-            if (!validatedSnapshot.equals(context.get("trainingSnapshotId"))) {
-                continue;
-            }
-            String column = row.getAs("column_name");
-            Row previous = latest.get(column);
-            if (previous == null || number(row, "created_at")
-                    > number(previous, "created_at")) {
-                latest.put(column, row);
-            }
-        }
-        List<ColumnProfile> profiles = new ArrayList<ColumnProfile>(latest.size());
-        for (Row row : latest.values()) {
-            profiles.add(FmdbColumnProfileCodec.read((String) row.getAs("profile_json")));
-        }
-        return profiles;
+        return Collections.emptyList();
     }
 
     private static long number(Row row, String column) {

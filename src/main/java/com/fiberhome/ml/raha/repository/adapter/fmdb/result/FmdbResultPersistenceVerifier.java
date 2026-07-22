@@ -15,8 +15,6 @@ import com.fiberhome.ml.raha.sampling.service.SampleMaterializationResult;
 import com.fiberhome.ml.raha.service.common.RahaServiceResult;
 import com.fiberhome.ml.raha.service.detect.RahaDetectOutput;
 import com.fiberhome.ml.raha.service.train.RahaTrainOutput;
-import com.fiberhome.ml.raha.service.train.TrainingArtifactMaterializationResult;
-import com.fiberhome.ml.raha.service.train.TrainingMergeResult;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -102,40 +100,16 @@ public final class FmdbResultPersistenceVerifier
             throw new IllegalStateException("训练结果缺少类型化输出");
         }
         RahaTrainOutput output = (RahaTrainOutput) result.getPayload();
-        TrainingArtifactMaterializationResult materialization =
-                output.getMaterializationResult();
-        Object mergeValue = context.getAttributes().get(
-                StageAttributeKeys.TRAINING_MERGE_RESULT);
         if (output.getModelSetVersion() == null) {
             throw new IllegalStateException("训练结果缺少模型集合版本");
         }
         String datasetId;
-        if (materialization != null && mergeValue instanceof TrainingMergeResult) {
-            TrainingMergeResult merge = (TrainingMergeResult) mergeValue;
-            datasetId = merge.getDataset().getDatasetId();
-            long artifacts = count(FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT,
-                    functions.col("dataset_id").equalTo(datasetId)
-                            .and(functions.col("training_batch_id")
-                                    .equalTo(merge.getTrainingBatchId())),
-                    "column_name");
-            requireCount("训练列级产物",
-                    output.getFeatures().getDictionaries().size(), artifacts);
-            long examples = count(FmdbPhysicalTable.TRAINING_EXAMPLE,
-                    functions.col("dataset_id").equalTo(datasetId)
-                            .and(functions.col("partition_month").equalTo(
-                                    materialization.getPartitionMonth()))
-                            .and(functions.col("model_set_version").equalTo(
-                                    output.getModelSetVersion())), "cell_id");
-            requireCount("最终训练样本",
-                    materialization.getMaterializedExampleCount(), examples);
+        Object datasetValue = context.getAttributes().get(
+                StageAttributeKeys.RAHA_DATASET);
+        if (datasetValue instanceof RahaDataset) {
+            datasetId = ((RahaDataset) datasetValue).getDatasetId();
         } else {
-            Object datasetValue = context.getAttributes().get(
-                    StageAttributeKeys.RAHA_DATASET);
-            if (datasetValue instanceof RahaDataset) {
-                datasetId = ((RahaDataset) datasetValue).getDatasetId();
-            } else {
-                datasetId = context.getConfig().getDatasetId();
-            }
+            datasetId = context.getConfig().getDatasetId();
         }
         long models = distinctCount(FmdbPhysicalTable.MODEL_ARTIFACT,
                 functions.col("dataset_id").equalTo(datasetId)

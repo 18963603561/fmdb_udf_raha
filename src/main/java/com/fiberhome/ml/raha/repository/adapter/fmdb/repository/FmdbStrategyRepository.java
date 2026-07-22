@@ -148,32 +148,15 @@ public final class FmdbStrategyRepository implements StrategyRepository {
     private List<Row> artifactRowsBySnapshot(String datasetId, String snapshotId) {
         String dataset = ValueUtils.requireNotBlank(datasetId, "数据集标识");
         String snapshot = ValueUtils.requireNotBlank(snapshotId, "快照标识");
-        List<Row> matches = new ArrayList<Row>();
-        for (Row row : artifactRows(functions.col("dataset_id").equalTo(dataset))) {
-            Map<String, Object> context = FmdbJsonCodec.readObject(
-                    (String) row.getAs("training_context_json"));
-            if (snapshot.equals(context.get("trainingSnapshotId"))) {
-                matches.add(row);
-            }
-        }
-        return matches;
+        LOGGER.debug("训练策略计划仅使用当前任务缓存，未命中缓存，datasetId={}，snapshotId={}",
+                dataset, snapshot);
+        return Collections.emptyList();
     }
 
     private List<Row> artifactRowsByBatch(String jobId) {
-        return artifactRows(functions.col("training_batch_id").equalTo(jobId));
-    }
-
-    private List<Row> artifactRows(org.apache.spark.sql.Column condition) {
-        if (!persistenceConfig.shouldPersist(
-                FmdbPhysicalTable.TRAINING_COLUMN_ARTIFACT)
-                || !tableGateway.tableExists(tableName)) {
-            return Collections.emptyList();
-        }
-        LOGGER.debug("开始从 FMDB 恢复策略列级产物，tableName={}", tableName);
-        return tableGateway.read(tableName,
-                java.util.Arrays.asList("training_context_json", "strategy_plan_json"),
-                condition.and(functions.col("strategy_plan_json").isNotNull()))
-                .collectAsList();
+        String validated = ValueUtils.requireNotBlank(jobId, "任务标识");
+        LOGGER.debug("训练策略计划仅使用当前任务缓存，未命中缓存，jobId={}", validated);
+        return Collections.emptyList();
     }
 
     private static List<StrategyPlan> immutablePlans(List<StrategyPlan> source) {

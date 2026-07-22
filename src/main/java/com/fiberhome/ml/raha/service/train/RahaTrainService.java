@@ -328,7 +328,7 @@ public final class RahaTrainService {
                             + "sourceName={}，modelSetVersion={}",
                     request.getJobId(), request.getDataset().getDatasetId(),
                     modelSource.getSourceName(), modelSetVersion);
-            Map<String, ColumnTrainingDataset> frozenDatasets = null;
+            Map<String, ColumnTrainingDataset> builtDatasetsForTraining = null;
             TrainingArtifactMaterializationResult materialization = null;
             if (mergeResult != null) {
                 if (artifactMaterializationService == null) {
@@ -336,18 +336,17 @@ public final class RahaTrainService {
                 }
                 Map<String, ColumnTrainingDataset> builtDatasets = buildTrainingDatasets(request, features,
                         trainingPropagation, planVersion);
-                if (!artifactMaterializationService.isTrainingExamplePersistenceEnabled()) {
-                    throw new IllegalStateException("首个可用训练闭环必须开启最终训练样本持久化");
-                }
+                builtDatasetsForTraining = builtDatasets;
                 materialization =
                         artifactMaterializationService.materialize(mergeResult, features,
                         clustering, trainingPropagation, modelSetVersion, planVersion,
                         builtDatasets, profileJsonByColumn(request.getDataset()),
                         strategyPlanJsonByColumn(plans, strategyBatch));
-                frozenDatasets = loadFrozenDatasets(request, features, modelSetVersion,
-                        materialization);
+                LOGGER.debug("训练审计记录已提交，jobId={}，modelSetVersion={}",
+                        request.getJobId(), modelSetVersion);
             }
-            final Map<String, ColumnTrainingDataset> trainingDatasets = frozenDatasets;
+            final Map<String, ColumnTrainingDataset> trainingDatasets =
+                    builtDatasetsForTraining;
             final FeatureAssemblyResult trainingFeatures = features;
             Map<String, ColumnModelTrainingResult> trainingResults =
                     new LinkedHashMap<String, ColumnModelTrainingResult>();
@@ -564,30 +563,6 @@ public final class RahaTrainService {
         }
         LOGGER.info("最终训练样本构建完成，jobId={}，columnCount={}，sampleCount={}",
                 request.getJobId(), result.size(), sampleCount(result));
-        return result;
-    }
-
-    private Map<String, ColumnTrainingDataset> loadFrozenDatasets(
-            RahaTrainRequest request,
-            FeatureAssemblyResult features,
-            String modelSetVersion,
-            TrainingArtifactMaterializationResult materialization) {
-        Map<String, ColumnTrainingDataset> result =
-                new LinkedHashMap<String, ColumnTrainingDataset>();
-        for (Map.Entry<String, FeatureDictionary> entry
-                : features.getDictionaries().entrySet()) {
-            result.put(entry.getKey(), artifactMaterializationService
-                    .loadFrozenTrainingDataset(request.getDataset().getDatasetId(),
-                            materialization.getPartitionMonth(), modelSetVersion,
-                            entry.getKey(), entry.getValue().getVersion(),
-                            entry.getValue().getDefinitions().size()));
-        }
-        long sampleCount = sampleCount(result);
-        if (sampleCount != materialization.getMaterializedExampleCount()) {
-            throw new IllegalStateException("冻结训练样本读取数量与写入数量不一致");
-        }
-        LOGGER.info("冻结训练样本读取完成，jobId={}，modelSetVersion={}，sampleCount={}",
-                request.getJobId(), modelSetVersion, sampleCount);
         return result;
     }
 

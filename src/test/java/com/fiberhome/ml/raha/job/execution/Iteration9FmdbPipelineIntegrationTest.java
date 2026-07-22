@@ -107,6 +107,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -188,9 +189,9 @@ class Iteration9FmdbPipelineIntegrationTest {
         FmdbModelStore restartedStore = new FmdbModelStore(spark, fmdbGateway,
                 MODEL_TABLE, DICTIONARY_TABLE, clock,
                 FmdbPersistenceConfig.fromDefaults());
-        FeatureDictionary reloadedDictionary = restartedStore.loadDictionary(
-                trained.getPayload().getFeatures().getDictionaries().get("code").getVersion());
-        assertEquals("code", reloadedDictionary.getColumnName());
+        assertThrows(UnsupportedOperationException.class,
+                () -> restartedStore.loadDictionary(trained.getPayload()
+                        .getFeatures().getDictionaries().get("code").getVersion()));
         DetectionResultRepository detectionRepository =
                 new DefaultDetectionResultRepository(coreStorage);
         RahaDetectService detectService = new RahaDetectService(
