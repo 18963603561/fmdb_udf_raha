@@ -1,0 +1,75 @@
+26/07/21 13:14:42 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:14:42 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:14:43 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784639686564
+Time taken: 3.358 seconds
+Time taken: 0.099 seconds
+26/07/21 13:14:53 WARN package: Truncated the string representation of a plan since it was too large. This behavior can be adjusted by setting 'spark.sql.debug.maxToStringFields'.
+26/07/21 13:14:55 ERROR AbstractRahaGenericUdf: Raha UDF 获取 SparkSession 失败
+java.lang.IllegalStateException: SparkSession should only be created and accessed on the driver.
+	at org.apache.spark.sql.SparkSession$.org$apache$spark$sql$SparkSession$$assertOnDriver(SparkSession.scala:1158)
+	at org.apache.spark.sql.SparkSession$Builder.getOrCreate(SparkSession.scala:927)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.resolveSqlContext(AbstractRahaGenericUdf.java:194)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initialize(AbstractRahaGenericUdf.java:41)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initializeAndFoldConstants(AbstractRahaGenericUdf.java:77)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector$lzycompute(hiveUDFs.scala:154)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector(hiveUDFs.scala:153)
+	at org.apache.spark.sql.hive.HiveGenericUDF.eval(hiveUDFs.scala:174)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at scala.collection.Iterator$$anon$10.next(Iterator.scala:461)
+	at org.apache.spark.sql.execution.SparkPlan.$anonfun$getByteArrayRdd$1(SparkPlan.scala:365)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:890)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:890)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:365)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:329)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:90)
+	at org.apache.spark.scheduler.Task.run(Task.scala:136)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$3(Executor.scala:548)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:1504)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:551)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 13:14:55 WARN AbstractRahaGenericUdf: Raha UDF 已通过本地 task 线程兼容逻辑复用 SparkSession，仅适用于 spark-sql 本地执行验证
+java.lang.IllegalStateException: SparkSession should only be created and accessed on the driver.
+	at org.apache.spark.sql.SparkSession$.org$apache$spark$sql$SparkSession$$assertOnDriver(SparkSession.scala:1158)
+	at org.apache.spark.sql.SparkSession$Builder.getOrCreate(SparkSession.scala:927)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.resolveSqlContext(AbstractRahaGenericUdf.java:194)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initialize(AbstractRahaGenericUdf.java:41)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initializeAndFoldConstants(AbstractRahaGenericUdf.java:77)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector$lzycompute(hiveUDFs.scala:154)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector(hiveUDFs.scala:153)
+	at org.apache.spark.sql.hive.HiveGenericUDF.eval(hiveUDFs.scala:174)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at scala.collection.Iterator$$anon$10.next(Iterator.scala:461)
+	at org.apache.spark.sql.execution.SparkPlan.$anonfun$getByteArrayRdd$1(SparkPlan.scala:365)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:890)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:890)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:365)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:329)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:90)
+	at org.apache.spark.scheduler.Task.run(Task.scala:136)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$3(Executor.scala:548)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:1504)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:551)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 13:14:58 ERROR AbstractRahaGenericUdf: F_DW_DETRUN 执行失败
+java.lang.IllegalStateException: 模型集合不存在：ded3f7875f3f62361945078dbc9c2b0f93a7270d65e077929122884d9181417e
+	at com.fiberhome.ml.raha.service.task.RahaTaskRequestFactory.requirePublishedModelSet(RahaTaskRequestFactory.java:456)
+	at com.fiberhome.ml.raha.service.task.RahaTaskRequestFactory.detection(RahaTaskRequestFactory.java:380)
+	at com.fiberhome.ml.raha.udf.RahaDetectionUdfService.detect(RahaDetectionUdfService.java:307)
+	at com.fiberhome.ml.raha.udf.F_DW_DETRUN.doEvaluate(F_DW_DETRUN.java:23)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf$1.call(AbstractRahaGenericUdf.java:107)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf$1.call(AbstractRahaGenericUdf.java:1)
+	at java.base/java.util.concurrent.FutureTask.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+[{"status":"FAILED","errorcode":"UNEXPECTED_ERROR","errormessage":"模型集合不存在：ded3f7875f3f62361945078dbc9c2b0f93a7270d65e077929122884d9181417e","datasetid":null,"snapshotid":null,"sourcetype":null,"inputreference":null,"createdat":1784639698754,"jobid":null,"configversion":null,"idempotentkey":null,"reused":null,"forcerun":null,"forcerunid":null,"baseexecutioninputfingerprint":null,"executioninputfingerprint":null,"currentselectrule":null,"modelsetversion":null,"schemahash":null,"rowcount":null,"fieldcount":null,"validfieldcount":null,"modelfieldcount":null,"failedfieldcount":null,"detectedcellcount":null,"detectederrorcount":null,"resulttable":null,"detailzipname":null,"detailzipurl":null}]
+Time taken: 5.824 seconds, Fetched 1 row(s)

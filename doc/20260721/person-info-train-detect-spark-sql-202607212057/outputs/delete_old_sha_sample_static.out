@@ -1,0 +1,21 @@
+26/07/21 13:12:49 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:12:49 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:12:49 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784639572893
+Time taken: 5.289 seconds
+Time taken: 0.234 seconds
+26/07/21 13:13:02 WARN SessionState: METASTORE_FILTER_HOOK will be ignored, since hive.security.authorization.manager is set to instance of HiveAuthorizerFactory.
+Time taken: 4.743 seconds
+Time taken: 1.38 seconds
+Time taken: 1.306 seconds
+Time taken: 0.786 seconds
+Time taken: 0.198 seconds
+Time taken: 0.225 seconds
+26/07/21 13:13:10 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_sample_record/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+sample_after_delete	0
+Time taken: 1.174 seconds, Fetched 1 row(s)
+26/07/21 13:13:11 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_annotation_record/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+annotation_after_delete	0
+Time taken: 0.387 seconds, Fetched 1 row(s)

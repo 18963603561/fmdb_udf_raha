@@ -1,0 +1,53 @@
+26/07/21 13:10:43 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:10:43 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:10:44 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784639447191
+sample_batch_id     	string              	                    
+input_reference     	string              	                    
+source_version      	string              	                    
+row_identity_mode   	string              	                    
+row_key_columns_json	string              	                    
+row_fingerprint_algorithm	string              	                    
+row_fingerprint_version	string              	                    
+row_id              	string              	                    
+row_content_hash    	string              	                    
+schema_hash         	string              	                    
+column_schema_json  	string              	                    
+row_data_json       	string              	                    
+duplicate_count     	bigint              	                    
+sampling_version    	string              	                    
+sampling_context_json	string              	                    
+created_at          	bigint              	                    
+dataset_id          	string              	                    
+partition_month     	string              	                    
+# Partition Information	                    	                    
+# col_name          	data_type           	comment             
+dataset_id          	string              	                    
+partition_month     	string              	                    
+Time taken: 4.301 seconds, Fetched 22 row(s)
+annotation_batch_id 	string              	                    
+sample_batch_id     	string              	                    
+annotation_task_id  	string              	                    
+row_id              	string              	                    
+row_content_hash    	string              	                    
+row_data_json       	string              	                    
+template_version    	string              	                    
+file_name           	string              	                    
+schema_hash         	string              	                    
+annotation_json     	string              	                    
+annotator           	string              	                    
+batch_status        	string              	                    
+batch_record_count  	bigint              	                    
+valid_record_count  	bigint              	                    
+invalid_record_count	bigint              	                    
+supersedes_batch_id 	string              	                    
+annotated_at        	bigint              	                    
+dataset_id          	string              	                    
+partition_month     	string              	                    
+# Partition Information	                    	                    
+# col_name          	data_type           	comment             
+dataset_id          	string              	                    
+partition_month     	string              	                    
+Time taken: 0.1 seconds, Fetched 23 row(s)

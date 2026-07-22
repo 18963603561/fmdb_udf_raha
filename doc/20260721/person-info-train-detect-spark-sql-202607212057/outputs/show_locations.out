@@ -1,0 +1,120 @@
+26/07/21 13:33:28 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:33:28 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:33:29 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784640813045
+sample_batch_id     	string              	                    
+input_reference     	string              	                    
+source_version      	string              	                    
+row_identity_mode   	string              	                    
+row_key_columns_json	string              	                    
+row_fingerprint_algorithm	string              	                    
+row_fingerprint_version	string              	                    
+row_id              	string              	                    
+row_content_hash    	string              	                    
+schema_hash         	string              	                    
+column_schema_json  	string              	                    
+row_data_json       	string              	                    
+duplicate_count     	bigint              	                    
+sampling_version    	string              	                    
+sampling_context_json	string              	                    
+created_at          	bigint              	                    
+dataset_id          	string              	                    
+partition_month     	string              	                    
+# Partition Information	                    	                    
+# col_name          	data_type           	comment             
+dataset_id          	string              	                    
+partition_month     	string              	                    
+                    	                    	                    
+# Detailed Table Information	                    	                    
+Database            	dw                  	                    
+Table               	raha_sample_record  	                    
+Owner               	185                 	                    
+Created Time        	Tue Jul 21 03:38:02 UTC 2026	                    
+Last Access         	UNKNOWN             	                    
+Created By          	Spark 3.3.1         	                    
+Type                	EXTERNAL            	                    
+Provider            	ORC                 	                    
+Table Properties    	[TRANSLATED_TO_EXTERNAL=TRUE, external.table.purge=TRUE, raha.schema.version=1]	                    
+Location            	hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_sample_record	                    
+Serde Library       	org.apache.hadoop.hive.ql.io.orc.OrcSerde	                    
+InputFormat         	org.apache.hadoop.hive.ql.io.orc.OrcInputFormat	                    
+OutputFormat        	org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat	                    
+Partition Provider  	Catalog             	                    
+Time taken: 4.138 seconds, Fetched 38 row(s)
+model_set_version   	string              	                    
+dataset_id          	string              	                    
+schema_hash         	string              	                    
+training_batch_id   	string              	                    
+model_set_status    	string              	                    
+state_version       	int                 	                    
+strategy_plan_version	string              	                    
+merge_algorithm_version	string              	                    
+column_name         	string              	                    
+model_version       	string              	                    
+classifier_type     	string              	                    
+feature_dictionary_version	string              	                    
+feature_dimension   	int                 	                    
+threshold           	double              	                    
+model_path          	string              	                    
+model_payload_json  	string              	                    
+metrics_json        	string              	                    
+created_at          	bigint              	                    
+published_at        	bigint              	                    
+                    	                    	                    
+# Detailed Table Information	                    	                    
+Database            	dw                  	                    
+Table               	raha_model_artifact 	                    
+Owner               	185                 	                    
+Created Time        	Tue Jul 21 03:38:02 UTC 2026	                    
+Last Access         	UNKNOWN             	                    
+Created By          	Spark 3.3.1         	                    
+Type                	EXTERNAL            	                    
+Provider            	ORC                 	                    
+Table Properties    	[TRANSLATED_TO_EXTERNAL=TRUE, external.table.purge=TRUE, raha.schema.version=1]	                    
+Location            	hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_model_artifact	                    
+Serde Library       	org.apache.hadoop.hive.ql.io.orc.OrcSerde	                    
+InputFormat         	org.apache.hadoop.hive.ql.io.orc.OrcInputFormat	                    
+OutputFormat        	org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat	                    
+Time taken: 0.103 seconds, Fetched 34 row(s)
+detection_batch_id  	string              	                    
+input_reference     	string              	                    
+model_set_version   	string              	                    
+model_version       	string              	                    
+row_id              	string              	                    
+column_name         	string              	                    
+cell_id             	string              	                    
+original_value      	string              	                    
+row_data_json       	string              	                    
+score               	double              	                    
+threshold           	double              	                    
+error_reason_json   	string              	                    
+detected_at         	bigint              	                    
+dataset_id          	string              	                    
+partition_date      	string              	                    
+# Partition Information	                    	                    
+# col_name          	data_type           	comment             
+dataset_id          	string              	                    
+partition_date      	string              	                    
+                    	                    	                    
+# Detailed Table Information	                    	                    
+Database            	dw                  	                    
+Table               	raha_detection_result	                    
+Owner               	185                 	                    
+Created Time        	Tue Jul 21 03:38:03 UTC 2026	                    
+Last Access         	UNKNOWN             	                    
+Created By          	Spark 3.3.1         	                    
+Type                	EXTERNAL            	                    
+Provider            	ORC                 	                    
+Table Properties    	[TRANSLATED_TO_EXTERNAL=TRUE, external.table.purge=TRUE, raha.schema.version=1]	                    
+Location            	hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_detection_result	                    
+Serde Library       	org.apache.hadoop.hive.ql.io.orc.OrcSerde	                    
+InputFormat         	org.apache.hadoop.hive.ql.io.orc.OrcInputFormat	                    
+OutputFormat        	org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat	                    
+Partition Provider  	Catalog             	                    
+Time taken: 0.108 seconds, Fetched 35 row(s)
+dataset_id=fmdb-table%3Adw.person_info/partition_month=2026-07
+dataset_id=person_info/partition_month=2026-07
+Time taken: 0.341 seconds, Fetched 2 row(s)
+Error in query: SHOW PARTITIONS is not allowed on a table that is not partitioned: `dw`.`raha_model_artifact`

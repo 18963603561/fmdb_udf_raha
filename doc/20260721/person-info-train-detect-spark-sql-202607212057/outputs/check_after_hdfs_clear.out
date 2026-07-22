@@ -1,0 +1,20 @@
+26/07/21 13:39:40 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:39:40 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:39:41 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784641184887
+26/07/21 13:39:55 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_sample_record/dataset_id=fmdb-table%3Adw.person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 13:39:55 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_sample_record/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+raha_sample_record	0
+Time taken: 7.646 seconds, Fetched 1 row(s)
+26/07/21 13:39:56 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_annotation_record/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+raha_annotation_record	0
+Time taken: 0.452 seconds, Fetched 1 row(s)
+raha_model_artifact	0
+Time taken: 0.405 seconds, Fetched 1 row(s)
+26/07/21 13:39:57 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_detection_result/dataset_id=person_info/partition_date=2026-07-21 was not found. Was it deleted very recently?
+raha_detection_result	0
+Time taken: 0.43 seconds, Fetched 1 row(s)
+person_info	1000
+Time taken: 1.322 seconds, Fetched 1 row(s)

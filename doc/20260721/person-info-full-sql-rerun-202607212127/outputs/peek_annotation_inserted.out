@@ -1,0 +1,9 @@
+26/07/21 13:49:48 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:49:48 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:49:49 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784641792654
+26/07/21 13:50:00 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_annotation_record/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+{"cellLabels":{"name":0,"age":0,"phone":0,"id_card":1,"email":0,"home_address":0},"comment":"sql-auto-label","importFingerprint":"sql-auto-label-sample_dw.person_info_20260721134516.455","reviewedColumns":["name","age","phone","id_card","email","home_address"],"rowLabel":1,"sourceSnapshotId":"snapshot_dw.person_info@content-d6f8fc08216579c6a5e5a9df6ce7617a"}
+Time taken: 6.664 seconds, Fetched 1 row(s)

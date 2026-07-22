@@ -1,0 +1,16 @@
+26/07/21 13:09:40 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:09:40 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:09:40 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784639383880
+raha_sample_record	300
+Time taken: 9.437 seconds, Fetched 1 row(s)
+raha_annotation_record	300
+Time taken: 1.344 seconds, Fetched 1 row(s)
+raha_job_run	46
+Time taken: 2.759 seconds, Fetched 1 row(s)
+raha_model_artifact	18
+Time taken: 1.898 seconds, Fetched 1 row(s)
+raha_detection_result	576
+Time taken: 0.764 seconds, Fetched 1 row(s)

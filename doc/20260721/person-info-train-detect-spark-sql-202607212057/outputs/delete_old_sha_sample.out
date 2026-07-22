@@ -1,0 +1,20 @@
+26/07/21 13:11:41 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:11:41 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:11:42 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784639505415
+26/07/21 13:11:51 WARN SetCommand: 'SET hive.exec.dynamic.partition=true' might not work, since Spark doesn't support changing the Hive config dynamically. Please pass the Hive-specific config by adding the prefix spark.hadoop (e.g. spark.hadoop.hive.exec.dynamic.partition) when starting a Spark application. For details, see the link: https://spark.apache.org/docs/latest/configuration.html#dynamically-loading-spark-properties.
+hive.exec.dynamic.partition	true
+Time taken: 3.891 seconds, Fetched 1 row(s)
+26/07/21 13:11:52 WARN SetCommand: 'SET hive.exec.dynamic.partition.mode=nonstrict' might not work, since Spark doesn't support changing the Hive config dynamically. Please pass the Hive-specific config by adding the prefix spark.hadoop (e.g. spark.hadoop.hive.exec.dynamic.partition.mode) when starting a Spark application. For details, see the link: https://spark.apache.org/docs/latest/configuration.html#dynamically-loading-spark-properties.
+hive.exec.dynamic.partition.mode	nonstrict
+Time taken: 0.042 seconds, Fetched 1 row(s)
+Time taken: 0.146 seconds
+Time taken: 0.059 seconds
+26/07/21 13:11:53 WARN SessionState: METASTORE_FILTER_HOOK will be ignored, since hive.security.authorization.manager is set to instance of HiveAuthorizerFactory.
+Time taken: 4.901 seconds
+Time taken: 0.868 seconds
+Error in query: Cannot write incompatible data to table '`dw`.`raha_sample_record`':
+- Cannot write nullable values to non-null column 'dataset_id'
+- Cannot write nullable values to non-null column 'partition_month'

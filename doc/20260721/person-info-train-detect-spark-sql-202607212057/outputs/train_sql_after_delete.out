@@ -1,0 +1,66 @@
+26/07/21 13:13:47 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 13:13:47 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 13:13:48 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784639631232
+Time taken: 3.372 seconds
+Time taken: 0.108 seconds
+26/07/21 13:13:58 WARN package: Truncated the string representation of a plan since it was too large. This behavior can be adjusted by setting 'spark.sql.debug.maxToStringFields'.
+26/07/21 13:14:01 ERROR AbstractRahaGenericUdf: Raha UDF 获取 SparkSession 失败
+java.lang.IllegalStateException: SparkSession should only be created and accessed on the driver.
+	at org.apache.spark.sql.SparkSession$.org$apache$spark$sql$SparkSession$$assertOnDriver(SparkSession.scala:1158)
+	at org.apache.spark.sql.SparkSession$Builder.getOrCreate(SparkSession.scala:927)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.resolveSqlContext(AbstractRahaGenericUdf.java:194)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initialize(AbstractRahaGenericUdf.java:41)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initializeAndFoldConstants(AbstractRahaGenericUdf.java:77)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector$lzycompute(hiveUDFs.scala:154)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector(hiveUDFs.scala:153)
+	at org.apache.spark.sql.hive.HiveGenericUDF.eval(hiveUDFs.scala:174)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at scala.collection.Iterator$$anon$10.next(Iterator.scala:461)
+	at org.apache.spark.sql.execution.SparkPlan.$anonfun$getByteArrayRdd$1(SparkPlan.scala:365)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:890)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:890)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:365)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:329)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:90)
+	at org.apache.spark.scheduler.Task.run(Task.scala:136)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$3(Executor.scala:548)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:1504)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:551)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 13:14:01 WARN AbstractRahaGenericUdf: Raha UDF 已通过本地 task 线程兼容逻辑复用 SparkSession，仅适用于 spark-sql 本地执行验证
+java.lang.IllegalStateException: SparkSession should only be created and accessed on the driver.
+	at org.apache.spark.sql.SparkSession$.org$apache$spark$sql$SparkSession$$assertOnDriver(SparkSession.scala:1158)
+	at org.apache.spark.sql.SparkSession$Builder.getOrCreate(SparkSession.scala:927)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.resolveSqlContext(AbstractRahaGenericUdf.java:194)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initialize(AbstractRahaGenericUdf.java:41)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initializeAndFoldConstants(AbstractRahaGenericUdf.java:77)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector$lzycompute(hiveUDFs.scala:154)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector(hiveUDFs.scala:153)
+	at org.apache.spark.sql.hive.HiveGenericUDF.eval(hiveUDFs.scala:174)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at scala.collection.Iterator$$anon$10.next(Iterator.scala:461)
+	at org.apache.spark.sql.execution.SparkPlan.$anonfun$getByteArrayRdd$1(SparkPlan.scala:365)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:890)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:890)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:365)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:329)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:90)
+	at org.apache.spark.scheduler.Task.run(Task.scala:136)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$3(Executor.scala:548)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:1504)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:551)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 13:14:02 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_sample_record/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+[{"status":"FAILED","errorcode":"SAMPLE_NOT_FOUND","errormessage":"sampleBatchId 不存在：sample-15d1d5b6681c79f83f4adef1","datasetid":null,"snapshotid":null,"sourcetype":"SQL","inputreference":null,"createdat":1784639643765,"jobid":null,"configversion":null,"idempotentkey":null,"reused":null,"forcerun":null,"forcerunid":null,"baseexecutioninputfingerprint":null,"executioninputfingerprint":null,"currentselectrule":null,"samplebatchid":"sample-15d1d5b6681c79f83f4adef1","annotationbatchid":null,"annotationfilename":null,"annotationstatus":null,"annotationrecordcount":null,"validannotationcount":null,"invalidannotationcount":null,"modelsetversion":null,"columnname":null,"modelversion":null,"modelstatus":null,"classifiertype":null,"featuredictionaryversion":null,"strategyplanversion":null,"threshold":null,"metricjson":null,"reportzipname":null,"reportzipurl":null}]
+Time taken: 5.804 seconds, Fetched 1 row(s)

@@ -1,0 +1,193 @@
+26/07/21 14:00:29 WARN Utils: Your hostname, sql-analysis-0 resolves to a loopback address: 127.0.0.1; using 172.22.0.4 instead (on interface eth0)
+26/07/21 14:00:29 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/21 14:00:29 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: local[2], Application Id: local-1784642432893
+Time taken: 3.211 seconds
+Time taken: 0.112 seconds
+26/07/21 14:00:39 WARN package: Truncated the string representation of a plan since it was too large. This behavior can be adjusted by setting 'spark.sql.debug.maxToStringFields'.
+26/07/21 14:00:42 ERROR AbstractRahaGenericUdf: Raha UDF 获取 SparkSession 失败
+java.lang.IllegalStateException: SparkSession should only be created and accessed on the driver.
+	at org.apache.spark.sql.SparkSession$.org$apache$spark$sql$SparkSession$$assertOnDriver(SparkSession.scala:1158)
+	at org.apache.spark.sql.SparkSession$Builder.getOrCreate(SparkSession.scala:927)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.resolveSqlContext(AbstractRahaGenericUdf.java:194)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initialize(AbstractRahaGenericUdf.java:41)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initializeAndFoldConstants(AbstractRahaGenericUdf.java:77)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector$lzycompute(hiveUDFs.scala:154)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector(hiveUDFs.scala:153)
+	at org.apache.spark.sql.hive.HiveGenericUDF.eval(hiveUDFs.scala:174)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at scala.collection.Iterator$$anon$10.next(Iterator.scala:461)
+	at org.apache.spark.sql.execution.SparkPlan.$anonfun$getByteArrayRdd$1(SparkPlan.scala:365)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:890)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:890)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:365)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:329)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:90)
+	at org.apache.spark.scheduler.Task.run(Task.scala:136)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$3(Executor.scala:548)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:1504)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:551)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 14:00:42 WARN AbstractRahaGenericUdf: Raha UDF 已通过本地 task 线程兼容逻辑复用 SparkSession，仅适用于 spark-sql 本地执行验证
+java.lang.IllegalStateException: SparkSession should only be created and accessed on the driver.
+	at org.apache.spark.sql.SparkSession$.org$apache$spark$sql$SparkSession$$assertOnDriver(SparkSession.scala:1158)
+	at org.apache.spark.sql.SparkSession$Builder.getOrCreate(SparkSession.scala:927)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.resolveSqlContext(AbstractRahaGenericUdf.java:194)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initialize(AbstractRahaGenericUdf.java:41)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf.initializeAndFoldConstants(AbstractRahaGenericUdf.java:77)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector$lzycompute(hiveUDFs.scala:154)
+	at org.apache.spark.sql.hive.HiveGenericUDF.returnInspector(hiveUDFs.scala:153)
+	at org.apache.spark.sql.hive.HiveGenericUDF.eval(hiveUDFs.scala:174)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificUnsafeProjection.apply(Unknown Source)
+	at scala.collection.Iterator$$anon$10.next(Iterator.scala:461)
+	at org.apache.spark.sql.execution.SparkPlan.$anonfun$getByteArrayRdd$1(SparkPlan.scala:365)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:890)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:890)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:365)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:329)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:90)
+	at org.apache.spark.scheduler.Task.run(Task.scala:136)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$3(Executor.scala:548)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:1504)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:551)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 14:00:49 WARN SessionState: METASTORE_FILTER_HOOK will be ignored, since hive.security.authorization.manager is set to instance of HiveAuthorizerFactory.
+26/07/21 14:00:50 WARN RetryingMetaStoreClient: MetaStoreClient lost connection. Attempting to reconnect (1 of 1) after 1s. listPartitionsWithAuthInfo
+org.apache.thrift.transport.TTransportException: Cannot write to null outputStream
+	at org.apache.thrift.transport.TIOStreamTransport.write(TIOStreamTransport.java:142)
+	at org.apache.thrift.protocol.TBinaryProtocol.writeI32(TBinaryProtocol.java:185)
+	at org.apache.thrift.protocol.TBinaryProtocol.writeMessageBegin(TBinaryProtocol.java:116)
+	at org.apache.thrift.TServiceClient.sendBase(TServiceClient.java:70)
+	at org.apache.thrift.TServiceClient.sendBase(TServiceClient.java:62)
+	at org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore$Client.send_get_partitions_ps_with_auth(ThriftHiveMetastore.java:2562)
+	at org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore$Client.get_partitions_ps_with_auth(ThriftHiveMetastore.java:2549)
+	at org.apache.hadoop.hive.metastore.HiveMetaStoreClient.listPartitionsWithAuthInfo(HiveMetaStoreClient.java:1207)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source)
+	at org.apache.hadoop.hive.metastore.RetryingMetaStoreClient.invoke(RetryingMetaStoreClient.java:173)
+	at com.sun.proxy.$Proxy38.listPartitionsWithAuthInfo(Unknown Source)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source)
+	at org.apache.hadoop.hive.metastore.HiveMetaStoreClient$SynchronizedHandler.invoke(HiveMetaStoreClient.java:2327)
+	at com.sun.proxy.$Proxy38.listPartitionsWithAuthInfo(Unknown Source)
+	at org.apache.hadoop.hive.ql.metadata.Hive.getPartitions(Hive.java:2562)
+	at org.apache.hadoop.hive.ql.metadata.Hive.getPartitions(Hive.java:2588)
+	at org.apache.spark.sql.hive.client.Shim_v0_12.getPartitions(HiveShim.scala:655)
+	at org.apache.spark.sql.hive.client.HiveClientImpl.$anonfun$getPartitions$3(HiveClientImpl.scala:771)
+	at org.apache.spark.sql.hive.client.HiveClientImpl.$anonfun$withHiveState$1(HiveClientImpl.scala:298)
+	at org.apache.spark.sql.hive.client.HiveClientImpl.liftedTree1$1(HiveClientImpl.scala:229)
+	at org.apache.spark.sql.hive.client.HiveClientImpl.retryLocked(HiveClientImpl.scala:228)
+	at org.apache.spark.sql.hive.client.HiveClientImpl.withHiveState(HiveClientImpl.scala:278)
+	at org.apache.spark.sql.hive.client.HiveClientImpl.getPartitions(HiveClientImpl.scala:764)
+	at org.apache.spark.sql.hive.client.HiveClientImpl.getPartitions(HiveClientImpl.scala:759)
+	at org.apache.spark.sql.hive.HiveExternalCatalog.$anonfun$listPartitions$1(HiveExternalCatalog.scala:1263)
+	at org.apache.spark.sql.hive.HiveExternalCatalog.withClient(HiveExternalCatalog.scala:101)
+	at org.apache.spark.sql.hive.HiveExternalCatalog.listPartitions(HiveExternalCatalog.scala:1260)
+	at org.apache.spark.sql.catalyst.catalog.ExternalCatalogWithListener.listPartitions(ExternalCatalogWithListener.scala:254)
+	at org.apache.spark.sql.catalyst.catalog.SessionCatalog.listPartitions(SessionCatalog.scala:1261)
+	at org.apache.spark.sql.execution.datasources.InsertIntoHadoopFsRelationCommand.run(InsertIntoHadoopFsRelationCommand.scala:101)
+	at org.apache.spark.sql.execution.command.DataWritingCommandExec.sideEffectResult$lzycompute(commands.scala:113)
+	at org.apache.spark.sql.execution.command.DataWritingCommandExec.sideEffectResult(commands.scala:111)
+	at org.apache.spark.sql.execution.command.DataWritingCommandExec.executeCollect(commands.scala:125)
+	at org.apache.spark.sql.execution.QueryExecution$$anonfun$eagerlyExecuteCommands$1.$anonfun$applyOrElse$1(QueryExecution.scala:98)
+	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId$6(SQLExecution.scala:109)
+	at org.apache.spark.sql.execution.SQLExecution$.withSQLConfPropagated(SQLExecution.scala:169)
+	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId$1(SQLExecution.scala:95)
+	at org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:779)
+	at org.apache.spark.sql.execution.SQLExecution$.withNewExecutionId(SQLExecution.scala:64)
+	at org.apache.spark.sql.execution.QueryExecution$$anonfun$eagerlyExecuteCommands$1.applyOrElse(QueryExecution.scala:98)
+	at org.apache.spark.sql.execution.QueryExecution$$anonfun$eagerlyExecuteCommands$1.applyOrElse(QueryExecution.scala:94)
+	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$transformDownWithPruning$1(TreeNode.scala:584)
+	at org.apache.spark.sql.catalyst.trees.CurrentOrigin$.withOrigin(TreeNode.scala:176)
+	at org.apache.spark.sql.catalyst.trees.TreeNode.transformDownWithPruning(TreeNode.scala:584)
+	at org.apache.spark.sql.catalyst.plans.logical.LogicalPlan.org$apache$spark$sql$catalyst$plans$logical$AnalysisHelper$$super$transformDownWithPruning(LogicalPlan.scala:30)
+	at org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper.transformDownWithPruning(AnalysisHelper.scala:267)
+	at org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper.transformDownWithPruning$(AnalysisHelper.scala:263)
+	at org.apache.spark.sql.catalyst.plans.logical.LogicalPlan.transformDownWithPruning(LogicalPlan.scala:30)
+	at org.apache.spark.sql.catalyst.plans.logical.LogicalPlan.transformDownWithPruning(LogicalPlan.scala:30)
+	at org.apache.spark.sql.catalyst.trees.TreeNode.transformDown(TreeNode.scala:560)
+	at org.apache.spark.sql.execution.QueryExecution.eagerlyExecuteCommands(QueryExecution.scala:94)
+	at org.apache.spark.sql.execution.QueryExecution.commandExecuted$lzycompute(QueryExecution.scala:81)
+	at org.apache.spark.sql.execution.QueryExecution.commandExecuted(QueryExecution.scala:79)
+	at org.apache.spark.sql.execution.QueryExecution.assertCommandExecuted(QueryExecution.scala:116)
+	at org.apache.spark.sql.DataFrameWriter.runCommand(DataFrameWriter.scala:860)
+	at org.apache.spark.sql.DataFrameWriter.insertInto(DataFrameWriter.scala:489)
+	at org.apache.spark.sql.DataFrameWriter.insertInto(DataFrameWriter.scala:444)
+	at com.fiberhome.ml.raha.repository.adapter.fmdb.gateway.SparkSqlFmdbTableGateway.appendDirect(SparkSqlFmdbTableGateway.java:208)
+	at com.fiberhome.ml.raha.repository.adapter.fmdb.gateway.SparkSqlFmdbTableGateway.append(SparkSqlFmdbTableGateway.java:115)
+	at com.fiberhome.ml.raha.repository.adapter.fmdb.result.SparkSqlFmdbResultWriter.writeJob(SparkSqlFmdbResultWriter.java:120)
+	at com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbJobRepository.save(FmdbJobRepository.java:73)
+	at com.fiberhome.ml.raha.repository.adapter.fmdb.repository.FmdbJobRepository.save(FmdbJobRepository.java:56)
+	at com.fiberhome.ml.raha.job.execution.RahaJobOrchestrator.submit(RahaJobOrchestrator.java:101)
+	at com.fiberhome.ml.raha.service.task.RahaTaskApplicationService.execute(RahaTaskApplicationService.java:96)
+	at com.fiberhome.ml.raha.udf.RahaDetectionUdfService.detect(RahaDetectionUdfService.java:311)
+	at com.fiberhome.ml.raha.udf.F_DW_DETRUN.doEvaluate(F_DW_DETRUN.java:23)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf$1.call(AbstractRahaGenericUdf.java:107)
+	at com.fiberhome.ml.raha.udf.AbstractRahaGenericUdf$1.call(AbstractRahaGenericUdf.java:1)
+	at java.base/java.util.concurrent.FutureTask.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 14:00:55 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_run/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:00:56 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:03 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:09 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_run/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:09 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:22 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:27 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_run/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:27 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:29 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:33 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_run/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:01:34 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:02 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:06 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_run/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:06 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:09 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:12 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_run/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:13 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:16 WARN ColumnModelCompatibilityValidator: 模型字典版本与运行时字典版本不同，后续预测需完成结构校验和版本映射，columnName=name，modelDictionaryVersion=1002c044c4ec7de28b9b093e3a0d460b，runtimeDictionaryVersion=a6ba9035613a5febbbe4b5d592ed75d2
+26/07/21 14:02:16 WARN ColumnModelCompatibilityValidator: 模型字典版本与运行时字典版本不同，后续预测需完成结构校验和版本映射，columnName=id_card，modelDictionaryVersion=160b2bb902fa150428a9c55fae1cf775，runtimeDictionaryVersion=1518f7d818ee0c08e1ec51fa57df7ba1
+26/07/21 14:02:16 WARN ColumnModelCompatibilityValidator: 模型字典版本与运行时字典版本不同，后续预测需完成结构校验和版本映射，columnName=age，modelDictionaryVersion=23737757c29ca36387afbe25e71ee919，runtimeDictionaryVersion=11adfe71e8f7a544a553703f61a6e461
+26/07/21 14:02:16 ERROR BoundedParallelExecutor: 并行工作项执行失败，workKey=phone
+java.lang.IllegalStateException: 指定模型集合未提供唯一字段模型：dw.person_info@20260721135853.933-job-43d61f46-cee7-43b0-ae80-1202caebe51c/phone
+	at com.fiberhome.ml.raha.model.release.PublishedColumnModelLoader.load(PublishedColumnModelLoader.java:76)
+	at com.fiberhome.ml.raha.service.detect.RahaDetectService.detectColumn(RahaDetectService.java:191)
+	at com.fiberhome.ml.raha.service.detect.RahaDetectService.lambda$detect$0(RahaDetectService.java:102)
+	at com.fiberhome.ml.raha.parallel.BoundedParallelExecutor.lambda$execute$1(BoundedParallelExecutor.java:75)
+	at java.base/java.util.concurrent.FutureTask.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 14:02:17 WARN ColumnModelCompatibilityValidator: 模型字典版本与运行时字典版本不同，后续预测需完成结构校验和版本映射，columnName=email，modelDictionaryVersion=a32c45e94f37eaadfa6fdb7db84cbe87，runtimeDictionaryVersion=20f1d2a04ef824c67d6e5d85ec1ba8f5
+26/07/21 14:02:17 ERROR BoundedParallelExecutor: 并行工作项执行失败，workKey=home_address
+java.lang.IllegalStateException: 指定模型集合未提供唯一字段模型：dw.person_info@20260721135853.933-job-43d61f46-cee7-43b0-ae80-1202caebe51c/home_address
+	at com.fiberhome.ml.raha.model.release.PublishedColumnModelLoader.load(PublishedColumnModelLoader.java:76)
+	at com.fiberhome.ml.raha.service.detect.RahaDetectService.detectColumn(RahaDetectService.java:191)
+	at com.fiberhome.ml.raha.service.detect.RahaDetectService.lambda$detect$0(RahaDetectService.java:102)
+	at com.fiberhome.ml.raha.parallel.BoundedParallelExecutor.lambda$execute$1(BoundedParallelExecutor.java:75)
+	at java.base/java.util.concurrent.FutureTask.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+26/07/21 14:02:20 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:22 WARN RahaJobOrchestrator: Raha 阶段部分成功，context=jobId=job-ac1bf372-dfbb-49dd-bb21-160bc3c47abe,stageId=predict-d29dbb991f4953ea,attemptId=1,snapshotId=snapshot_dw.person_info@content-d6f8fc08216579c6a5e5a9df6ce7617a，stageType=PREDICT，errorCode=PARTIAL_DETECTION_FAILURE，elapsedMillis=6501，totalItemCount=6，failedItemCount=2
+26/07/21 14:02:24 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_run/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:24 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:27 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+26/07/21 14:02:33 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_detection_result/dataset_id=person_info/partition_date=2026-07-21 was not found. Was it deleted very recently?
+26/07/21 14:02:33 WARN POIDocument: DocumentSummaryInformation property set came back as null
+26/07/21 14:02:33 WARN POIDocument: SummaryInformation property set came back as null
+[{"status":"SUCCESS","errorcode":null,"errormessage":null,"datasetid":"fmdb-table:dw.person_info","snapshotid":"snapshot_dw.person_info@content-d6f8fc08216579c6a5e5a9df6ce7617a","sourcetype":"SQL","inputreference":"dw.person_info","createdat":1784642552931,"jobid":"job-ac1bf372-dfbb-49dd-bb21-160bc3c47abe","configversion":"a9f97dab35ff67d9caf2aea3a70b00d0","idempotentkey":"0505e9c943253b98c1de2835e29f6d8a","reused":false,"forcerun":false,"forcerunid":null,"baseexecutioninputfingerprint":"9c4943f179b8774211f72c2abedec47e","executioninputfingerprint":"9c4943f179b8774211f72c2abedec47e","currentselectrule":"LATEST_SUCCESS_BY_BASE_FINGERPRINT","modelsetversion":"dw.person_info@20260721135853.933-job-43d61f46-cee7-43b0-ae80-1202caebe51c","schemahash":"baad45317bd30e099d1f4dc2c981a5ad","rowcount":400,"fieldcount":6,"validfieldcount":6,"modelfieldcount":4,"failedfieldcount":2,"detectedcellcount":1600,"detectederrorcount":134,"resulttable":"dw.raha_detection_result","detailzipname":"raha-detrun_dw.person_info_20260721140232.zip","detailzipurl":"http://localhost:10030/fmdb_report/2026/7/21/raha-detrun_dw.person_info_20260721140232.zip"}]
+Time taken: 114.879 seconds, Fetched 1 row(s)
