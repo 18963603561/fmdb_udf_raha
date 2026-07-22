@@ -40,9 +40,8 @@ public final class RahaUdfDriverApp {
     private static final int REQUEST_ARG_INDEX = 1;
     /** 命令行输出路径参数下标。 */
     private static final int OUTPUT_ARG_INDEX = 2;
-    /** 默认调试函数配置项，用于 main 无参数时选择 COLLECT、TRAIN 或 DETECT。 */
-    private static final String DEBUG_FUNCTION_PROPERTY =
-            "raha.udf.debug.function";
+    /** 默认调试函数配置项，用于 main 无参数时选择 COLLECT 、 TRAIN 或 DETECT 。 */
+    private static final String DEBUG_FUNCTION_PROPERTY ="TRAIN";
     /** 默认调试函数值，未配置系统属性时使用该函数。 */
     private static final String DEFAULT_DEBUG_FUNCTION = "TRAIN";
     /** 默认调试数据根目录配置项，用于覆盖 datasets 下的默认 person_info 目录。 */

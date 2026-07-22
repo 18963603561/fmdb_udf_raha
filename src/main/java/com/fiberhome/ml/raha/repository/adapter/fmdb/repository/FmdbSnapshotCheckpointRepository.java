@@ -440,8 +440,8 @@ public final class FmdbSnapshotCheckpointRepository
     }
 
     private static String clusterKey(Row row) {
-        return String.valueOf(row.getAs("column_name")) + "|"
-                + String.valueOf(row.getAs("cluster_version"));
+        return String.valueOf((Object) row.getAs("column_name")) + "|"
+                + String.valueOf((Object) row.getAs("cluster_version"));
     }
 
     private static DatasetSnapshot snapshot(Map<String, Object> payload, Row row) {
