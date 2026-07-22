@@ -2,9 +2,11 @@ package com.fiberhome.ml.raha.service.task;
 
 import com.fiberhome.ml.raha.cluster.ClusterVersioner;
 import com.fiberhome.ml.raha.cluster.ColumnClusteringService;
-import com.fiberhome.ml.raha.cluster.algorithm.HierarchicalColumnClusterer;
+import com.fiberhome.ml.raha.cluster.algorithm.ClusteringProviderResolver;
+import com.fiberhome.ml.raha.cluster.algorithm.ColumnClusterer;
 import com.fiberhome.ml.raha.config.core.RahaDefaultConfigProvider;
 import com.fiberhome.ml.raha.config.core.RahaStorageMode;
+import com.fiberhome.ml.raha.config.dto.ClusteringConfig;
 import com.fiberhome.ml.raha.config.validation.ConfigVersioner;
 import com.fiberhome.ml.raha.config.validation.RahaConfigValidator;
 import com.fiberhome.ml.raha.data.loader.FileRahaDatasetLoader;
@@ -930,9 +932,11 @@ public final class RahaTaskApplicationServiceFactory {
      */
     private static ColumnClusteringService clusteringService(
             ClusterRepository repository, Clock clock) {
-        return new ColumnClusteringService(new HierarchicalColumnClusterer(
-                new ClusterVersioner(), clock),
-                repository, clock);
+        ClusteringConfig clusteringConfig = RahaDefaultConfigProvider.factory()
+                .clusteringConfig();
+        ColumnClusterer clusterer = ClusteringProviderResolver.resolve(
+                clusteringConfig.getProvider(), new ClusterVersioner(), clock);
+        return new ColumnClusteringService(clusterer, repository, clock);
     }
 
     /**

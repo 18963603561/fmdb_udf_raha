@@ -115,8 +115,8 @@ public final class RahaConfigFactory {
     }
 
     public ClusteringConfig clusteringConfig() {
-        return new ClusteringConfig(properties.getEnum(
-                "raha.clustering.distance-metric", ClusteringDistanceMetric.class),
+        return new ClusteringConfig(properties.getRequired("raha.clustering.provider"),
+                properties.getEnum("raha.clustering.distance-metric", ClusteringDistanceMetric.class),
                 properties.getInt("raha.clustering.target-cluster-count"),
                 properties.getInt("raha.clustering.max-sample-count"));
     }

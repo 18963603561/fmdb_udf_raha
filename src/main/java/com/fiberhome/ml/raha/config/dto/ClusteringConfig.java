@@ -1,14 +1,19 @@
 package com.fiberhome.ml.raha.config.dto;
 
+import com.fiberhome.ml.raha.cluster.algorithm.ClusteringProviderResolver;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringDistanceMetric;
 import com.fiberhome.ml.raha.config.core.ConfigTextUtils;
 import com.fiberhome.ml.raha.config.core.RahaDefaultConfigProvider;
 
 /**
- * 控制列内聚类距离、目标簇数量和小表样本上限。
+ * 单列聚类配置。
+ *
+ * <p>聚类提供方由 {@code provider} 指定，默认收敛到 Smile 层次聚类实现。</p>
  */
 public final class ClusteringConfig {
 
+    /** 聚类提供方名称。 */
+    private final String provider;
     /** 聚类距离度量。 */
     private final ClusteringDistanceMetric distanceMetric;
     /** 每列期望生成的簇数量。 */
@@ -19,6 +24,15 @@ public final class ClusteringConfig {
     public ClusteringConfig(ClusteringDistanceMetric distanceMetric,
                             int targetClusterCount,
                             int maxSampleCount) {
+        this(ClusteringProviderResolver.defaultProvider(), distanceMetric,
+                targetClusterCount, maxSampleCount);
+    }
+
+    public ClusteringConfig(String provider,
+                            ClusteringDistanceMetric distanceMetric,
+                            int targetClusterCount,
+                            int maxSampleCount) {
+        this.provider = provider == null ? null : provider.trim();
         this.distanceMetric = distanceMetric;
         this.targetClusterCount = targetClusterCount;
         this.maxSampleCount = maxSampleCount;
@@ -26,6 +40,10 @@ public final class ClusteringConfig {
 
     public static ClusteringConfig defaults() {
         return RahaDefaultConfigProvider.factory().clusteringConfig();
+    }
+
+    public String getProvider() {
+        return provider;
     }
 
     public ClusteringDistanceMetric getDistanceMetric() {
@@ -41,7 +59,9 @@ public final class ClusteringConfig {
     }
 
     String toCanonicalString() {
-        return ConfigTextUtils.token(distanceMetric)
+        return ConfigTextUtils.token(
+                ClusteringProviderResolver.canonicalProvider(provider))
+                + ConfigTextUtils.token(distanceMetric)
                 + ConfigTextUtils.token(targetClusterCount)
                 + ConfigTextUtils.token(maxSampleCount);
     }

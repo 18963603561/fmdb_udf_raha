@@ -9,6 +9,7 @@ import com.fiberhome.ml.raha.config.dto.RahaJobConfig;
 import com.fiberhome.ml.raha.config.dto.ResourceConfig;
 import com.fiberhome.ml.raha.config.dto.SamplingConfig;
 import com.fiberhome.ml.raha.config.dto.StrategyConfig;
+import com.fiberhome.ml.raha.cluster.algorithm.ClusteringProviderResolver;
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
 import java.util.HashSet;
 import java.util.Map;
@@ -171,9 +172,10 @@ public final class RahaConfigValidator {
     private void validateClustering(ClusteringConfig config) {
         if (config == null || config.getDistanceMetric() == null
                 || config.getTargetClusterCount() <= 0
-                || config.getMaxSampleCount() <= 0) {
+                || config.getMaxSampleCount() <= 0
+                || !ClusteringProviderResolver.isSupported(config.getProvider())) {
             fail(ConfigErrorCode.CLUSTERING_CONFIG_INVALID,
-                    "聚类距离、目标簇数量和样本上限必须有效");
+                    "聚类距离、目标簇数量、样本上限和提供方必须有效");
         }
     }
 

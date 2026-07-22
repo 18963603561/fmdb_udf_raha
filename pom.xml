@@ -22,6 +22,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <spark.version>3.3.1</spark.version>
         <scala.binary.version>2.12</scala.binary.version>
+        <smile.version>3.1.1</smile.version>
         <slf4j.version>1.7.36</slf4j.version>
         <junit.version>5.10.2</junit.version>
         <poi.version>5.2.5</poi.version>
@@ -54,6 +55,11 @@
             <artifactId>slf4j-api</artifactId>
             <version>${slf4j.version}</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.haifengl</groupId>
+            <artifactId>smile-core</artifactId>
+            <version>${smile.version}</version>
         </dependency>
         <dependency>
             <groupId>net.lingala.zip4j</groupId>
@@ -170,6 +176,10 @@
                                 <relocation>
                                     <pattern>org.apache.commons.io</pattern>
                                     <shadedPattern>raha.org.apache.commons.io</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>smile</pattern>
+                                    <shadedPattern>raha.smile</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>

@@ -42,6 +42,8 @@ class RahaConfigValidatorTest {
                 RowIdentityConfig.sourceKey("id"));
 
         assertDoesNotThrow(() -> validator.validate(config));
+        assertEquals("SmileHierarchicalColumnClusterer",
+                config.getClusteringConfig().getProvider());
     }
 
     @Test
@@ -150,6 +152,24 @@ class RahaConfigValidatorTest {
         assertEquals(ConfigErrorCode.SAMPLING_CONFIG_INVALID,
                 assertThrows(ConfigValidationException.class,
                         () -> validator.validate(invalidSampling)).getErrorCode());
+    }
+
+    @Test
+    void shouldRejectUnsupportedClusteringProvider() {
+        RahaJobConfig config = new RahaJobConfig(
+                JobType.SAMPLING, "dataset-1", null, "table-1",
+                RowIdentityConfig.sourceKey("id"),
+                1L, StrategyConfig.defaults(), FeatureConfig.defaults(),
+                ModelConfig.defaults(),
+                new ClusteringConfig("UnknownClusterer", ClusteringDistanceMetric.COSINE,
+                        2, 100),
+                SamplingConfig.defaults(), ResourceConfig.defaults(),
+                FailureToleranceConfig.defaults());
+
+        ConfigValidationException exception = assertThrows(
+                ConfigValidationException.class, () -> validator.validate(config));
+
+        assertEquals(ConfigErrorCode.CLUSTERING_CONFIG_INVALID, exception.getErrorCode());
     }
 
     @Test
