@@ -8,7 +8,9 @@ import com.fiberhome.ml.raha.job.stage.core.StageHandler;
 import com.fiberhome.ml.raha.job.stage.core.StageResult;
 import com.fiberhome.ml.raha.repository.port.SnapshotCheckpointRepository;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,13 +24,31 @@ public final class RestoreSnapshotCheckpointStageHandler implements StageHandler
             RestoreSnapshotCheckpointStageHandler.class);
     /** 快照检查点仓储。 */
     private final SnapshotCheckpointRepository repository;
+    /** 当前任务需要恢复的可检测字段，为空表示恢复全部字段。 */
+    private final Set<String> includedColumns;
 
     public RestoreSnapshotCheckpointStageHandler(
             SnapshotCheckpointRepository repository) {
+        this(repository, Collections.<String>emptySet());
+    }
+
+    /**
+     * 创建支持按字段裁剪恢复的阶段处理器。
+     *
+     * @param repository 快照检查点仓储
+     * @param includedColumns 需要恢复的可检测字段，为空表示全部字段
+     */
+    public RestoreSnapshotCheckpointStageHandler(
+            SnapshotCheckpointRepository repository,
+            Set<String> includedColumns) {
         if (repository == null) {
             throw new IllegalArgumentException("快照检查点仓储不能为空");
         }
         this.repository = repository;
+        this.includedColumns = includedColumns == null
+                ? Collections.<String>emptySet()
+                : Collections.unmodifiableSet(
+                new LinkedHashSet<String>(includedColumns));
     }
 
     @Override
@@ -45,7 +65,8 @@ public final class RestoreSnapshotCheckpointStageHandler implements StageHandler
         }
         Optional<SnapshotPreparedArtifacts> artifacts = repository.restore(
                 context.getConfig().getDatasetId(), snapshotId,
-                context.getConfig().getExecutionConfigFingerprint());
+                context.getConfig().getExecutionConfigFingerprint(),
+                includedColumns);
         if (!artifacts.isPresent()) {
             return StageResult.failure("CHECKPOINT_NOT_FOUND",
                     "未找到匹配的采样快照检查点", false, 0L, 0L);
@@ -67,10 +88,12 @@ public final class RestoreSnapshotCheckpointStageHandler implements StageHandler
                 value.getFeatures());
         context.getAttributes().put(StageAttributeKeys.CLUSTERING_BATCH_RESULT,
                 value.getClustering());
-        LOGGER.info("训练快照检查点恢复完成，jobId={}，checkpointId={}，datasetId={}，snapshotId={}",
+        LOGGER.info("训练快照检查点恢复完成，jobId={}，checkpointId={}，datasetId={}，snapshotId={}，includedColumns={}，featureRowCount={}，assignmentCount={}",
                 context.getJob().getJobId(), value.getCheckpointId(),
                 value.getDataset().getDatasetId(),
-                value.getDataset().getSnapshotId());
+                value.getDataset().getSnapshotId(), includedColumns,
+                value.getFeatures().getRows().size(),
+                value.getClustering().getMetrics().getAssignmentCount());
         return StageResult.successWithSnapshot(value.getSnapshot().getSnapshotId());
     }
 }

@@ -12,6 +12,9 @@ import com.fiberhome.ml.raha.data.loader.DataLoadRequest;
 import com.fiberhome.ml.raha.data.loader.identity.RowIdentityConfig;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
+import com.fiberhome.ml.raha.label.propagation.LabelPropagationConfig;
+import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
+import com.fiberhome.ml.raha.model.training.LogisticRegressionTrainingConfig;
 import com.fiberhome.ml.raha.service.task.RahaTaskExecutionRequest;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,5 +74,38 @@ class ColumnBatchRequestTest {
         assertFalse(disabled.getStrategyFamilies().contains(StrategyFamily.RVD));
         assertThrows(IllegalArgumentException.class,
                 () -> new ColumnBatchOptions(10, 2, false, false));
+    }
+
+    @Test
+    void shouldPreserveCheckpointReuseForColumnBatchChild() {
+        RowIdentityConfig identity = RowIdentityConfig.contentHash();
+        RahaJobConfig parentConfig = RahaJobConfig.defaults(JobType.TRAINING,
+                "dataset", "dw.wide_table", identity)
+                .withSnapshotId("snapshot-v1")
+                .withExecutionInputFingerprint("parent-fingerprint");
+        DataLoadRequest loadRequest = new DataLoadRequest("dataset",
+                "dw.wide_table", "dw.wide_table", identity,
+                DataFormat.FMDB_TABLE, null, null, null, null, null, null);
+        RahaTaskExecutionRequest parent = RahaTaskExecutionRequest
+                .trainingFromSnapshotCheckpoint(parentConfig, loadRequest,
+                        Collections.emptyList(),
+                        LabelPropagationMethod.HOMOGENEITY,
+                        LabelPropagationConfig.defaults(),
+                        LogisticRegressionTrainingConfig.defaults(), "raha")
+                .withColumnBatchOptions(new ColumnBatchOptions(
+                        10, 1, false, false));
+        Set<String> columns = new LinkedHashSet<String>(
+                Arrays.asList("c01", "c02"));
+        RahaTaskExecutionRequest child = parent.toColumnBatchChild(
+                parentConfig.withExecutionInputFingerprint("child-fingerprint"),
+                loadRequest.withIncludedColumns(columns),
+                new ColumnBatchContext("parent", new ColumnBatch(0,
+                        "batch-001", Arrays.asList("c01", "c02")), 1),
+                "model-set-parent", "plan-parent", null);
+
+        assertTrue(child.isReuseSnapshotCheckpoint());
+        assertTrue(child.isColumnBatchChild());
+        assertEquals(columns,
+                child.getDataLoadRequest().getIncludedColumns());
     }
 }

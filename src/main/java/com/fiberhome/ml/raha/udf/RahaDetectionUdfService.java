@@ -279,9 +279,8 @@ public final class RahaDetectionUdfService {
         boolean reuseSnapshotCheckpoint = requestedSnapshotId != null
                 && trainingInputMissing(parser);
         if (reuseSnapshotCheckpoint && columnBatchOptions.isEnabled()) {
-            // 全字段检查点不能直接拆成列批，改为从采样批次恢复原始输入后重新执行前置阶段。
-            reuseSnapshotCheckpoint = false;
-            LOGGER.info("列批训练关闭全字段快照检查点复用，sampleBatchId={}，snapshotId={}",
+            // 列批训练由检查点仓储按字段裁剪恢复，避免每个子任务加载全字段产物。
+            LOGGER.info("列批训练启用快照检查点按字段恢复，sampleBatchId={}，snapshotId={}",
                     sampleBatchId, requestedSnapshotId);
         }
         if (reuseSnapshotCheckpoint

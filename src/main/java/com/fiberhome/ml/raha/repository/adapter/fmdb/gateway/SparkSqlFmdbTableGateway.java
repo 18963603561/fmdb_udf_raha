@@ -93,10 +93,10 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
     }
 
     @Override
-    public long append(String tableName,
-                       Dataset<Row> rows,
-                       List<String> keyColumns,
-                       long expectedCount) {
+    public synchronized long append(String tableName,
+                                    Dataset<Row> rows,
+                                    List<String> keyColumns,
+                                    long expectedCount) {
         String validated = validateTableName(tableName);
         validateRowsAndKeys(rows, keyColumns);
         if (expectedCount < 0L) {
@@ -170,9 +170,9 @@ public final class SparkSqlFmdbTableGateway implements FmdbTableGateway {
     }
 
     @Override
-    public long appendDirect(String tableName,
-                             Dataset<Row> rows,
-                             long expectedCount) {
+    public synchronized long appendDirect(String tableName,
+                                          Dataset<Row> rows,
+                                          long expectedCount) {
         String validated = validateTableName(tableName);
         validateRows(rows);
         if (expectedCount < 0L) {

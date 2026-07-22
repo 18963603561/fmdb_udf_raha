@@ -266,10 +266,13 @@ public final class RahaTaskRequestFactory {
                             configFactory.labelPropagationConfig(),
                             configFactory.logisticRegressionTrainingConfig(),
                             options.getModelNamePrefix())
-                            .withExecutionFingerprint(batchFingerprint);
-            LOGGER.info("最小训练请求已切换为快照检查点复用，datasetId={}，snapshotId={}，batchCount={}",
+                            .withExecutionFingerprint(batchFingerprint)
+                            .withColumnBatchOptions(
+                                    options.getColumnBatchOptions());
+            LOGGER.info("最小训练请求已切换为快照检查点复用，datasetId={}，snapshotId={}，batchCount={}，columnBatchEnabled={}",
                     trainingInput.spec.getDatasetId(),
-                    trainingInput.spec.getSnapshotId(), references.size());
+                    trainingInput.spec.getSnapshotId(), references.size(),
+                    options.getColumnBatchOptions().isEnabled());
             return request;
         }
         RahaTaskExecutionRequest request = RahaTaskExecutionRequest.trainingBatches(

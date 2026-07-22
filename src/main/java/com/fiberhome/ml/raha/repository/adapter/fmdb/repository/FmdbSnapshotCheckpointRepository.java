@@ -36,10 +36,13 @@ import com.fiberhome.ml.raha.util.ValueUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -125,111 +128,130 @@ public final class FmdbSnapshotCheckpointRepository
                 "执行配置指纹");
         String checkpointId = checkpointId(jobId, snapshot, fingerprint);
         String rowSetFingerprint = rowSetFingerprint(snapshot);
-        List<FmdbTableRecord> records = new ArrayList<FmdbTableRecord>();
-        records.add(record(base(checkpointId, jobId, snapshot, rowSetFingerprint,
+        FmdbTableRecord manifest = record(base(checkpointId, jobId, snapshot,
+                rowSetFingerprint,
                 fingerprint, createdAt), MANIFEST, SCOPE_CHECKPOINT, null,
-                manifestPayload(dataset, snapshot, strategyPlanVersion)));
+                manifestPayload(dataset, snapshot, strategyPlanVersion));
+        CheckpointBatchWriter writer = new CheckpointBatchWriter(checkpointId,
+                persistenceConfig.getSnapshotCheckpointAppendBatchSize());
+        LOGGER.info("开始分批写入 FMDB 快照检查点，checkpointId={}，datasetId={}，"
+                        + "snapshotId={}，appendBatchSize={}，featureRowCount={}，assignmentCount={}",
+                checkpointId, snapshot.getDatasetId(), snapshot.getSnapshotId(),
+                persistenceConfig.getSnapshotCheckpointAppendBatchSize(),
+                features.getRows().size(),
+                clustering.getMetrics().getAssignmentCount());
 
-        List<ColumnProfile> profiles = new ArrayList<ColumnProfile>(
-                dataset.getProfiles().values());
-        Collections.sort(profiles, Comparator.comparing(ColumnProfile::getColumnName));
-        for (ColumnProfile profile : profiles) {
-            Map<String, Object> values = base(checkpointId, jobId, snapshot,
-                    rowSetFingerprint, fingerprint, createdAt);
-            values.put("column_name", profile.getColumnName());
-            values.put("artifact_version", snapshot.getSnapshotId());
-            values.put("profile_json", FmdbColumnProfileCodec.write(profile));
-            records.add(record(values, PROFILE, SCOPE_COLUMN, profile.getColumnName(),
-                    null));
-        }
-
-        Map<String, Object> strategyValues = base(checkpointId, jobId, snapshot,
-                rowSetFingerprint, fingerprint, createdAt);
-        strategyValues.put("artifact_version", strategyPlanVersion);
-        strategyValues.put("strategy_plan_json", FmdbStrategyArtifactCodec.write(
-                strategyPlans, summaries(strategyBatch)));
-        records.add(record(strategyValues, STRATEGY_PLAN, SCOPE_CHECKPOINT,
-                null, null));
-
-        List<String> dictionaryColumns = new ArrayList<String>(
-                features.getDictionaries().keySet());
-        Collections.sort(dictionaryColumns);
-        for (String column : dictionaryColumns) {
-            FeatureDictionary dictionary = features.getDictionaries().get(column);
-            Map<String, Object> values = base(checkpointId, jobId, snapshot,
-                    rowSetFingerprint, fingerprint, createdAt);
-            values.put("column_name", column);
-            values.put("artifact_version", dictionary.getVersion());
-            values.put("feature_dictionary_json",
-                    FmdbFeatureDictionaryCodec.write(dictionary));
-            records.add(record(values, FEATURE_DICTIONARY, SCOPE_COLUMN,
-                    column, null));
-        }
-
-        List<SparseFeatureRow> featureRows = new ArrayList<SparseFeatureRow>(
-                features.getRows());
-        Collections.sort(featureRows, Comparator.comparing(
-                SparseFeatureRow::getCellId));
-        for (SparseFeatureRow row : featureRows) {
-            Map<String, Object> values = base(checkpointId, jobId, snapshot,
-                    rowSetFingerprint, fingerprint, createdAt);
-            values.put("column_name", row.getColumnName());
-            values.put("row_id", row.getCoordinate() == null ? null
-                    : row.getCoordinate().getRowId());
-            values.put("cell_id", row.getCellId());
-            values.put("cell_value", row.getMaskedValue());
-            values.put("artifact_version", row.getFeatureDictionaryVersion());
-            values.put("feature_vector_json", featureValues(row.getValues()));
-            values.put("feature_summary_json", FmdbJsonCodec.write(row.getSummary()));
-            records.add(record(values, CELL_FEATURE, SCOPE_CELL,
-                    row.getColumnName(), null));
-        }
-
-        List<ColumnClusteringResult> clusteringResults =
-                new ArrayList<ColumnClusteringResult>(
-                        clustering.getResults().values());
-        Collections.sort(clusteringResults, Comparator.comparing(
-                ColumnClusteringResult::getColumnName));
-        for (ColumnClusteringResult result : clusteringResults) {
-            Map<String, Object> values = base(checkpointId, jobId, snapshot,
-                    rowSetFingerprint, fingerprint, createdAt);
-            values.put("column_name", result.getColumnName());
-            values.put("artifact_version", result.getClusterVersion());
-            values.put("cluster_version", result.getClusterVersion());
-            values.put("cluster_summary_json",
-                    FmdbClusterSummaryCodec.write(result));
-            records.add(record(values, CLUSTER_SUMMARY, SCOPE_COLUMN,
-                    result.getColumnName(), null));
-            for (ClusterAssignment assignment : result.getAssignments()) {
-                Map<String, Object> item = base(checkpointId, jobId, snapshot,
+        try {
+            List<ColumnProfile> profiles = new ArrayList<ColumnProfile>(
+                    dataset.getProfiles().values());
+            Collections.sort(profiles, Comparator.comparing(
+                    ColumnProfile::getColumnName));
+            for (ColumnProfile profile : profiles) {
+                Map<String, Object> values = base(checkpointId, jobId, snapshot,
                         rowSetFingerprint, fingerprint, createdAt);
-                item.put("column_name", assignment.getColumnName());
-                item.put("row_id", assignment.getCoordinate() == null ? null
-                        : assignment.getCoordinate().getRowId());
-                item.put("cell_id", assignment.getCellId());
-                item.put("artifact_version", assignment.getClusterVersion());
-                item.put("cluster_version", assignment.getClusterVersion());
-                item.put("cluster_id", assignment.getClusterId());
-                item.put("cluster_distance", assignment.getDistance());
-                records.add(record(item, CLUSTER_ASSIGNMENT, SCOPE_CELL,
-                        assignment.getColumnName(), null));
+                values.put("column_name", profile.getColumnName());
+                values.put("artifact_version", snapshot.getSnapshotId());
+                values.put("profile_json", FmdbColumnProfileCodec.write(profile));
+                writer.add(record(values, PROFILE, SCOPE_COLUMN,
+                        profile.getColumnName(), null));
             }
+
+            Map<String, Object> strategyValues = base(checkpointId, jobId,
+                    snapshot, rowSetFingerprint, fingerprint, createdAt);
+            strategyValues.put("artifact_version", strategyPlanVersion);
+            strategyValues.put("strategy_plan_json", FmdbStrategyArtifactCodec.write(
+                    strategyPlans, summaries(strategyBatch)));
+            writer.add(record(strategyValues, STRATEGY_PLAN, SCOPE_CHECKPOINT,
+                    null, null));
+
+            List<String> dictionaryColumns = new ArrayList<String>(
+                    features.getDictionaries().keySet());
+            Collections.sort(dictionaryColumns);
+            for (String column : dictionaryColumns) {
+                FeatureDictionary dictionary = features.getDictionaries().get(column);
+                Map<String, Object> values = base(checkpointId, jobId, snapshot,
+                        rowSetFingerprint, fingerprint, createdAt);
+                values.put("column_name", column);
+                values.put("artifact_version", dictionary.getVersion());
+                values.put("feature_dictionary_json",
+                        FmdbFeatureDictionaryCodec.write(dictionary));
+                writer.add(record(values, FEATURE_DICTIONARY, SCOPE_COLUMN,
+                        column, null));
+            }
+
+            // 特征阶段已经按单元格标识稳定排序，此处直接流式编码，避免复制全量大列表。
+            for (SparseFeatureRow row : features.getRows()) {
+                Map<String, Object> values = base(checkpointId, jobId, snapshot,
+                        rowSetFingerprint, fingerprint, createdAt);
+                values.put("column_name", row.getColumnName());
+                values.put("row_id", row.getCoordinate() == null ? null
+                        : row.getCoordinate().getRowId());
+                values.put("cell_id", row.getCellId());
+                values.put("cell_value", row.getMaskedValue());
+                values.put("artifact_version", row.getFeatureDictionaryVersion());
+                values.put("feature_vector_json", featureValues(row.getValues()));
+                values.put("feature_summary_json",
+                        FmdbJsonCodec.write(row.getSummary()));
+                writer.add(record(values, CELL_FEATURE, SCOPE_CELL,
+                        row.getColumnName(), null));
+            }
+
+            List<ColumnClusteringResult> clusteringResults =
+                    new ArrayList<ColumnClusteringResult>(
+                            clustering.getResults().values());
+            Collections.sort(clusteringResults, Comparator.comparing(
+                    ColumnClusteringResult::getColumnName));
+            for (ColumnClusteringResult result : clusteringResults) {
+                Map<String, Object> values = base(checkpointId, jobId, snapshot,
+                        rowSetFingerprint, fingerprint, createdAt);
+                values.put("column_name", result.getColumnName());
+                values.put("artifact_version", result.getClusterVersion());
+                values.put("cluster_version", result.getClusterVersion());
+                values.put("cluster_summary_json",
+                        FmdbClusterSummaryCodec.write(result));
+                writer.add(record(values, CLUSTER_SUMMARY, SCOPE_COLUMN,
+                        result.getColumnName(), null));
+                for (ClusterAssignment assignment : result.getAssignments()) {
+                    Map<String, Object> item = base(checkpointId, jobId, snapshot,
+                            rowSetFingerprint, fingerprint, createdAt);
+                    item.put("column_name", assignment.getColumnName());
+                    item.put("row_id", assignment.getCoordinate() == null ? null
+                            : assignment.getCoordinate().getRowId());
+                    item.put("cell_id", assignment.getCellId());
+                    item.put("artifact_version", assignment.getClusterVersion());
+                    item.put("cluster_version", assignment.getClusterVersion());
+                    item.put("cluster_id", assignment.getClusterId());
+                    item.put("cluster_distance", assignment.getDistance());
+                    writer.add(record(item, CLUSTER_ASSIGNMENT, SCOPE_CELL,
+                            assignment.getColumnName(), null));
+                }
+            }
+            // manifest 最后提交，恢复端只会发现已经完整写入的检查点。
+            writer.finish(manifest);
+        } catch (RuntimeException exception) {
+            LOGGER.error("FMDB 快照检查点分批写入失败，checkpointId={}，"
+                            + "datasetId={}，snapshotId={}，writtenCount={}",
+                    checkpointId, snapshot.getDatasetId(),
+                    snapshot.getSnapshotId(), writer.getWrittenCount(), exception);
+            throw exception;
         }
-        append(records);
         LOGGER.info("FMDB 快照检查点写入完成，checkpointId={}，datasetId={}，"
                         + "snapshotId={}，recordCount={}",
                 checkpointId, snapshot.getDatasetId(), snapshot.getSnapshotId(),
-                records.size());
+                writer.getWrittenCount());
     }
 
     @Override
-    public Optional<SnapshotPreparedArtifacts> restore(String datasetId,
-                                                       String snapshotId,
-                                                       String configFingerprint) {
+    public Optional<SnapshotPreparedArtifacts> restore(
+            String datasetId,
+            String snapshotId,
+            String configFingerprint,
+            Set<String> includedColumns) {
         String dataset = ValueUtils.requireNotBlank(datasetId, "数据集标识");
         String snapshot = ValueUtils.requireNotBlank(snapshotId, "快照标识");
         String fingerprint = ValueUtils.requireNotBlank(configFingerprint,
                 "执行配置指纹");
+        Set<String> requestedColumns = normalizedColumns(includedColumns);
         if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT)
                 || !tableGateway.tableExists(tableName)) {
             return Optional.empty();
@@ -248,16 +270,34 @@ public final class FmdbSnapshotCheckpointRepository
             return Optional.empty();
         }
         String checkpointId = manifests.get(0).getAs("checkpoint_id");
+        Map<String, Object> manifestPayload = FmdbJsonCodec.readObject(
+                (String) manifests.get(0).getAs("payload_json"));
+        validateRequestedColumns(columns(manifestPayload), requestedColumns);
+        Column checkpointCondition = functions.col("checkpoint_id")
+                .equalTo(checkpointId);
+        if (!requestedColumns.isEmpty()) {
+            // 清单和全局策略记录必须保留，列级和单元格级记录由数据库直接裁剪。
+            Column globalRecord = functions.col("record_type")
+                    .isin(MANIFEST, STRATEGY_PLAN);
+            Column selectedColumn = functions.col("column_name")
+                    .isin(requestedColumns.toArray(new Object[0]));
+            checkpointCondition = checkpointCondition.and(
+                    globalRecord.or(selectedColumn));
+        }
+        LOGGER.info("开始从 FMDB 恢复快照检查点，checkpointId={}，datasetId={}，"
+                        + "snapshotId={}，includedColumns={}",
+                checkpointId, dataset, snapshot, requestedColumns);
         List<Row> rows = tableGateway.read(tableName,
                 FmdbTableSchemas.columns(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT),
-                functions.col("checkpoint_id").equalTo(checkpointId))
+                checkpointCondition)
                 .collectAsList();
         SnapshotPreparedArtifacts artifacts = restoreArtifacts(checkpointId,
-                fingerprint, rows);
+                fingerprint, rows, requestedColumns);
         LOGGER.info("FMDB 快照检查点恢复完成，checkpointId={}，datasetId={}，"
-                        + "snapshotId={}，featureRowCount={}，assignmentCount={}",
+                        + "snapshotId={}，includedColumns={}，featureRowCount={}，assignmentCount={}",
                 checkpointId, artifacts.getDataset().getDatasetId(),
                 artifacts.getDataset().getSnapshotId(),
+                requestedColumns,
                 artifacts.getFeatures().getRows().size(),
                 artifacts.getClustering().getMetrics().getAssignmentCount());
         return Optional.of(artifacts);
@@ -265,18 +305,20 @@ public final class FmdbSnapshotCheckpointRepository
 
     private SnapshotPreparedArtifacts restoreArtifacts(String checkpointId,
                                                        String configFingerprint,
-                                                       List<Row> rows) {
+                                                       List<Row> rows,
+                                                       Set<String> includedColumns) {
         Row manifest = manifest(rows);
         Map<String, Object> payload = FmdbJsonCodec.readObject(
                 (String) manifest.getAs("payload_json"));
         DatasetSnapshot snapshot = snapshot(payload, manifest);
-        List<ColumnMetadata> columns = columns(payload);
+        List<ColumnMetadata> columns = selectedColumns(columns(payload),
+                includedColumns);
         Map<String, ColumnProfile> profiles = profiles(rows);
         RahaDataset dataset = new RahaDataset(snapshot.getDatasetId(),
                 snapshot.getSnapshotId(), snapshot.getTableName(),
                 snapshot.getRowIdColumn(), columns, null,
                 snapshot.getSchemaHash(), profiles);
-        StrategyArtifacts strategy = strategyArtifacts(rows);
+        StrategyArtifacts strategy = strategyArtifacts(rows, includedColumns);
         FeatureAssemblyResult features = features(rows);
         ClusteringBatchResult clustering = clustering(rows, dataset);
         return new SnapshotPreparedArtifacts(checkpointId, dataset, snapshot,
@@ -317,7 +359,9 @@ public final class FmdbSnapshotCheckpointRepository
         return profiles;
     }
 
-    private static StrategyArtifacts strategyArtifacts(List<Row> rows) {
+    private static StrategyArtifacts strategyArtifacts(
+            List<Row> rows,
+            Set<String> includedColumns) {
         Map<String, StrategyPlan> plans = new LinkedHashMap<String, StrategyPlan>();
         Map<String, StrategyRunSummary> summaries =
                 new LinkedHashMap<String, StrategyRunSummary>();
@@ -325,11 +369,18 @@ public final class FmdbSnapshotCheckpointRepository
             if (STRATEGY_PLAN.equals(row.getAs("record_type"))) {
                 String json = (String) row.getAs("strategy_plan_json");
                 for (StrategyPlan plan : FmdbStrategyArtifactCodec.readPlans(json)) {
-                    plans.put(plan.getStrategyId(), plan);
+                    // 按列恢复时只保留目标字段完全位于当前批次内的策略，防止跨批 RVD 混入。
+                    if (includedColumns.isEmpty()
+                            || includedColumns.containsAll(
+                            plan.getTargetColumns())) {
+                        plans.put(plan.getStrategyId(), plan);
+                    }
                 }
                 for (StrategyRunSummary summary
                         : FmdbStrategyArtifactCodec.readSummaries(json)) {
-                    summaries.put(summary.getStrategyId(), summary);
+                    if (plans.containsKey(summary.getStrategyId())) {
+                        summaries.put(summary.getStrategyId(), summary);
+                    }
                 }
             }
         }
@@ -473,6 +524,53 @@ public final class FmdbSnapshotCheckpointRepository
         Collections.sort(columns, Comparator.comparingInt(
                 ColumnMetadata::getOrdinal));
         return columns;
+    }
+
+    private static Set<String> normalizedColumns(Set<String> source) {
+        if (source == null || source.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> result = new LinkedHashSet<String>();
+        for (String column : source) {
+            result.add(ValueUtils.requireNotBlank(column, "检查点恢复字段"));
+        }
+        return Collections.unmodifiableSet(result);
+    }
+
+    private static void validateRequestedColumns(
+            List<ColumnMetadata> availableColumns,
+            Set<String> requestedColumns) {
+        if (requestedColumns.isEmpty()) {
+            return;
+        }
+        Set<String> detectableColumns = new LinkedHashSet<String>();
+        for (ColumnMetadata column : availableColumns) {
+            if (column.isDetectable()) {
+                detectableColumns.add(column.getName());
+            }
+        }
+        if (!detectableColumns.containsAll(requestedColumns)) {
+            Set<String> missing = new LinkedHashSet<String>(requestedColumns);
+            missing.removeAll(detectableColumns);
+            throw new IllegalArgumentException("检查点不包含请求的可检测字段：" + missing);
+        }
+    }
+
+    private static List<ColumnMetadata> selectedColumns(
+            List<ColumnMetadata> availableColumns,
+            Set<String> includedColumns) {
+        if (includedColumns.isEmpty()) {
+            return availableColumns;
+        }
+        List<ColumnMetadata> selected = new ArrayList<ColumnMetadata>();
+        for (ColumnMetadata column : availableColumns) {
+            // 行标识等不可检测字段必须保留，后续可继续构造稳定单元格坐标。
+            if (!column.isDetectable()
+                    || includedColumns.contains(column.getName())) {
+                selected.add(column);
+            }
+        }
+        return selected;
     }
 
     private static Boolean booleanValue(Map<String, Object> values, String key) {
@@ -621,6 +719,63 @@ public final class FmdbSnapshotCheckpointRepository
         return HashUtils.md5Hex(snapshot.getDatasetId() + "|"
                 + snapshot.getSnapshotId() + "|" + snapshot.getSchemaHash()
                 + "|" + snapshot.getRowCount() + "|" + snapshot.getColumnCount());
+    }
+
+    /**
+     * 将检查点记录限制在固定大小缓冲区内，并在全部明细成功后提交清单。
+     */
+    private final class CheckpointBatchWriter {
+
+        /** 当前检查点标识。 */
+        private final String checkpointId;
+        /** 单次追加记录数上限。 */
+        private final int batchSize;
+        /** 当前尚未提交的记录。 */
+        private final List<FmdbTableRecord> buffer;
+        /** 已经成功提交的记录总数。 */
+        private long writtenCount;
+        /** 已经成功提交的明细批次数。 */
+        private int batchIndex;
+
+        private CheckpointBatchWriter(String checkpointId, int batchSize) {
+            this.checkpointId = checkpointId;
+            this.batchSize = batchSize;
+            this.buffer = new ArrayList<FmdbTableRecord>(batchSize);
+        }
+
+        private void add(FmdbTableRecord record) {
+            buffer.add(record);
+            if (buffer.size() >= batchSize) {
+                flush();
+            }
+        }
+
+        private void finish(FmdbTableRecord manifest) {
+            flush();
+            append(Collections.singletonList(manifest));
+            writtenCount++;
+            LOGGER.info("FMDB 快照检查点清单提交完成，checkpointId={}，"
+                            + "detailBatchCount={}，recordCount={}",
+                    checkpointId, batchIndex, writtenCount);
+        }
+
+        private void flush() {
+            if (buffer.isEmpty()) {
+                return;
+            }
+            int currentSize = buffer.size();
+            append(buffer);
+            writtenCount += currentSize;
+            batchIndex++;
+            LOGGER.info("FMDB 快照检查点明细批次写入完成，checkpointId={}，"
+                            + "batchIndex={}，batchRecordCount={}，writtenCount={}",
+                    checkpointId, batchIndex, currentSize, writtenCount);
+            buffer.clear();
+        }
+
+        private long getWrittenCount() {
+            return writtenCount;
+        }
     }
 
     /** 策略计划和执行摘要恢复结果。 */

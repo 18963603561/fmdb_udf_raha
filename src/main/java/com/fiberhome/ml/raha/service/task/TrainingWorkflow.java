@@ -138,7 +138,8 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
             }
             List<StageHandler> handlers = new ArrayList<StageHandler>();
             handlers.add(new RestoreSnapshotCheckpointStageHandler(
-                    snapshotCheckpointRepository));
+                    snapshotCheckpointRepository,
+                    request.getDataLoadRequest().getIncludedColumns()));
             handlers.add(new DirectLabelStageHandler(request.getLabels()));
             handlers.add(new LabelPropagationStageHandler(propagationService,
                     request.getPropagationMethod(),

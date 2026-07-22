@@ -79,10 +79,6 @@ public final class TrainingRequestOptions {
         this.reuseSnapshotCheckpoint = reuseSnapshotCheckpoint;
         this.columnBatchOptions = columnBatchOptions == null
                 ? ColumnBatchOptions.disabled() : columnBatchOptions;
-        if (reuseSnapshotCheckpoint && this.columnBatchOptions.isEnabled()) {
-            throw new IllegalArgumentException(
-                    "列批训练不能直接复用包含全字段特征的快照检查点");
-        }
     }
 
     /**

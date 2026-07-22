@@ -5,9 +5,15 @@ import com.fiberhome.ml.raha.data.domain.ColumnMetadata;
 import com.fiberhome.ml.raha.data.domain.ColumnProfile;
 import com.fiberhome.ml.raha.data.domain.RahaDataset;
 import com.fiberhome.ml.raha.data.type.StrategyFamily;
+import com.fiberhome.ml.raha.repository.adapter.DefaultStrategyRepository;
+import com.fiberhome.ml.raha.repository.adapter.InMemoryRahaRepository;
+import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.strategy.api.StrategyConfigurationKeys;
 import com.fiberhome.ml.raha.strategy.api.StrategyTypes;
 import com.fiberhome.ml.raha.util.HashUtils;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -125,6 +131,48 @@ class StrategyPlanGeneratorTest {
                 .getConfiguration().get(StrategyConfigurationKeys.PLACEHOLDERS));
         assertEquals(11, byType.get(StrategyTypes.OD_LOW_FREQUENCY).getPriority());
         assertEquals(24, byType.get(StrategyTypes.PVD_TYPE_FORMAT).getPriority());
+    }
+
+    @Test
+    void shouldNotReusePlansFromPreviousColumnBatch() {
+        StrategyPlanService service = new StrategyPlanService(
+                new StrategyPlanGenerator(),
+                new DefaultStrategyRepository(new InMemoryRahaRepository()),
+                Clock.fixed(Instant.ofEpochMilli(2000L), ZoneOffset.UTC));
+        ArtifactVersion version = new ArtifactVersion("config-v1", "snapshot",
+                "stage-plan", 1);
+        StrategyConfig amountBatch = odBatch("amount");
+        StrategyConfig nameBatch = odBatch("name");
+
+        List<StrategyPlan> amountPlans = service.generateAndSave(
+                dataset(false), amountBatch, version);
+        List<StrategyPlan> namePlans = service.generateAndSave(
+                dataset(false), nameBatch, version);
+        List<StrategyPlan> restoredAmountPlans = service.generateAndSave(
+                dataset(false), amountBatch, version);
+
+        assertTrue(!amountPlans.isEmpty());
+        assertTrue(!namePlans.isEmpty());
+        assertTrue(targetOnly(amountPlans, "amount"));
+        assertTrue(targetOnly(namePlans, "name"));
+        assertTrue(targetOnly(restoredAmountPlans, "amount"));
+    }
+
+    private static StrategyConfig odBatch(String column) {
+        return new StrategyConfig(Collections.singleton(StrategyFamily.OD),
+                20, Collections.singleton(column),
+                Collections.<String>emptySet(), 10, 1000L, false);
+    }
+
+    private static boolean targetOnly(List<StrategyPlan> plans,
+                                      String column) {
+        for (StrategyPlan plan : plans) {
+            if (!plan.getTargetColumns().equals(
+                    Collections.singletonList(column))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static RahaDataset dataset(boolean reverseProfiles) {

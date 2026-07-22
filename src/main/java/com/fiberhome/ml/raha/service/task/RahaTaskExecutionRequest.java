@@ -565,7 +565,8 @@ public final class RahaTaskExecutionRequest {
                 samplePartitionMonth, annotationBatchId,
                 annotationPartitionMonth, rowIdentityConfig,
                 trainingBatchReferences, modelSetVersion, missingModelPolicy,
-                childFingerprint, false, ColumnBatchOptions.disabled(),
+                childFingerprint, reuseSnapshotCheckpoint,
+                ColumnBatchOptions.disabled(),
                 context, trainingModelSetVersion, modelCompatibilityVersion,
                 detectionBatchId);
     }

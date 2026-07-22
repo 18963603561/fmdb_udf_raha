@@ -38,6 +38,7 @@ class FmdbPersistenceConfigTest {
         assertFalse(config.shouldPersist(FmdbColumnArtifact.PROPAGATION_SUMMARY));
         assertEquals(FmdbWriteMode.DIRECT_APPEND, config.getWriteMode());
         assertTrue(config.isDirectAppend());
+        assertEquals(10000, config.getSnapshotCheckpointAppendBatchSize());
     }
 
     @Test
@@ -55,6 +56,8 @@ class FmdbPersistenceConfigTest {
                     artifact.getConfigKey());
         }
         assertEquals(properties.getWriteMode(), builder.getWriteMode());
+        assertEquals(properties.getSnapshotCheckpointAppendBatchSize(),
+                builder.getSnapshotCheckpointAppendBatchSize());
     }
 
     @Test
@@ -89,5 +92,8 @@ class FmdbPersistenceConfigTest {
                         .table(FmdbPhysicalTable.JOB_RUN, false)
                         .table(FmdbPhysicalTable.JOB_STAGE_ATTEMPT, true)
                         .build());
+        assertThrows(IllegalArgumentException.class,
+                () -> FmdbPersistenceConfig.builder()
+                        .snapshotCheckpointAppendBatchSize(0));
     }
 }

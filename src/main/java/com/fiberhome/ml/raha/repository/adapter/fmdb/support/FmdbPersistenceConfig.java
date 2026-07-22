@@ -19,6 +19,9 @@ public final class FmdbPersistenceConfig {
             "db/fmdb/raha-fmdb-schema.sql";
     /** 全局 FMDB 表写入模式配置键。 */
     private static final String WRITE_MODE_KEY = "raha.persistence.write-mode";
+    /** 快照检查点分批追加大小配置键。 */
+    private static final String SNAPSHOT_CHECKPOINT_APPEND_BATCH_SIZE_KEY =
+            "raha.persistence.snapshot-checkpoint.append-batch-size";
     /** 是否启用 FMDB 物理表持久化。 */
     private final boolean enabled;
     /** 是否自动创建不存在的默认表。 */
@@ -31,13 +34,16 @@ public final class FmdbPersistenceConfig {
     private final Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches;
     /** FMDB 标准物理表的全局追加写入模式。 */
     private final FmdbWriteMode writeMode;
+    /** 快照检查点单次写入的最大记录数。 */
+    private final int snapshotCheckpointAppendBatchSize;
 
     private FmdbPersistenceConfig(boolean enabled,
                                   boolean autoCreateTables,
                                   String schemaResource,
                                   Map<FmdbPhysicalTable, Boolean> tableSwitches,
                                   Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches,
-                                  FmdbWriteMode writeMode) {
+                                  FmdbWriteMode writeMode,
+                                  int snapshotCheckpointAppendBatchSize) {
         this.enabled = enabled;
         this.autoCreateTables = autoCreateTables;
         this.schemaResource = ValueUtils.requireNotBlank(
@@ -49,6 +55,11 @@ public final class FmdbPersistenceConfig {
             throw new IllegalArgumentException("FMDB 写入模式不能为空");
         }
         this.writeMode = writeMode;
+        if (snapshotCheckpointAppendBatchSize <= 0) {
+            throw new IllegalArgumentException("快照检查点分批追加大小必须大于零");
+        }
+        this.snapshotCheckpointAppendBatchSize =
+                snapshotCheckpointAppendBatchSize;
         validateDependencies();
     }
 
@@ -87,7 +98,8 @@ public final class FmdbPersistenceConfig {
                 properties.getBoolean("raha.persistence.schema.auto-create"),
                 properties.getRequired("raha.persistence.schema.resource"),
                 tableValues, artifactValues,
-                properties.getEnum(WRITE_MODE_KEY, FmdbWriteMode.class));
+                properties.getEnum(WRITE_MODE_KEY, FmdbWriteMode.class),
+                properties.getInt(SNAPSHOT_CHECKPOINT_APPEND_BATCH_SIZE_KEY));
     }
 
     /**
@@ -150,6 +162,10 @@ public final class FmdbPersistenceConfig {
 
     public boolean isDirectAppend() {
         return writeMode == FmdbWriteMode.DIRECT_APPEND;
+    }
+
+    public int getSnapshotCheckpointAppendBatchSize() {
+        return snapshotCheckpointAppendBatchSize;
     }
 
     private void validateDependencies() {
@@ -256,6 +272,8 @@ public final class FmdbPersistenceConfig {
                 new EnumMap<FmdbColumnArtifact, Boolean>(FmdbColumnArtifact.class);
         /** FMDB 标准物理表的全局追加写入模式。 */
         private FmdbWriteMode writeMode = FmdbWriteMode.DIRECT_APPEND;
+        /** 快照检查点单次写入的最大记录数。 */
+        private int snapshotCheckpointAppendBatchSize = 10000;
 
         private Builder() {
             for (FmdbPhysicalTable table : FmdbPhysicalTable.values()) {
@@ -347,6 +365,20 @@ public final class FmdbPersistenceConfig {
         }
 
         /**
+         * 设置快照检查点单次追加的最大记录数。
+         *
+         * @param value 每次提交的记录数上限
+         * @return 当前构建器
+         */
+        public Builder snapshotCheckpointAppendBatchSize(int value) {
+            if (value <= 0) {
+                throw new IllegalArgumentException("快照检查点分批追加大小必须大于零");
+            }
+            this.snapshotCheckpointAppendBatchSize = value;
+            return this;
+        }
+
+        /**
          * 校验依赖并生成不可变配置。
          *
          * @return 完整持久化配置
@@ -354,7 +386,7 @@ public final class FmdbPersistenceConfig {
         public FmdbPersistenceConfig build() {
             return new FmdbPersistenceConfig(enabled, autoCreateTables,
                     schemaResource, tableSwitches, columnArtifactSwitches,
-                    writeMode);
+                    writeMode, snapshotCheckpointAppendBatchSize);
         }
     }
 }

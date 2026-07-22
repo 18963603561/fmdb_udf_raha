@@ -111,10 +111,17 @@ public final class FmdbResultPersistenceVerifier
         } else {
             datasetId = context.getConfig().getDatasetId();
         }
+        Set<String> candidateColumns = output.getCandidateModels().keySet();
+        Column condition = functions.col("dataset_id").equalTo(datasetId)
+                .and(functions.col("model_set_version")
+                        .equalTo(output.getModelSetVersion()));
+        // 列批训练共享模型集合版本，物理回读必须限制到当前子批候选字段。
+        if (!candidateColumns.isEmpty()) {
+            condition = condition.and(functions.col("column_name").isin(
+                    candidateColumns.toArray(new Object[0])));
+        }
         long models = distinctCount(FmdbPhysicalTable.MODEL_ARTIFACT,
-                functions.col("dataset_id").equalTo(datasetId)
-                        .and(functions.col("model_set_version")
-                                .equalTo(output.getModelSetVersion())), "model_version");
+                condition, "model_version");
         requireCount("候选模型", output.getCandidateModels().size(), models);
         return "fmdb://" + FmdbPhysicalTable.MODEL_ARTIFACT.getTableName()
                 + "/" + output.getModelSetVersion();
@@ -133,12 +140,19 @@ public final class FmdbResultPersistenceVerifier
         }
         RahaDetectOutput output = (RahaDetectOutput) result.getPayload();
         RahaDataset dataset = (RahaDataset) datasetValue;
+        String detectionBatchId = result.getSummary().getDetails().get(
+                "detectionBatchId");
+        if (detectionBatchId == null || detectionBatchId.trim().isEmpty()) {
+            detectionBatchId = result.getJobId();
+        }
         List<DetectionResult> errors = new ArrayList<DetectionResult>();
         Set<String> partitionDates = new LinkedHashSet<String>();
+        Set<String> errorColumns = new LinkedHashSet<String>();
         for (DetectionResult detection : output.getResults()) {
             if (detection.isError()) {
                 errors.add(detection);
                 partitionDates.add(FmdbPartitionUtils.date(detection.getDetectedAt()));
+                errorColumns.add(detection.getCoordinate().getColumnName());
             }
         }
         long actual = 0L;
@@ -146,7 +160,10 @@ public final class FmdbResultPersistenceVerifier
             Column condition = functions.col("dataset_id")
                     .equalTo(dataset.getDatasetId())
                     .and(functions.col("detection_batch_id")
-                            .equalTo(result.getJobId()))
+                            .equalTo(detectionBatchId))
+                    // 同一父检测批次包含多个列子批，必须限制到当前子批实际错误字段。
+                    .and(functions.col("column_name").isin(
+                            errorColumns.toArray(new Object[0])))
                     .and(functions.col("partition_date").isin(
                             partitionDates.toArray(new Object[0])));
             actual = count(FmdbPhysicalTable.DETECTION_RESULT, condition, "cell_id");

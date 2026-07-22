@@ -9,6 +9,7 @@ import com.fiberhome.ml.raha.strategy.execution.StrategyBatchResult;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlan;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 保存和恢复采样快照级前置产物。
@@ -28,7 +29,28 @@ public interface SnapshotCheckpointRepository {
               String configFingerprint,
               long createdAt);
 
+    default Optional<SnapshotPreparedArtifacts> restore(
+            String datasetId,
+            String snapshotId,
+            String configFingerprint) {
+        return restore(datasetId, snapshotId, configFingerprint,
+                java.util.Collections.<String>emptySet());
+    }
+
+    /**
+     * 按字段范围恢复采样快照检查点。
+     *
+     * <p>字段集合为空时恢复完整检查点；非空时只恢复指定可检测字段，
+     * 同时保留行标识等不可检测字段元数据。</p>
+     *
+     * @param datasetId 数据集标识
+     * @param snapshotId 快照标识
+     * @param configFingerprint 执行配置指纹
+     * @param includedColumns 需要恢复的可检测字段，为空表示全部字段
+     * @return 匹配的完整或字段裁剪检查点
+     */
     Optional<SnapshotPreparedArtifacts> restore(String datasetId,
                                                 String snapshotId,
-                                                String configFingerprint);
+                                                String configFingerprint,
+                                                Set<String> includedColumns);
 }

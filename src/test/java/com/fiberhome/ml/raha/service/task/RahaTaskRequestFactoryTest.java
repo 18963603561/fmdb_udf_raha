@@ -14,6 +14,7 @@ import com.fiberhome.ml.raha.data.type.ClassifierType;
 import com.fiberhome.ml.raha.data.type.LabelSource;
 import com.fiberhome.ml.raha.data.type.ModelStatus;
 import com.fiberhome.ml.raha.label.CellLabel;
+import com.fiberhome.ml.raha.label.propagation.LabelPropagationMethod;
 import com.fiberhome.ml.raha.model.domain.ModelSetManifest;
 import com.fiberhome.ml.raha.model.domain.RahaColumnModel;
 import com.fiberhome.ml.raha.repository.port.AnnotationRecordRepository;
@@ -22,6 +23,7 @@ import com.fiberhome.ml.raha.repository.port.SampleRecordRepository;
 import com.fiberhome.ml.raha.sampling.domain.SampleAnnotationRow;
 import com.fiberhome.ml.raha.sampling.domain.SampleBatch;
 import com.fiberhome.ml.raha.sampling.domain.SampleRecord;
+import com.fiberhome.ml.raha.service.task.batch.ColumnBatchOptions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -224,6 +226,29 @@ class RahaTaskRequestFactoryTest {
                 request.getDataLoadRequest().getInputReference());
         assertEquals("dw.orders",
                 request.getDataLoadRequest().getSourceReference());
+    }
+
+    @Test
+    void shouldCreateColumnBatchTrainingFromSnapshotCheckpoint() {
+        SampleBatch sample = sampleBatch("sample-checkpoint", "annotation-row");
+        AnnotationBatch annotation = annotationBatch(sample,
+                "annotation-checkpoint");
+        RahaTaskRequestFactory factory = factory(
+                Collections.singletonList(sample),
+                Collections.singletonList(annotation),
+                Collections.<String, ModelSetManifest>emptyMap());
+        TrainingRequestOptions options = new TrainingRequestOptions(false,
+                "raha", LabelPropagationMethod.HOMOGENEITY, null,
+                ExecutionOverrideOptions.DEFAULT, "snapshot-v1", true,
+                new ColumnBatchOptions(10, 1, false, false));
+
+        RahaTaskExecutionRequest request = factory.training(
+                Collections.singletonList("sample-checkpoint"), options);
+
+        assertTrue(request.isReuseSnapshotCheckpoint());
+        assertTrue(request.getColumnBatchOptions().isEnabled());
+        assertEquals(10,
+                request.getColumnBatchOptions().getColumnBatchSize());
     }
 
     @Test
