@@ -1,0 +1,12 @@
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+26/07/23 06:54:28 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Spark master: spark://spark-master:7077, Application Id: app-20260723065431-0008
+26/07/23 06:54:43 WARN HadoopFSUtils: The directory hdfs://hdfs:9000/user/hive/warehouse/dw.db/raha_job_stage_attempt/dataset_id=person_info/partition_month=2026-07 was not found. Was it deleted very recently?
+load_data-36db40b973b8af66	LOAD_DATA	SUCCEEDED	NULL	1784787697290	1784787707411	10121
+profile-1a14841aed3e49da	PROFILE	SUCCEEDED	NULL	1784787714887	1784787722695	7808
+generate_strategy-f6771ff71bea0267	GENERATE_STRATEGY	SUCCEEDED	NULL	1784787727945	1784787727971	26
+snapshot_checkpoint-a23817f085451368	SNAPSHOT_CHECKPOINT	SUCCEEDED	NULL	1784787732789	1784787777682	44893
+sample-69cdb1bcb4021f78	SAMPLE	SUCCEEDED	NULL	1784787781716	1784787783729	2013
+persist_result-e6b8be726cc71254	PERSIST_RESULT	SUCCEEDED	NULL	1784787787413	1784787787649	236
+Time taken: 22.96 seconds, Fetched 6 row(s)

@@ -10,3 +10,4 @@ target/
 /spark-warehouse/
 /.mvn/
 /.vscode/
+/src/main/resources/.env

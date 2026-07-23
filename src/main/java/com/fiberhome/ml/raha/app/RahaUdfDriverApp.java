@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -59,6 +60,14 @@ public final class RahaUdfDriverApp {
     private static final String HADOOP_DLL_NAME = "hadoop.dll";
     /** Windows Hadoop 辅助程序文件名。 */
     private static final String WINUTILS_NAME = "winutils.exe";
+    /** 默认模型配置文件路径，用于本地驱动调试时补齐自动标注参数。 */
+    private static final String DEFAULT_MODEL_ENV_FILE = "src/main/resources/.env";
+    /** 聊天接口密钥配置名。 */
+    private static final String MODEL_CHAT_API_KEY = "MODEL_CHAT_API_KEY";
+    /** 聊天接口基础地址配置名。 */
+    private static final String MODEL_CHAT_BASE_URL = "MODEL_CHAT_BASE_URL";
+    /** 聊天模型名称配置名。 */
+    private static final String MODEL_CHAT_MODEL_NAME = "MODEL_CHAT_MODEL_NAME";
 
     private RahaUdfDriverApp() {
     }
@@ -115,7 +124,8 @@ public final class RahaUdfDriverApp {
                     "用法：RahaUdfDriverApp <functionName> <request|@requestFile> [outputJsonPath]");
         }
         String functionName = resolvedArgs[FUNCTION_ARG_INDEX];
-        String request = readRequest(resolvedArgs[REQUEST_ARG_INDEX]);
+        String request = enrichAutoLabelModelConfig(
+                readRequest(resolvedArgs[REQUEST_ARG_INDEX]));
         SparkSession spark = SparkSession.builder()
                 .appName("RahaUdfDriverApp-" + functionName)
                 .master(System.getProperty("raha.spark.master",
@@ -450,6 +460,89 @@ public final class RahaUdfDriverApp {
             return new String(bytes, StandardCharsets.UTF_8).trim();
         }
         return argument;
+    }
+
+    private static String enrichAutoLabelModelConfig(String request) {
+        if (request == null || request.trim().isEmpty()) {
+            return request;
+        }
+        Map<String, Object> values;
+        try {
+            values = new LinkedHashMap<String, Object>(
+                    FmdbJsonCodec.readObject(request));
+        } catch (IllegalArgumentException exception) {
+            return request;
+        }
+        if (!boolValue(values.get("autoLabelEnabled"))) {
+            return request;
+        }
+        Map<String, String> envValues = loadModelEnv();
+        putIfBlank(values, "autoLabelModelUrl", chatCompletionUrl(
+                envValues.get(MODEL_CHAT_BASE_URL)));
+        putIfBlank(values, "autoLabelApiKey",
+                envValues.get(MODEL_CHAT_API_KEY));
+        putIfBlank(values, "autoLabelModel",
+                envValues.get(MODEL_CHAT_MODEL_NAME));
+        return FmdbJsonCodec.write(values);
+    }
+
+    private static Map<String, String> loadModelEnv() {
+        Path path = Paths.get(DEFAULT_MODEL_ENV_FILE);
+        if (!Files.isRegularFile(path)) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> result = new LinkedHashMap<String, String>();
+        try {
+            List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+            for (String line : lines) {
+                String text = line == null ? "" : line.trim();
+                if (text.isEmpty() || text.startsWith("#")) {
+                    continue;
+                }
+                int index = text.indexOf('=');
+                if (index <= 0) {
+                    continue;
+                }
+                result.put(text.substring(0, index).trim(),
+                        text.substring(index + 1).trim());
+            }
+            return result;
+        } catch (IOException exception) {
+            throw new IllegalStateException("读取本地模型配置失败：" + path,
+                    exception);
+        }
+    }
+
+    private static void putIfBlank(Map<String, Object> values, String key,
+                                   String value) {
+        if (trimToNull(stringValue(values.get(key))) == null
+                && trimToNull(value) != null) {
+            values.put(key, value.trim());
+        }
+    }
+
+    private static String chatCompletionUrl(String baseUrl) {
+        String value = trimToNull(baseUrl);
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.endsWith("/")
+                ? value.substring(0, value.length() - 1) : value;
+        return normalized.endsWith("/chat/completions")
+                ? normalized : normalized + "/chat/completions";
+    }
+
+    private static boolean boolValue(Object value) {
+        if (value instanceof Boolean) {
+            return ((Boolean) value).booleanValue();
+        }
+        String text = stringValue(value);
+        return "true".equalsIgnoreCase(text) || "1".equals(text)
+                || "yes".equalsIgnoreCase(text);
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value).trim();
     }
 
     private static void appendJavaLibraryPath(Path expectedPath) {

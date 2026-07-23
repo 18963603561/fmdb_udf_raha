@@ -1,0 +1,20 @@
+{
+  "sourceType": "SQL",
+  "datasetId": "person_info",
+  "sqlText": "select * from dw.person_info",
+  "sourceVersion": "person-info-docker-detect-full-20260723135436",
+  "modelSetVersion": "dw.person_info@20260723064121.282-job-be73e05d-4e87-4912-bc49-bc7391d2bcc4",
+  "missingModelPolicy": "PARTIAL",
+  "columnBatchSize": "2",
+  "maxParallelColumnBatches": "1",
+  "batchRvdEnabled": "false",
+  "failFastColumnBatch": "false",
+  "detailFormat": "xls",
+  "publishZip": "false",
+  "artifactBaseDir": "/opt/spark/work-dir/data/person-info-500-full-20260723135436/udf-work",
+  "localWebRoot": "/opt/spark/work-dir/data/person-info-500-full-20260723135436/web",
+  "caller": "codex",
+  "requestId": "person-info-detect-docker-full-20260723135436",
+  "forceRun": true,
+  "forceRunId": "d-docker-full-20260723135436"
+}

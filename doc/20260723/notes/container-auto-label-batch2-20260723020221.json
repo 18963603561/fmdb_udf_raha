@@ -1,0 +1,8 @@
+{
+  "input": "F:\\ai-code\\fmdb_udf_schmatch\\data\\person-info-column-batch2-20260723\\udf-work\\collect\\20260723020056-1784772056415\\raha-annotation_sample_dw.person_info_20260723020208.229_20260723020221.xls",
+  "output": "F:\\ai-code\\fmdb_udf_schmatch\\data\\person-info-column-batch2-20260723\\annotation-upload\\raha-annotation_sample_dw.person_info_20260723020208.229_20260723020221_labeled.xls",
+  "labeledCount": 300,
+  "errorRowCount": 84,
+  "correctRowCount": 216,
+  "unmatchedRows": []
+}

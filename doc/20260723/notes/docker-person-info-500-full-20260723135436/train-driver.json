@@ -1,0 +1,17 @@
+{
+  "sampleBatchId": "sample_dw.person_info@20260723062301.717",
+  "annotationDir": "/fmdb/detection/annotation/",
+  "allowPartialAnnotation": "false",
+  "modelNamePrefix": "person_info_docker_500_full",
+  "columnBatchSize": "2",
+  "maxParallelColumnBatches": "1",
+  "batchRvdEnabled": "false",
+  "failFastColumnBatch": "false",
+  "publishZip": "false",
+  "artifactBaseDir": "/opt/spark/work-dir/data/person-info-500-full-20260723135436/udf-work",
+  "localWebRoot": "/opt/spark/work-dir/data/person-info-500-full-20260723135436/web",
+  "caller": "codex",
+  "requestId": "person-info-train-docker-500-full-20260723135436",
+  "forceRun": true,
+  "forceRunId": "t-docker-500-full-20260723135436-r2"
+}
