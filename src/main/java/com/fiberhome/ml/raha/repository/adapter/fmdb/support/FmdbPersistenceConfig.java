@@ -19,9 +19,21 @@ public final class FmdbPersistenceConfig {
             "db/fmdb/raha-fmdb-schema.sql";
     /** 全局 FMDB 表写入模式配置键。 */
     private static final String WRITE_MODE_KEY = "raha.persistence.write-mode";
-    /** 快照检查点分批追加大小配置键。 */
-    private static final String SNAPSHOT_CHECKPOINT_APPEND_BATCH_SIZE_KEY =
-            "raha.persistence.snapshot-checkpoint.append-batch-size";
+    /** 快照检查点 HDFS 明细根目录配置键。 */
+    private static final String SNAPSHOT_CHECKPOINT_DETAIL_BASE_PATH_KEY =
+            "raha.persistence.snapshot-checkpoint.detail-base-path";
+    /** 快照检查点逻辑列批大小配置键。 */
+    private static final String SNAPSHOT_CHECKPOINT_COLUMN_BATCH_SIZE_KEY =
+            "raha.persistence.snapshot-checkpoint.column-batch-size";
+    /** 快照检查点 ORC 文件分区数配置键。 */
+    private static final String SNAPSHOT_CHECKPOINT_ORC_PARTITION_COUNT_KEY =
+            "raha.persistence.snapshot-checkpoint.orc-partition-count";
+    /** 快照检查点重明细保留时间配置键。 */
+    private static final String SNAPSHOT_CHECKPOINT_RETENTION_MILLIS_KEY =
+            "raha.persistence.snapshot-checkpoint.retention-millis";
+    /** 快照检查点重明细清理开关配置键。 */
+    private static final String SNAPSHOT_CHECKPOINT_CLEANUP_ENABLED_KEY =
+            "raha.persistence.snapshot-checkpoint.cleanup-enabled";
     /** 是否启用 FMDB 物理表持久化。 */
     private final boolean enabled;
     /** 是否自动创建不存在的默认表。 */
@@ -34,8 +46,16 @@ public final class FmdbPersistenceConfig {
     private final Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches;
     /** FMDB 标准物理表的全局追加写入模式。 */
     private final FmdbWriteMode writeMode;
-    /** 快照检查点单次写入的最大记录数。 */
-    private final int snapshotCheckpointAppendBatchSize;
+    /** 快照检查点 HDFS 明细根目录。 */
+    private final String snapshotCheckpointDetailBasePath;
+    /** 快照检查点逻辑列批大小。 */
+    private final int snapshotCheckpointColumnBatchSize;
+    /** 每个检查点列批的 ORC 文件分区数。 */
+    private final int snapshotCheckpointOrcPartitionCount;
+    /** 已完成检查点重明细保留时间。 */
+    private final long snapshotCheckpointRetentionMillis;
+    /** 是否允许清理过期检查点重明细。 */
+    private final boolean snapshotCheckpointCleanupEnabled;
 
     private FmdbPersistenceConfig(boolean enabled,
                                   boolean autoCreateTables,
@@ -43,7 +63,11 @@ public final class FmdbPersistenceConfig {
                                   Map<FmdbPhysicalTable, Boolean> tableSwitches,
                                   Map<FmdbColumnArtifact, Boolean> columnArtifactSwitches,
                                   FmdbWriteMode writeMode,
-                                  int snapshotCheckpointAppendBatchSize) {
+                                  String detailBasePath,
+                                  int columnBatchSize,
+                                  int orcPartitionCount,
+                                  long retentionMillis,
+                                  boolean cleanupEnabled) {
         this.enabled = enabled;
         this.autoCreateTables = autoCreateTables;
         this.schemaResource = ValueUtils.requireNotBlank(
@@ -55,11 +79,17 @@ public final class FmdbPersistenceConfig {
             throw new IllegalArgumentException("FMDB 写入模式不能为空");
         }
         this.writeMode = writeMode;
-        if (snapshotCheckpointAppendBatchSize <= 0) {
-            throw new IllegalArgumentException("快照检查点分批追加大小必须大于零");
+        if (columnBatchSize <= 0 || orcPartitionCount <= 0
+                || retentionMillis < 0L) {
+            throw new IllegalArgumentException(
+                    "快照检查点列批、ORC 分区和保留时间配置非法");
         }
-        this.snapshotCheckpointAppendBatchSize =
-                snapshotCheckpointAppendBatchSize;
+        this.snapshotCheckpointDetailBasePath = ValueUtils.requireNotBlank(
+                detailBasePath, "快照检查点 HDFS 明细根目录");
+        this.snapshotCheckpointColumnBatchSize = columnBatchSize;
+        this.snapshotCheckpointOrcPartitionCount = orcPartitionCount;
+        this.snapshotCheckpointRetentionMillis = retentionMillis;
+        this.snapshotCheckpointCleanupEnabled = cleanupEnabled;
         validateDependencies();
     }
 
@@ -99,7 +129,11 @@ public final class FmdbPersistenceConfig {
                 properties.getRequired("raha.persistence.schema.resource"),
                 tableValues, artifactValues,
                 properties.getEnum(WRITE_MODE_KEY, FmdbWriteMode.class),
-                properties.getInt(SNAPSHOT_CHECKPOINT_APPEND_BATCH_SIZE_KEY));
+                properties.getRequired(SNAPSHOT_CHECKPOINT_DETAIL_BASE_PATH_KEY),
+                properties.getInt(SNAPSHOT_CHECKPOINT_COLUMN_BATCH_SIZE_KEY),
+                properties.getInt(SNAPSHOT_CHECKPOINT_ORC_PARTITION_COUNT_KEY),
+                properties.getLong(SNAPSHOT_CHECKPOINT_RETENTION_MILLIS_KEY),
+                properties.getBoolean(SNAPSHOT_CHECKPOINT_CLEANUP_ENABLED_KEY));
     }
 
     /**
@@ -164,8 +198,24 @@ public final class FmdbPersistenceConfig {
         return writeMode == FmdbWriteMode.DIRECT_APPEND;
     }
 
-    public int getSnapshotCheckpointAppendBatchSize() {
-        return snapshotCheckpointAppendBatchSize;
+    public String getSnapshotCheckpointDetailBasePath() {
+        return snapshotCheckpointDetailBasePath;
+    }
+
+    public int getSnapshotCheckpointColumnBatchSize() {
+        return snapshotCheckpointColumnBatchSize;
+    }
+
+    public int getSnapshotCheckpointOrcPartitionCount() {
+        return snapshotCheckpointOrcPartitionCount;
+    }
+
+    public long getSnapshotCheckpointRetentionMillis() {
+        return snapshotCheckpointRetentionMillis;
+    }
+
+    public boolean isSnapshotCheckpointCleanupEnabled() {
+        return snapshotCheckpointCleanupEnabled;
     }
 
     private void validateDependencies() {
@@ -272,8 +322,17 @@ public final class FmdbPersistenceConfig {
                 new EnumMap<FmdbColumnArtifact, Boolean>(FmdbColumnArtifact.class);
         /** FMDB 标准物理表的全局追加写入模式。 */
         private FmdbWriteMode writeMode = FmdbWriteMode.DIRECT_APPEND;
-        /** 快照检查点单次写入的最大记录数。 */
-        private int snapshotCheckpointAppendBatchSize = 10000;
+        /** 快照检查点 HDFS 明细根目录。 */
+        private String snapshotCheckpointDetailBasePath =
+                "/fmdb/raha/checkpoint";
+        /** 快照检查点逻辑列批大小。 */
+        private int snapshotCheckpointColumnBatchSize = 10;
+        /** 每个列批写出的 ORC 文件分区数。 */
+        private int snapshotCheckpointOrcPartitionCount = 4;
+        /** 已完成检查点重明细保留时间。 */
+        private long snapshotCheckpointRetentionMillis = 604800000L;
+        /** 是否允许清理过期重明细。 */
+        private boolean snapshotCheckpointCleanupEnabled = true;
 
         private Builder() {
             for (FmdbPhysicalTable table : FmdbPhysicalTable.values()) {
@@ -364,17 +423,33 @@ public final class FmdbPersistenceConfig {
             return this;
         }
 
-        /**
-         * 设置快照检查点单次追加的最大记录数。
-         *
-         * @param value 每次提交的记录数上限
-         * @return 当前构建器
-         */
-        public Builder snapshotCheckpointAppendBatchSize(int value) {
-            if (value <= 0) {
-                throw new IllegalArgumentException("快照检查点分批追加大小必须大于零");
-            }
-            this.snapshotCheckpointAppendBatchSize = value;
+        /** 设置快照检查点 HDFS 明细根目录。 */
+        public Builder snapshotCheckpointDetailBasePath(String value) {
+            this.snapshotCheckpointDetailBasePath = value;
+            return this;
+        }
+
+        /** 设置快照检查点逻辑列批大小。 */
+        public Builder snapshotCheckpointColumnBatchSize(int value) {
+            this.snapshotCheckpointColumnBatchSize = value;
+            return this;
+        }
+
+        /** 设置每个检查点列批的 ORC 文件分区数。 */
+        public Builder snapshotCheckpointOrcPartitionCount(int value) {
+            this.snapshotCheckpointOrcPartitionCount = value;
+            return this;
+        }
+
+        /** 设置已完成检查点重明细保留时间。 */
+        public Builder snapshotCheckpointRetentionMillis(long value) {
+            this.snapshotCheckpointRetentionMillis = value;
+            return this;
+        }
+
+        /** 设置是否允许清理过期检查点重明细。 */
+        public Builder snapshotCheckpointCleanupEnabled(boolean value) {
+            this.snapshotCheckpointCleanupEnabled = value;
             return this;
         }
 
@@ -386,7 +461,11 @@ public final class FmdbPersistenceConfig {
         public FmdbPersistenceConfig build() {
             return new FmdbPersistenceConfig(enabled, autoCreateTables,
                     schemaResource, tableSwitches, columnArtifactSwitches,
-                    writeMode, snapshotCheckpointAppendBatchSize);
+                    writeMode, snapshotCheckpointDetailBasePath,
+                    snapshotCheckpointColumnBatchSize,
+                    snapshotCheckpointOrcPartitionCount,
+                    snapshotCheckpointRetentionMillis,
+                    snapshotCheckpointCleanupEnabled);
         }
     }
 }

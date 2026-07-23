@@ -39,5 +39,7 @@ public enum StageType {
     /** 评估检测质量。 */
     EVALUATE,
     /** 持久化最终结果。 */
-    PERSIST_RESULT
+    PERSIST_RESULT,
+    /** 模型发布成功后清理超过保留期的快照检查点明细。 */
+    CLEANUP_CHECKPOINT
 }

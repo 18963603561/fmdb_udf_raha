@@ -82,6 +82,18 @@ public final class SampleTaskStageHandler implements StageHandler {
     @Override
     @SuppressWarnings("unchecked")
     public StageResult execute(StageExecutionContext context) {
+        Object preparedValue = context.getAttributes().get(
+                StageAttributeKeys.SAMPLE_SERVICE_RESULT);
+        if (preparedValue instanceof RahaServiceResult) {
+            RahaServiceResult<RahaSampleOutput> prepared =
+                    (RahaServiceResult<RahaSampleOutput>) preparedValue;
+            if (prepared.getStatus() == JobStatus.SUCCEEDED
+                    && prepared.getPayload() != null) {
+                prepared = persistSampleBatch(context, prepared);
+            }
+            applyResult(context, prepared);
+            return ServiceStageResultMapper.map(prepared);
+        }
         Object featureValue = context.getAttributes().get(
                 StageAttributeKeys.FEATURE_ASSEMBLY_RESULT);
         Object clusteringValue = context.getAttributes().get(
@@ -109,15 +121,23 @@ public final class SampleTaskStageHandler implements StageHandler {
                 && result.getPayload() != null) {
             result = persistSampleBatch(context, result);
         }
-        context.getAttributes().put(StageAttributeKeys.SAMPLE_SERVICE_RESULT, result);
+        applyResult(context, result);
+        return ServiceStageResultMapper.map(result);
+    }
+
+    private static void applyResult(
+            StageExecutionContext context,
+            RahaServiceResult<RahaSampleOutput> result) {
+        context.getAttributes().put(StageAttributeKeys.SAMPLE_SERVICE_RESULT,
+                result);
         if (result.getPayload() != null) {
-            context.getAttributes().put(StageAttributeKeys.SAMPLE_OUTPUT, result.getPayload());
+            context.getAttributes().put(StageAttributeKeys.SAMPLE_OUTPUT,
+                    result.getPayload());
             context.getAttributes().put(StageAttributeKeys.SAMPLING_BATCH_RESULT,
                     result.getPayload().getSampling());
             context.getAttributes().put(StageAttributeKeys.ANNOTATION_TASKS,
                     result.getPayload().getSampling().getTasks());
         }
-        return ServiceStageResultMapper.map(result);
     }
 
     private RahaServiceResult<RahaSampleOutput> persistSampleBatch(

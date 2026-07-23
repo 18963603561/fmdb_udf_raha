@@ -11,7 +11,7 @@ import java.util.List;
  */
 public final class SamplingBatchResult {
 
-    /** 本轮全部可选元组分数。 */
+    /** 本轮预算内选中的元组分数，不保留全部候选明细。 */
     private final List<TupleSamplingScore> scores;
     /** 预算内生成的待标注任务。 */
     private final List<AnnotationTask> tasks;

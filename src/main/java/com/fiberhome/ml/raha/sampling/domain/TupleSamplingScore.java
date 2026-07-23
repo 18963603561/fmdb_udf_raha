@@ -30,9 +30,8 @@ public final class TupleSamplingScore {
         if (!finiteNonNegative(score) || !finiteNonNegative(coverageScore)) {
             throw new IllegalArgumentException("元组采样分数必须为非负有限数值");
         }
-        if (coveredClusters == null || coveredClusters.isEmpty()
-                || columnContributions == null) {
-            throw new IllegalArgumentException("元组采样必须包含聚类覆盖和字段贡献");
+        if (coveredClusters == null || columnContributions == null) {
+            throw new IllegalArgumentException("元组采样覆盖和字段贡献不能为空");
         }
         this.score = score;
         this.coverageScore = coverageScore;

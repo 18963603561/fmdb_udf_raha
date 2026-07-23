@@ -2,14 +2,16 @@ package com.fiberhome.ml.raha.service.sample;
 
 import com.fiberhome.ml.raha.cluster.ColumnClusteringService;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
+import com.fiberhome.ml.raha.config.dto.SamplingConfig;
+import com.fiberhome.ml.raha.data.type.JobStatus;
+import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
+import com.fiberhome.ml.raha.sampling.ClusterCoverageAccumulator;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
 import com.fiberhome.ml.raha.sampling.service.SamplingBatchResult;
 import com.fiberhome.ml.raha.sampling.service.SamplingService;
 import com.fiberhome.ml.raha.service.common.RahaServiceResult;
-import com.fiberhome.ml.raha.data.type.JobStatus;
 import com.fiberhome.ml.raha.service.common.RahaServiceSummary;
-import com.fiberhome.ml.raha.data.type.JobType;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -98,6 +100,57 @@ public final class RahaSampleService {
             RahaServiceSummary summary = new RahaServiceSummary(startedAt, clock.millis(),
                     1L, 0L, 0L, 1L, Collections.<String, String>emptyMap());
             return new RahaServiceResult<RahaSampleOutput>(request.getJobId(),
+                    JobType.SAMPLING, JobStatus.FAILED, null, summary, null,
+                    "SAMPLE_SERVICE_FAILED", exception.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * 使用分批聚类累积出的紧凑覆盖状态生成采样任务。
+     */
+    public RahaServiceResult<RahaSampleOutput> samplePreparedScores(
+            String jobId,
+            int samplingRound,
+            ClusteringBatchResult clusteringSummary,
+            ClusterCoverageAccumulator coverage,
+            SamplingConfig config,
+            long randomSeed,
+            ArtifactVersion version) {
+        if (clusteringSummary == null || coverage == null || config == null
+                || version == null) {
+            throw new IllegalArgumentException("分批采样服务输入不能为空");
+        }
+        long startedAt = clock.millis();
+        LOGGER.info("开始使用紧凑覆盖状态执行 Raha 采样，jobId={}，samplingRound={}，"
+                        + "candidateRowCount={}，clusteredColumnCount={}",
+                jobId, samplingRound, coverage.getCandidateRowCount(),
+                coverage.getClusterVersions().size());
+        try {
+            SamplingBatchResult sampling = samplingService
+                    .createTasksFromCompactScores(jobId, samplingRound,
+                            coverage, config, randomSeed, version);
+            Map<String, String> details = new LinkedHashMap<String, String>();
+            details.put("assignmentCount", String.valueOf(
+                    clusteringSummary.getMetrics().getAssignmentCount()));
+            details.put("candidateTupleCount", String.valueOf(
+                    sampling.getMetrics().getCandidateTupleCount()));
+            details.put("samplingVersion", sampling.getSamplingVersion());
+            RahaServiceSummary summary = new RahaServiceSummary(startedAt,
+                    clock.millis(), sampling.getMetrics().getCandidateTupleCount(),
+                    sampling.getTasks().size(), Math.max(0L,
+                    sampling.getMetrics().getCandidateTupleCount()
+                            - sampling.getTasks().size()), 0L, details);
+            return new RahaServiceResult<RahaSampleOutput>(jobId,
+                    JobType.SAMPLING, JobStatus.SUCCEEDED,
+                    "memory://annotation-task/" + jobId, summary,
+                    new RahaSampleOutput(clusteringSummary, sampling), null, null);
+        } catch (RuntimeException exception) {
+            LOGGER.error("紧凑覆盖状态 Raha 采样失败，jobId={}，samplingRound={}",
+                    jobId, samplingRound, exception);
+            RahaServiceSummary summary = new RahaServiceSummary(startedAt,
+                    clock.millis(), 1L, 0L, 0L, 1L,
+                    Collections.<String, String>emptyMap());
+            return new RahaServiceResult<RahaSampleOutput>(jobId,
                     JobType.SAMPLING, JobStatus.FAILED, null, summary, null,
                     "SAMPLE_SERVICE_FAILED", exception.getClass().getSimpleName());
         }

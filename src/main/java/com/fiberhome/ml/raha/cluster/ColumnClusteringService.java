@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -199,6 +200,13 @@ public final class ColumnClusteringService {
         return new ClusteringBatchResult(results, new ClusteringMetrics(
                 results.size(), clusteredColumnCount, assignmentCount,
                 exceptionalColumnCount));
+    }
+
+    /**
+     * 释放已经保存到外部检查点的任务级列聚类缓存。
+     */
+    public void releaseCachedBatch(String jobId, Set<String> columns) {
+        repository.release(jobId, columns);
     }
 
     private ColumnClusteringResult clusterColumn(String jobId,

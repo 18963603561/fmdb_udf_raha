@@ -38,7 +38,13 @@ class FmdbPersistenceConfigTest {
         assertFalse(config.shouldPersist(FmdbColumnArtifact.PROPAGATION_SUMMARY));
         assertEquals(FmdbWriteMode.DIRECT_APPEND, config.getWriteMode());
         assertTrue(config.isDirectAppend());
-        assertEquals(10000, config.getSnapshotCheckpointAppendBatchSize());
+        assertEquals("/fmdb/raha/checkpoint",
+                config.getSnapshotCheckpointDetailBasePath());
+        assertEquals(10, config.getSnapshotCheckpointColumnBatchSize());
+        assertEquals(4, config.getSnapshotCheckpointOrcPartitionCount());
+        assertEquals(604800000L,
+                config.getSnapshotCheckpointRetentionMillis());
+        assertTrue(config.isSnapshotCheckpointCleanupEnabled());
     }
 
     @Test
@@ -56,8 +62,12 @@ class FmdbPersistenceConfigTest {
                     artifact.getConfigKey());
         }
         assertEquals(properties.getWriteMode(), builder.getWriteMode());
-        assertEquals(properties.getSnapshotCheckpointAppendBatchSize(),
-                builder.getSnapshotCheckpointAppendBatchSize());
+        assertEquals(properties.getSnapshotCheckpointDetailBasePath(),
+                builder.getSnapshotCheckpointDetailBasePath());
+        assertEquals(properties.getSnapshotCheckpointColumnBatchSize(),
+                builder.getSnapshotCheckpointColumnBatchSize());
+        assertEquals(properties.getSnapshotCheckpointOrcPartitionCount(),
+                builder.getSnapshotCheckpointOrcPartitionCount());
     }
 
     @Test
@@ -94,6 +104,11 @@ class FmdbPersistenceConfigTest {
                         .build());
         assertThrows(IllegalArgumentException.class,
                 () -> FmdbPersistenceConfig.builder()
-                        .snapshotCheckpointAppendBatchSize(0));
+                        .snapshotCheckpointColumnBatchSize(0)
+                        .build());
+        assertThrows(IllegalArgumentException.class,
+                () -> FmdbPersistenceConfig.builder()
+                        .snapshotCheckpointOrcPartitionCount(0)
+                        .build());
     }
 }

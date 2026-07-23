@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.repository.adapter.fmdb.repository;
 
 import com.fiberhome.ml.raha.checkpoint.SnapshotPreparedArtifacts;
+import com.fiberhome.ml.raha.checkpoint.SnapshotCheckpointWriteSession;
 import com.fiberhome.ml.raha.cluster.domain.ClusterAssignment;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringMetrics;
@@ -33,49 +34,84 @@ import com.fiberhome.ml.raha.strategy.execution.StrategyRunSummary;
 import com.fiberhome.ml.raha.strategy.plan.StrategyPlan;
 import com.fiberhome.ml.raha.util.HashUtils;
 import com.fiberhome.ml.raha.util.ValueUtils;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
+import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 使用统一 FMDB 检查点表保存和恢复采样阶段前置产物。
+ * 使用 FMDB 保存检查点元数据，并按列批将训练必要明细保存为 HDFS ORC。
+ *
+ * <p>检查点表只承担发现、审计和完整性判断；单元格特征与聚类归属在
+ * 同一条 ORC 记录中保存。所有列批成功后才提交最终清单。</p>
  */
 public final class FmdbSnapshotCheckpointRepository
         implements SnapshotCheckpointRepository {
 
-    /** manifest 行类型。 */
+    /** 检查点最终清单记录类型。 */
     private static final String MANIFEST = "MANIFEST";
-    /** 列画像行类型。 */
+    /** 已清理检查点记录类型。 */
+    private static final String CLEANED = "CLEANED";
+    /** 字段画像记录类型。 */
     private static final String PROFILE = "PROFILE";
-    /** 策略计划行类型。 */
+    /** 策略计划记录类型。 */
     private static final String STRATEGY_PLAN = "STRATEGY_PLAN";
-    /** 特征字典行类型。 */
+    /** 特征字典记录类型。 */
     private static final String FEATURE_DICTIONARY = "FEATURE_DICTIONARY";
-    /** 单元格特征行类型。 */
-    private static final String CELL_FEATURE = "CELL_FEATURE";
-    /** 聚类摘要行类型。 */
+    /** 聚类摘要记录类型。 */
     private static final String CLUSTER_SUMMARY = "CLUSTER_SUMMARY";
-    /** 聚类成员行类型。 */
-    private static final String CLUSTER_ASSIGNMENT = "CLUSTER_ASSIGNMENT";
+    /** HDFS 明细列批清单记录类型。 */
+    private static final String DETAIL_BATCH = "DETAIL_BATCH";
     /** 检查点级记录作用域。 */
     private static final String SCOPE_CHECKPOINT = "CHECKPOINT";
+    /** 列批级记录作用域。 */
+    private static final String SCOPE_BATCH = "COLUMN_BATCH";
     /** 列级记录作用域。 */
     private static final String SCOPE_COLUMN = "COLUMN";
-    /** 单元格级记录作用域。 */
-    private static final String SCOPE_CELL = "CELL";
+    /** 当前 HDFS 明细协议版本。 */
+    private static final String DETAIL_SCHEMA_VERSION = "2";
+
+    /** HDFS ORC 明细模式。 */
+    private static final StructType DETAIL_SCHEMA = DataTypes.createStructType(
+            new StructField[] {
+                DataTypes.createStructField("checkpoint_id", DataTypes.StringType, false),
+                DataTypes.createStructField("batch_index", DataTypes.IntegerType, false),
+                DataTypes.createStructField("column_name", DataTypes.StringType, false),
+                DataTypes.createStructField("row_id", DataTypes.StringType, false),
+                DataTypes.createStructField("cell_id", DataTypes.StringType, false),
+                DataTypes.createStructField("value_hash", DataTypes.StringType, false),
+                DataTypes.createStructField("feature_dictionary_version",
+                        DataTypes.StringType, false),
+                DataTypes.createStructField("feature_values",
+                        DataTypes.createMapType(DataTypes.IntegerType,
+                                DataTypes.DoubleType, false), false),
+                DataTypes.createStructField("cluster_version", DataTypes.StringType, false),
+                DataTypes.createStructField("cluster_id", DataTypes.StringType, false)
+            });
 
     /** 日志记录器。 */
     private static final Logger LOGGER = LoggerFactory.getLogger(
@@ -88,6 +124,9 @@ public final class FmdbSnapshotCheckpointRepository
     private final FmdbPersistenceConfig persistenceConfig;
     /** 检查点物理表名。 */
     private final String tableName;
+    /** 当前进程尚未提交最终清单的检查点写会话。 */
+    private final Map<String, PendingCheckpoint> pendingCheckpoints =
+            new LinkedHashMap<String, PendingCheckpoint>();
 
     public FmdbSnapshotCheckpointRepository(SparkSession sparkSession,
                                             FmdbTableGateway tableGateway,
@@ -103,142 +142,208 @@ public final class FmdbSnapshotCheckpointRepository
     }
 
     @Override
-    public void save(String sourceJobId,
-                     RahaDataset dataset,
-                     DatasetSnapshot snapshot,
-                     List<StrategyPlan> strategyPlans,
-                     String strategyPlanVersion,
-                     StrategyBatchResult strategyBatch,
-                     FeatureAssemblyResult features,
-                     ClusteringBatchResult clustering,
-                     String configFingerprint,
-                     long createdAt) {
+    public int getColumnBatchSize() {
+        return persistenceConfig.getSnapshotCheckpointColumnBatchSize();
+    }
+
+    @Override
+    public synchronized SnapshotCheckpointWriteSession begin(
+            String sourceJobId,
+            RahaDataset dataset,
+            DatasetSnapshot snapshot,
+            List<StrategyPlan> strategyPlans,
+            String strategyPlanVersion,
+            String configFingerprint,
+            long createdAt) {
         String jobId = ValueUtils.requireNotBlank(sourceJobId, "来源任务标识");
         if (dataset == null || snapshot == null || strategyPlans == null
-                || strategyBatch == null || features == null || clustering == null
                 || createdAt <= 0L) {
-            throw new IllegalArgumentException("快照检查点保存参数不能为空");
-        }
-        if (!persistenceConfig.shouldPersist(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT)) {
-            LOGGER.info("FMDB 快照检查点持久化已关闭，跳过写入，jobId={}，snapshotId={}",
-                    jobId, snapshot.getSnapshotId());
-            return;
+            throw new IllegalArgumentException("快照检查点写会话参数不能为空");
         }
         String fingerprint = ValueUtils.requireNotBlank(configFingerprint,
                 "执行配置指纹");
-        String checkpointId = checkpointId(jobId, snapshot, fingerprint);
+        String checkpointId = checkpointId(jobId, snapshot, fingerprint,
+                createdAt);
         String rowSetFingerprint = rowSetFingerprint(snapshot);
-        FmdbTableRecord manifest = record(base(checkpointId, jobId, snapshot,
-                rowSetFingerprint,
-                fingerprint, createdAt), MANIFEST, SCOPE_CHECKPOINT, null,
-                manifestPayload(dataset, snapshot, strategyPlanVersion));
-        CheckpointBatchWriter writer = new CheckpointBatchWriter(checkpointId,
-                persistenceConfig.getSnapshotCheckpointAppendBatchSize());
-        LOGGER.info("开始分批写入 FMDB 快照检查点，checkpointId={}，datasetId={}，"
-                        + "snapshotId={}，appendBatchSize={}，featureRowCount={}，assignmentCount={}",
-                checkpointId, snapshot.getDatasetId(), snapshot.getSnapshotId(),
-                persistenceConfig.getSnapshotCheckpointAppendBatchSize(),
-                features.getRows().size(),
-                clustering.getMetrics().getAssignmentCount());
-
-        try {
-            List<ColumnProfile> profiles = new ArrayList<ColumnProfile>(
-                    dataset.getProfiles().values());
-            Collections.sort(profiles, Comparator.comparing(
-                    ColumnProfile::getColumnName));
-            for (ColumnProfile profile : profiles) {
-                Map<String, Object> values = base(checkpointId, jobId, snapshot,
-                        rowSetFingerprint, fingerprint, createdAt);
-                values.put("column_name", profile.getColumnName());
-                values.put("artifact_version", snapshot.getSnapshotId());
-                values.put("profile_json", FmdbColumnProfileCodec.write(profile));
-                writer.add(record(values, PROFILE, SCOPE_COLUMN,
-                        profile.getColumnName(), null));
-            }
-
-            Map<String, Object> strategyValues = base(checkpointId, jobId,
-                    snapshot, rowSetFingerprint, fingerprint, createdAt);
-            strategyValues.put("artifact_version", strategyPlanVersion);
-            strategyValues.put("strategy_plan_json", FmdbStrategyArtifactCodec.write(
-                    strategyPlans, summaries(strategyBatch)));
-            writer.add(record(strategyValues, STRATEGY_PLAN, SCOPE_CHECKPOINT,
-                    null, null));
-
-            List<String> dictionaryColumns = new ArrayList<String>(
-                    features.getDictionaries().keySet());
-            Collections.sort(dictionaryColumns);
-            for (String column : dictionaryColumns) {
-                FeatureDictionary dictionary = features.getDictionaries().get(column);
-                Map<String, Object> values = base(checkpointId, jobId, snapshot,
-                        rowSetFingerprint, fingerprint, createdAt);
-                values.put("column_name", column);
-                values.put("artifact_version", dictionary.getVersion());
-                values.put("feature_dictionary_json",
-                        FmdbFeatureDictionaryCodec.write(dictionary));
-                writer.add(record(values, FEATURE_DICTIONARY, SCOPE_COLUMN,
-                        column, null));
-            }
-
-            // 特征阶段已经按单元格标识稳定排序，此处直接流式编码，避免复制全量大列表。
-            for (SparseFeatureRow row : features.getRows()) {
-                Map<String, Object> values = base(checkpointId, jobId, snapshot,
-                        rowSetFingerprint, fingerprint, createdAt);
-                values.put("column_name", row.getColumnName());
-                values.put("row_id", row.getCoordinate() == null ? null
-                        : row.getCoordinate().getRowId());
-                values.put("cell_id", row.getCellId());
-                values.put("cell_value", row.getMaskedValue());
-                values.put("artifact_version", row.getFeatureDictionaryVersion());
-                values.put("feature_vector_json", featureValues(row.getValues()));
-                values.put("feature_summary_json",
-                        FmdbJsonCodec.write(row.getSummary()));
-                writer.add(record(values, CELL_FEATURE, SCOPE_CELL,
-                        row.getColumnName(), null));
-            }
-
-            List<ColumnClusteringResult> clusteringResults =
-                    new ArrayList<ColumnClusteringResult>(
-                            clustering.getResults().values());
-            Collections.sort(clusteringResults, Comparator.comparing(
-                    ColumnClusteringResult::getColumnName));
-            for (ColumnClusteringResult result : clusteringResults) {
-                Map<String, Object> values = base(checkpointId, jobId, snapshot,
-                        rowSetFingerprint, fingerprint, createdAt);
-                values.put("column_name", result.getColumnName());
-                values.put("artifact_version", result.getClusterVersion());
-                values.put("cluster_version", result.getClusterVersion());
-                values.put("cluster_summary_json",
-                        FmdbClusterSummaryCodec.write(result));
-                writer.add(record(values, CLUSTER_SUMMARY, SCOPE_COLUMN,
-                        result.getColumnName(), null));
-                for (ClusterAssignment assignment : result.getAssignments()) {
-                    Map<String, Object> item = base(checkpointId, jobId, snapshot,
-                            rowSetFingerprint, fingerprint, createdAt);
-                    item.put("column_name", assignment.getColumnName());
-                    item.put("row_id", assignment.getCoordinate() == null ? null
-                            : assignment.getCoordinate().getRowId());
-                    item.put("cell_id", assignment.getCellId());
-                    item.put("artifact_version", assignment.getClusterVersion());
-                    item.put("cluster_version", assignment.getClusterVersion());
-                    item.put("cluster_id", assignment.getClusterId());
-                    item.put("cluster_distance", assignment.getDistance());
-                    writer.add(record(item, CLUSTER_ASSIGNMENT, SCOPE_CELL,
-                            assignment.getColumnName(), null));
-                }
-            }
-            // manifest 最后提交，恢复端只会发现已经完整写入的检查点。
-            writer.finish(manifest);
-        } catch (RuntimeException exception) {
-            LOGGER.error("FMDB 快照检查点分批写入失败，checkpointId={}，"
-                            + "datasetId={}，snapshotId={}，writtenCount={}",
-                    checkpointId, snapshot.getDatasetId(),
-                    snapshot.getSnapshotId(), writer.getWrittenCount(), exception);
-            throw exception;
+        SnapshotCheckpointWriteSession session =
+                new SnapshotCheckpointWriteSession(checkpointId, jobId,
+                        dataset, snapshot, strategyPlans, strategyPlanVersion,
+                        fingerprint, createdAt);
+        if (!persistenceConfig.shouldPersist(
+                FmdbPhysicalTable.SNAPSHOT_CHECKPOINT)) {
+            LOGGER.info("FMDB 快照检查点持久化已关闭，创建空写会话，jobId={}，snapshotId={}",
+                    jobId, snapshot.getSnapshotId());
+            return session;
         }
-        LOGGER.info("FMDB 快照检查点写入完成，checkpointId={}，datasetId={}，"
-                        + "snapshotId={}，recordCount={}",
-                checkpointId, snapshot.getDatasetId(), snapshot.getSnapshotId(),
-                writer.getWrittenCount());
+        if (pendingCheckpoints.containsKey(checkpointId)) {
+            throw new IllegalStateException("检查点写会话已经存在：" + checkpointId);
+        }
+        List<FmdbTableRecord> globalRecords = globalRecords(checkpointId, jobId,
+                dataset, snapshot, rowSetFingerprint, fingerprint, createdAt);
+        pendingCheckpoints.put(checkpointId, new PendingCheckpoint(
+                globalRecords, rowSetFingerprint));
+        LOGGER.info("快照检查点分批写会话已创建，checkpointId={}，datasetId={}，"
+                        + "snapshotId={}，detailBasePath={}", checkpointId,
+                snapshot.getDatasetId(), snapshot.getSnapshotId(),
+                persistenceConfig.getSnapshotCheckpointDetailBasePath());
+        return session;
+    }
+
+    @Override
+    public synchronized void saveColumnBatch(
+            SnapshotCheckpointWriteSession session,
+            int batchIndex,
+            List<String> columns,
+            FeatureAssemblyResult features,
+            ClusteringBatchResult clustering) {
+        if (session == null || columns == null || columns.isEmpty()
+                || features == null || clustering == null || batchIndex <= 0) {
+            throw new IllegalArgumentException("检查点列批参数不能为空");
+        }
+        if (!persistenceConfig.shouldPersist(
+                FmdbPhysicalTable.SNAPSHOT_CHECKPOINT)) {
+            return;
+        }
+        PendingCheckpoint pending = requiredPending(session);
+        if (batchIndex != pending.nextBatchIndex) {
+            throw new IllegalStateException("检查点列批序号不连续，expected="
+                    + pending.nextBatchIndex + "，actual=" + batchIndex);
+        }
+        Set<String> uniqueColumns = new LinkedHashSet<String>(columns);
+        if (uniqueColumns.size() != columns.size()
+                || !Collections.disjoint(pending.completedColumns, uniqueColumns)) {
+            throw new IllegalArgumentException("检查点列批字段重复：" + columns);
+        }
+        validateColumnBatch(session, uniqueColumns, features, clustering);
+        DetailBatch detail = writeDetailBatch(session.getCheckpointId(),
+                batchIndex, session.getSnapshot(), columns,
+                featuresByColumn(features.getRows()),
+                assignmentsByColumn(clustering));
+        Map<String, Object> payload = detailPayload(detail, columns);
+        List<FmdbTableRecord> metadata = batchMetadata(
+                session.getCheckpointId(), session.getSourceJobId(),
+                session.getSnapshot(), features, clustering, columns,
+                pending.rowSetFingerprint, session.getConfigFingerprint(),
+                session.getCreatedAt(), payload);
+        if (batchIndex == 1) {
+            metadata.addAll(0, pending.globalRecords);
+        }
+        append(metadata);
+        pending.batchPayloads.add(payload);
+        pending.completedColumns.addAll(uniqueColumns);
+        pending.detailRecordCount += detail.recordCount;
+        pending.nextBatchIndex++;
+        LOGGER.info("快照检查点列批提交完成，checkpointId={}，batchIndex={}，"
+                        + "columns={}，detailCount={}，detailPath={}",
+                session.getCheckpointId(), batchIndex, columns,
+                detail.recordCount, detail.path);
+    }
+
+    private static void validateColumnBatch(
+            SnapshotCheckpointWriteSession session,
+            Set<String> columns,
+            FeatureAssemblyResult features,
+            ClusteringBatchResult clustering) {
+        if (!features.getDictionaries().keySet().equals(columns)
+                || !clustering.getResults().keySet().equals(columns)) {
+            throw new IllegalArgumentException("检查点列批字段、字典和聚类结果不一致");
+        }
+        Map<String, Long> featureCounts = new LinkedHashMap<String, Long>();
+        Map<String, Long> assignmentCounts = new LinkedHashMap<String, Long>();
+        for (String column : columns) {
+            featureCounts.put(column, Long.valueOf(0L));
+            assignmentCounts.put(column, Long.valueOf(clustering.getResults()
+                    .get(column).getAssignments().size()));
+        }
+        for (SparseFeatureRow row : features.getRows()) {
+            if (!columns.contains(row.getColumnName())) {
+                throw new IllegalArgumentException("检查点列批包含范围外特征："
+                        + row.getColumnName());
+            }
+            FeatureDictionary dictionary = features.getDictionaries().get(
+                    row.getColumnName());
+            if (!dictionary.getVersion().equals(
+                    row.getFeatureDictionaryVersion())) {
+                throw new IllegalArgumentException("检查点特征字典版本不一致："
+                        + row.getColumnName());
+            }
+            featureCounts.put(row.getColumnName(), Long.valueOf(
+                    featureCounts.get(row.getColumnName()).longValue() + 1L));
+        }
+        for (String column : columns) {
+            long featureCount = featureCounts.get(column).longValue();
+            long assignmentCount = assignmentCounts.get(column).longValue();
+            if (featureCount != session.getSnapshot().getRowCount()
+                    || assignmentCount != featureCount) {
+                throw new IllegalArgumentException("检查点列批行数不完整，column="
+                        + column + "，snapshotRows="
+                        + session.getSnapshot().getRowCount()
+                        + "，features=" + featureCount + "，assignments="
+                        + assignmentCount);
+            }
+        }
+    }
+
+    @Override
+    public synchronized void complete(SnapshotCheckpointWriteSession session,
+                                      StrategyBatchResult strategyBatch) {
+        if (session == null || strategyBatch == null) {
+            throw new IllegalArgumentException("检查点写会话和策略摘要不能为空");
+        }
+        if (!persistenceConfig.shouldPersist(
+                FmdbPhysicalTable.SNAPSHOT_CHECKPOINT)) {
+            return;
+        }
+        PendingCheckpoint pending = requiredPending(session);
+        Set<String> expectedColumns = new LinkedHashSet<String>();
+        for (ColumnMetadata column : session.getDataset().getColumns()) {
+            if (column.isDetectable()) {
+                expectedColumns.add(column.getName());
+            }
+        }
+        if (!pending.completedColumns.equals(expectedColumns)) {
+            throw new IllegalStateException("检查点字段未完整提交，expected="
+                    + expectedColumns + "，actual=" + pending.completedColumns);
+        }
+        if (pending.batchPayloads.isEmpty()) {
+            append(pending.globalRecords);
+        }
+        Map<String, Object> payload = manifestPayload(session.getDataset(),
+                session.getSnapshot(), session.getStrategyPlanVersion(),
+                pending.batchPayloads, checkpointRoot(session.getCheckpointId(),
+                        session.getSnapshot()));
+        List<FmdbTableRecord> finalRecords = new ArrayList<FmdbTableRecord>();
+        finalRecords.add(strategyRecord(session, pending.rowSetFingerprint,
+                strategyBatch));
+        finalRecords.add(record(base(session.getCheckpointId(),
+                session.getSourceJobId(), session.getSnapshot(),
+                pending.rowSetFingerprint, session.getConfigFingerprint(),
+                session.getCreatedAt()), MANIFEST, SCOPE_CHECKPOINT, null,
+                payload));
+        append(finalRecords);
+        pendingCheckpoints.remove(session.getCheckpointId());
+        LOGGER.info("HDFS 快照检查点最终清单提交完成，checkpointId={}，"
+                        + "columnBatchCount={}，columnCount={}，detailRecordCount={}",
+                session.getCheckpointId(), pending.batchPayloads.size(),
+                pending.completedColumns.size(), pending.detailRecordCount);
+    }
+
+    @Override
+    public synchronized void abort(SnapshotCheckpointWriteSession session) {
+        if (session == null) {
+            return;
+        }
+        PendingCheckpoint pending = pendingCheckpoints.remove(
+                session.getCheckpointId());
+        if (pending == null) {
+            return;
+        }
+        deletePathQuietly(checkpointRoot(session.getCheckpointId(),
+                session.getSnapshot()));
+        LOGGER.warn("快照检查点写会话已中止，checkpointId={}，"
+                        + "completedColumnCount={}，detailRecordCount={}",
+                session.getCheckpointId(), pending.completedColumns.size(),
+                pending.detailRecordCount);
     }
 
     @Override
@@ -256,78 +361,223 @@ public final class FmdbSnapshotCheckpointRepository
                 || !tableGateway.tableExists(tableName)) {
             return Optional.empty();
         }
-        List<Row> manifests = tableGateway.read(tableName,
+        List<Row> candidates = tableGateway.read(tableName,
                 FmdbTableSchemas.columns(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT),
                 functions.col("dataset_id").equalTo(dataset)
                         .and(functions.col("snapshot_id").equalTo(snapshot))
                         .and(functions.col("config_fingerprint").equalTo(fingerprint))
-                        .and(functions.col("record_type").equalTo(MANIFEST)))
-                .orderBy(functions.col("created_at").desc()).limit(1)
+                        .and(functions.col("record_type").isin(MANIFEST, CLEANED)))
+                .orderBy(functions.col("created_at").desc())
                 .collectAsList();
-        if (manifests.isEmpty()) {
-            LOGGER.warn("未找到可复用快照检查点，datasetId={}，snapshotId={}",
+        Row manifest = latestActiveManifest(candidates);
+        if (manifest == null) {
+            LOGGER.warn("未找到可复用 HDFS 快照检查点，datasetId={}，snapshotId={}",
                     dataset, snapshot);
             return Optional.empty();
         }
-        String checkpointId = manifests.get(0).getAs("checkpoint_id");
+        String checkpointId = manifest.getAs("checkpoint_id");
         Map<String, Object> manifestPayload = FmdbJsonCodec.readObject(
-                (String) manifests.get(0).getAs("payload_json"));
+                (String) manifest.getAs("payload_json"));
         validateRequestedColumns(columns(manifestPayload), requestedColumns);
-        Column checkpointCondition = functions.col("checkpoint_id")
-                .equalTo(checkpointId);
-        if (!requestedColumns.isEmpty()) {
-            // 清单和全局策略记录必须保留，列级和单元格级记录由数据库直接裁剪。
-            Column globalRecord = functions.col("record_type")
-                    .isin(MANIFEST, STRATEGY_PLAN);
-            Column selectedColumn = functions.col("column_name")
-                    .isin(requestedColumns.toArray(new Object[0]));
-            checkpointCondition = checkpointCondition.and(
-                    globalRecord.or(selectedColumn));
-        }
-        LOGGER.info("开始从 FMDB 恢复快照检查点，checkpointId={}，datasetId={}，"
-                        + "snapshotId={}，includedColumns={}",
-                checkpointId, dataset, snapshot, requestedColumns);
-        List<Row> rows = tableGateway.read(tableName,
+        LOGGER.info("开始恢复 HDFS 快照检查点，checkpointId={}，datasetId={}，"
+                        + "snapshotId={}，includedColumns={}", checkpointId,
+                dataset, snapshot, requestedColumns);
+        List<Row> metadataRows = tableGateway.read(tableName,
                 FmdbTableSchemas.columns(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT),
-                checkpointCondition)
+                functions.col("checkpoint_id").equalTo(checkpointId))
                 .collectAsList();
+        List<Row> detailRows = readDetailRows(metadataRows, requestedColumns);
         SnapshotPreparedArtifacts artifacts = restoreArtifacts(checkpointId,
-                fingerprint, rows, requestedColumns);
-        LOGGER.info("FMDB 快照检查点恢复完成，checkpointId={}，datasetId={}，"
-                        + "snapshotId={}，includedColumns={}，featureRowCount={}，assignmentCount={}",
-                checkpointId, artifacts.getDataset().getDatasetId(),
-                artifacts.getDataset().getSnapshotId(),
-                requestedColumns,
-                artifacts.getFeatures().getRows().size(),
+                fingerprint, metadataRows, detailRows, requestedColumns);
+        LOGGER.info("HDFS 快照检查点恢复完成，checkpointId={}，includedColumns={}，"
+                        + "featureRowCount={}，assignmentCount={}", checkpointId,
+                requestedColumns, artifacts.getFeatures().getRows().size(),
                 artifacts.getClustering().getMetrics().getAssignmentCount());
         return Optional.of(artifacts);
     }
 
-    private SnapshotPreparedArtifacts restoreArtifacts(String checkpointId,
-                                                       String configFingerprint,
-                                                       List<Row> rows,
-                                                       Set<String> includedColumns) {
-        Row manifest = manifest(rows);
+    @Override
+    public void cleanupExpired(long currentTimeMillis) {
+        if (!persistenceConfig.isSnapshotCheckpointCleanupEnabled()
+                || !persistenceConfig.shouldPersist(
+                FmdbPhysicalTable.SNAPSHOT_CHECKPOINT)
+                || !tableGateway.tableExists(tableName)) {
+            return;
+        }
+        long cutoff = currentTimeMillis
+                - persistenceConfig.getSnapshotCheckpointRetentionMillis();
+        Column expiredManifest = functions.col("record_type").equalTo(MANIFEST)
+                .and(functions.col("created_at").leq(cutoff));
+        Column cleanedRecord = functions.col("record_type").equalTo(CLEANED);
+        List<Row> rows = tableGateway.read(tableName,
+                FmdbTableSchemas.columns(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT),
+                expiredManifest.or(cleanedRecord))
+                .collectAsList();
+        Set<String> cleaned = new LinkedHashSet<String>();
+        for (Row row : rows) {
+            if (CLEANED.equals(row.getAs("record_type"))) {
+                cleaned.add((String) row.getAs("checkpoint_id"));
+            }
+        }
+        for (Row row : rows) {
+            String checkpointId = row.getAs("checkpoint_id");
+            if (!MANIFEST.equals(row.getAs("record_type"))
+                    || cleaned.contains(checkpointId)) {
+                continue;
+            }
+            Map<String, Object> payload = FmdbJsonCodec.readObject(
+                    (String) row.getAs("payload_json"));
+            String root = FmdbJsonValue.requiredText(payload, "detailRootPath");
+            deletePath(root);
+            append(Collections.singletonList(cleanedRecord(row,
+                    currentTimeMillis, root)));
+            LOGGER.info("过期快照检查点 HDFS 明细已清理，checkpointId={}，detailRootPath={}",
+                    checkpointId, root);
+        }
+    }
+
+    private SnapshotPreparedArtifacts restoreArtifacts(
+            String checkpointId,
+            String configFingerprint,
+            List<Row> metadataRows,
+            List<Row> detailRows,
+            Set<String> includedColumns) {
+        Row manifest = requiredManifest(metadataRows);
         Map<String, Object> payload = FmdbJsonCodec.readObject(
                 (String) manifest.getAs("payload_json"));
         DatasetSnapshot snapshot = snapshot(payload, manifest);
-        List<ColumnMetadata> columns = selectedColumns(columns(payload),
+        List<ColumnMetadata> selected = selectedColumns(columns(payload),
                 includedColumns);
-        Map<String, ColumnProfile> profiles = profiles(rows);
         RahaDataset dataset = new RahaDataset(snapshot.getDatasetId(),
                 snapshot.getSnapshotId(), snapshot.getTableName(),
-                snapshot.getRowIdColumn(), columns, null,
-                snapshot.getSchemaHash(), profiles);
-        StrategyArtifacts strategy = strategyArtifacts(rows, includedColumns);
-        FeatureAssemblyResult features = features(rows);
-        ClusteringBatchResult clustering = clustering(rows, dataset);
+                snapshot.getRowIdColumn(), selected, null,
+                snapshot.getSchemaHash(), profiles(metadataRows, includedColumns));
+        StrategyArtifacts strategy = strategyArtifacts(metadataRows,
+                includedColumns);
+        FeatureAssemblyResult features = features(metadataRows, detailRows,
+                dataset, includedColumns);
+        ClusteringBatchResult clustering = clustering(metadataRows, detailRows,
+                dataset, includedColumns);
         return new SnapshotPreparedArtifacts(checkpointId, dataset, snapshot,
                 strategy.plans, strategy.batch, features,
                 FmdbJsonValue.requiredText(payload, "strategyPlanVersion"),
                 clustering, configFingerprint);
     }
 
+    private DetailBatch writeDetailBatch(
+            String checkpointId,
+            int batchIndex,
+            DatasetSnapshot snapshot,
+            List<String> columns,
+            Map<String, List<SparseFeatureRow>> featuresByColumn,
+            Map<String, Map<String, ClusterAssignment>> assignmentsByColumn) {
+        List<Row> rows = new ArrayList<Row>();
+        MessageDigest checksum = messageDigest();
+        for (String column : columns) {
+            Map<String, ClusterAssignment> assignments =
+                    assignmentsByColumn.get(column);
+            if (assignments == null) {
+                throw new IllegalStateException("检查点字段缺少聚类结果：" + column);
+            }
+            List<SparseFeatureRow> columnRows = featuresByColumn.containsKey(column)
+                    ? featuresByColumn.get(column)
+                    : Collections.<SparseFeatureRow>emptyList();
+            for (SparseFeatureRow feature : columnRows) {
+                ClusterAssignment assignment = assignments.get(feature.getCellId());
+                if (assignment == null || assignment.getCoordinate() == null) {
+                    throw new IllegalStateException("检查点特征缺少聚类归属或坐标："
+                            + feature.getCellId());
+                }
+                rows.add(RowFactory.create(checkpointId, Integer.valueOf(batchIndex),
+                        column, assignment.getCoordinate().getRowId(),
+                        feature.getCellId(), feature.getValueHash(),
+                        feature.getFeatureDictionaryVersion(),
+                        feature.getValues(), assignment.getClusterVersion(),
+                        assignment.getClusterId()));
+                updateChecksum(checksum, feature, assignment);
+            }
+        }
+        String finalPath = batchPath(checkpointId, snapshot, batchIndex);
+        String temporaryPath = finalPath + ".tmp-" + System.nanoTime();
+        Dataset<Row> frame = sparkSession.createDataFrame(rows, DETAIL_SCHEMA);
+        int partitions = Math.min(Math.max(1, rows.size()),
+                persistenceConfig.getSnapshotCheckpointOrcPartitionCount());
+        try {
+            LOGGER.info("开始写入快照检查点 HDFS 列批，checkpointId={}，batchIndex={}，"
+                            + "columns={}，recordCount={}，partitionCount={}，temporaryPath={}",
+                    checkpointId, batchIndex, columns, rows.size(), partitions,
+                    temporaryPath);
+            frame.repartition(partitions).write().mode(SaveMode.ErrorIfExists)
+                    .format("orc").save(temporaryPath);
+            long stored = sparkSession.read().schema(DETAIL_SCHEMA)
+                    .format("orc").load(temporaryPath).count();
+            if (stored != rows.size()) {
+                throw new IllegalStateException("检查点 HDFS 列批写入数量校验失败，expected="
+                        + rows.size() + "，actual=" + stored);
+            }
+            commitPath(temporaryPath, finalPath);
+            return new DetailBatch(batchIndex, finalPath, rows.size(),
+                    hex(checksum.digest()));
+        } catch (RuntimeException exception) {
+            deletePathQuietly(temporaryPath);
+            LOGGER.error("快照检查点 HDFS 列批写入失败，checkpointId={}，batchIndex={}，"
+                            + "temporaryPath={}", checkpointId, batchIndex,
+                    temporaryPath, exception);
+            throw exception;
+        }
+    }
+
+    private List<Row> readDetailRows(List<Row> metadataRows,
+                                     Set<String> includedColumns) {
+        List<DetailReference> references = new ArrayList<DetailReference>();
+        for (Row row : metadataRows) {
+            if (!DETAIL_BATCH.equals(row.getAs("record_type"))) {
+                continue;
+            }
+            Map<String, Object> payload = FmdbJsonCodec.readObject(
+                    (String) row.getAs("payload_json"));
+            if (includedColumns.isEmpty()
+                    || intersects(stringList(payload, "columns"), includedColumns)) {
+                references.add(new DetailReference(
+                        FmdbJsonValue.requiredText(payload, "path"),
+                        FmdbJsonValue.requiredNumber(payload,
+                                "recordCount").longValue()));
+            }
+        }
+        if (references.isEmpty()) {
+            return Collections.emptyList();
+        }
+        try {
+            List<String> paths = new ArrayList<String>();
+            for (DetailReference reference : references) {
+                long stored = sparkSession.read().schema(DETAIL_SCHEMA)
+                        .format("orc").load(reference.path).count();
+                if (stored != reference.recordCount) {
+                    throw new IllegalStateException(
+                            "检查点 HDFS 列批数量校验失败，path="
+                                    + reference.path + "，expected="
+                                    + reference.recordCount + "，actual=" + stored);
+                }
+                paths.add(reference.path);
+            }
+            Dataset<Row> frame = sparkSession.read().schema(DETAIL_SCHEMA)
+                    .format("orc").load(paths.toArray(new String[0]));
+            if (!includedColumns.isEmpty()) {
+                frame = frame.filter(functions.col("column_name").isin(
+                        includedColumns.toArray(new Object[0])));
+            }
+            return frame.collectAsList();
+        } catch (RuntimeException exception) {
+            LOGGER.error("读取快照检查点 HDFS 明细失败，references={}，includedColumns={}",
+                    references, includedColumns, exception);
+            throw exception;
+        }
+    }
+
     private void append(List<FmdbTableRecord> records) {
+        if (records.isEmpty()) {
+            return;
+        }
         List<Row> rows = new ArrayList<Row>(records.size());
         for (FmdbTableRecord record : records) {
             rows.add(record.toRow());
@@ -337,26 +587,113 @@ public final class FmdbSnapshotCheckpointRepository
         tableGateway.appendDirect(tableName, frame, records.size());
     }
 
-    private static Row manifest(List<Row> rows) {
-        for (Row row : rows) {
-            if (MANIFEST.equals(row.getAs("record_type"))) {
-                return row;
-            }
+    private List<FmdbTableRecord> globalRecords(
+            String checkpointId,
+            String jobId,
+            RahaDataset dataset,
+            DatasetSnapshot snapshot,
+            String rowSetFingerprint,
+            String fingerprint,
+            long createdAt) {
+        List<FmdbTableRecord> records = new ArrayList<FmdbTableRecord>();
+        List<ColumnProfile> profiles = new ArrayList<ColumnProfile>(
+                dataset.getProfiles().values());
+        Collections.sort(profiles, Comparator.comparing(
+                ColumnProfile::getColumnName));
+        for (ColumnProfile profile : profiles) {
+            Map<String, Object> values = base(checkpointId, jobId, snapshot,
+                    rowSetFingerprint, fingerprint, createdAt);
+            values.put("artifact_version", snapshot.getSnapshotId());
+            values.put("profile_json", FmdbColumnProfileCodec.write(profile));
+            records.add(record(values, PROFILE, SCOPE_COLUMN,
+                    profile.getColumnName(), null));
         }
-        throw new IllegalStateException("快照检查点缺少 manifest 记录");
+        return records;
     }
 
-    private static Map<String, ColumnProfile> profiles(List<Row> rows) {
-        Map<String, ColumnProfile> profiles =
+    private static FmdbTableRecord strategyRecord(
+            SnapshotCheckpointWriteSession session,
+            String rowSetFingerprint,
+            StrategyBatchResult strategyBatch) {
+        Map<String, Object> values = base(session.getCheckpointId(),
+                session.getSourceJobId(), session.getSnapshot(),
+                rowSetFingerprint, session.getConfigFingerprint(),
+                session.getCreatedAt());
+        values.put("artifact_version", session.getStrategyPlanVersion());
+        Set<String> executedIds = new LinkedHashSet<String>();
+        for (StrategyExecutionResult execution : strategyBatch.getExecutions()) {
+            executedIds.add(execution.getSummary().getStrategyId());
+        }
+        List<StrategyPlan> executedPlans = new ArrayList<StrategyPlan>();
+        for (StrategyPlan plan : session.getStrategyPlans()) {
+            if (executedIds.contains(plan.getStrategyId())) {
+                executedPlans.add(plan);
+            }
+        }
+        if (executedPlans.size() != executedIds.size()) {
+            throw new IllegalStateException("检查点策略摘要包含未声明的策略计划");
+        }
+        values.put("strategy_plan_json", FmdbStrategyArtifactCodec.write(
+                executedPlans, summaries(strategyBatch)));
+        return record(values, STRATEGY_PLAN, SCOPE_CHECKPOINT, null, null);
+    }
+
+    private List<FmdbTableRecord> batchMetadata(
+            String checkpointId,
+            String jobId,
+            DatasetSnapshot snapshot,
+            FeatureAssemblyResult features,
+            ClusteringBatchResult clustering,
+            List<String> columns,
+            String rowSetFingerprint,
+            String fingerprint,
+            long createdAt,
+            Map<String, Object> detailPayload) {
+        List<FmdbTableRecord> records = new ArrayList<FmdbTableRecord>();
+        for (String column : columns) {
+            FeatureDictionary dictionary = features.getDictionaries().get(column);
+            ColumnClusteringResult cluster = clustering.getResults().get(column);
+            if (dictionary == null || cluster == null) {
+                throw new IllegalStateException("检查点列批缺少字典或聚类摘要：" + column);
+            }
+            Map<String, Object> dictionaryValues = base(checkpointId, jobId,
+                    snapshot, rowSetFingerprint, fingerprint, createdAt);
+            dictionaryValues.put("artifact_version", dictionary.getVersion());
+            dictionaryValues.put("feature_dictionary_json",
+                    FmdbFeatureDictionaryCodec.write(dictionary));
+            records.add(record(dictionaryValues, FEATURE_DICTIONARY,
+                    SCOPE_COLUMN, column, null));
+            Map<String, Object> clusterValues = base(checkpointId, jobId,
+                    snapshot, rowSetFingerprint, fingerprint, createdAt);
+            clusterValues.put("artifact_version", cluster.getClusterVersion());
+            clusterValues.put("cluster_version", cluster.getClusterVersion());
+            clusterValues.put("cluster_summary_json",
+                    FmdbClusterSummaryCodec.write(cluster));
+            records.add(record(clusterValues, CLUSTER_SUMMARY,
+                    SCOPE_COLUMN, column, null));
+        }
+        records.add(record(base(checkpointId, jobId, snapshot,
+                rowSetFingerprint, fingerprint, createdAt), DETAIL_BATCH,
+                SCOPE_BATCH, null, detailPayload));
+        return records;
+    }
+
+    private static Map<String, ColumnProfile> profiles(
+            List<Row> rows,
+            Set<String> includedColumns) {
+        Map<String, ColumnProfile> result =
                 new LinkedHashMap<String, ColumnProfile>();
         for (Row row : rows) {
             if (PROFILE.equals(row.getAs("record_type"))) {
                 ColumnProfile profile = FmdbColumnProfileCodec.read(
                         (String) row.getAs("profile_json"));
-                profiles.put(profile.getColumnName(), profile);
+                if (includedColumns.isEmpty()
+                        || includedColumns.contains(profile.getColumnName())) {
+                    result.put(profile.getColumnName(), profile);
+                }
             }
         }
-        return profiles;
+        return result;
     }
 
     private static StrategyArtifacts strategyArtifacts(
@@ -366,26 +703,25 @@ public final class FmdbSnapshotCheckpointRepository
         Map<String, StrategyRunSummary> summaries =
                 new LinkedHashMap<String, StrategyRunSummary>();
         for (Row row : rows) {
-            if (STRATEGY_PLAN.equals(row.getAs("record_type"))) {
-                String json = (String) row.getAs("strategy_plan_json");
-                for (StrategyPlan plan : FmdbStrategyArtifactCodec.readPlans(json)) {
-                    // 按列恢复时只保留目标字段完全位于当前批次内的策略，防止跨批 RVD 混入。
-                    if (includedColumns.isEmpty()
-                            || includedColumns.containsAll(
-                            plan.getTargetColumns())) {
-                        plans.put(plan.getStrategyId(), plan);
-                    }
+            if (!STRATEGY_PLAN.equals(row.getAs("record_type"))) {
+                continue;
+            }
+            String json = row.getAs("strategy_plan_json");
+            for (StrategyPlan plan : FmdbStrategyArtifactCodec.readPlans(json)) {
+                if (includedColumns.isEmpty()
+                        || includedColumns.containsAll(plan.getTargetColumns())) {
+                    plans.put(plan.getStrategyId(), plan);
                 }
-                for (StrategyRunSummary summary
-                        : FmdbStrategyArtifactCodec.readSummaries(json)) {
-                    if (plans.containsKey(summary.getStrategyId())) {
-                        summaries.put(summary.getStrategyId(), summary);
-                    }
+            }
+            for (StrategyRunSummary summary
+                    : FmdbStrategyArtifactCodec.readSummaries(json)) {
+                if (plans.containsKey(summary.getStrategyId())) {
+                    summaries.put(summary.getStrategyId(), summary);
                 }
             }
         }
         List<StrategyExecutionResult> executions =
-                new ArrayList<StrategyExecutionResult>(summaries.size());
+                new ArrayList<StrategyExecutionResult>();
         for (StrategyRunSummary summary : summaries.values()) {
             executions.add(StrategyExecutionResult.summaryOnly(summary));
         }
@@ -393,109 +729,299 @@ public final class FmdbSnapshotCheckpointRepository
                 new StrategyBatchResult(executions));
     }
 
-    private static FeatureAssemblyResult features(List<Row> rows) {
+    private static FeatureAssemblyResult features(
+            List<Row> metadataRows,
+            List<Row> detailRows,
+            RahaDataset dataset,
+            Set<String> includedColumns) {
         Map<String, FeatureDictionary> dictionaries =
                 new LinkedHashMap<String, FeatureDictionary>();
-        Map<String, SparseFeatureRow> featureRows =
-                new LinkedHashMap<String, SparseFeatureRow>();
-        for (Row row : rows) {
-            String recordType = row.getAs("record_type");
-            if (FEATURE_DICTIONARY.equals(recordType)) {
+        for (Row row : metadataRows) {
+            if (FEATURE_DICTIONARY.equals(row.getAs("record_type"))) {
                 FeatureDictionary dictionary = FmdbFeatureDictionaryCodec.read(
                         (String) row.getAs("feature_dictionary_json"));
-                dictionaries.put(dictionary.getColumnName(), dictionary);
-            } else if (CELL_FEATURE.equals(recordType)) {
-                SparseFeatureRow featureRow = new SparseFeatureRow(
-                        (String) row.getAs("cell_id"),
-                        (String) row.getAs("column_name"),
-                        (String) row.getAs("artifact_version"),
-                        featureValues((String) row.getAs("feature_vector_json")),
-                        stringValues((String) row.getAs("feature_summary_json")));
-                featureRows.put(featureRow.getCellId(), featureRow);
+                if (includedColumns.isEmpty() || includedColumns.contains(
+                        dictionary.getColumnName())) {
+                    dictionaries.put(dictionary.getColumnName(), dictionary);
+                }
             }
         }
+        List<SparseFeatureRow> rows = new ArrayList<SparseFeatureRow>();
+        for (Row row : detailRows) {
+            String column = row.getAs("column_name");
+            CellCoordinate coordinate = new CellCoordinate(
+                    dataset.getDatasetId(), dataset.getSnapshotId(),
+                    (String) row.getAs("row_id"), column);
+            rows.add(new SparseFeatureRow((String) row.getAs("cell_id"),
+                    column, coordinate, (String) row.getAs("value_hash"), null,
+                    (String) row.getAs("feature_dictionary_version"),
+                    integerDoubleMap(row.getJavaMap(
+                            row.fieldIndex("feature_values"))),
+                    Collections.<String, String>emptyMap()));
+        }
+        Collections.sort(rows, Comparator.comparing(SparseFeatureRow::getCellId));
         long retained = 0L;
         for (FeatureDictionary dictionary : dictionaries.values()) {
             retained += dictionary.getDefinitions().size();
         }
-        List<SparseFeatureRow> orderedRows =
-                new ArrayList<SparseFeatureRow>(featureRows.values());
-        Collections.sort(orderedRows, Comparator.comparing(
-                SparseFeatureRow::getCellId));
-        return new FeatureAssemblyResult(dictionaries, orderedRows,
-                new FeatureAssemblyMetrics(orderedRows.size(), retained,
-                        retained, 0L));
+        return new FeatureAssemblyResult(dictionaries, rows,
+                new FeatureAssemblyMetrics(rows.size(), retained, retained, 0L));
     }
 
-    private static ClusteringBatchResult clustering(List<Row> rows,
-                                                    RahaDataset dataset) {
+    private static ClusteringBatchResult clustering(
+            List<Row> metadataRows,
+            List<Row> detailRows,
+            RahaDataset dataset,
+            Set<String> includedColumns) {
         Map<String, Row> summaries = new LinkedHashMap<String, Row>();
-        Map<String, Map<String, ClusterAssignment>> assignmentGroups =
-                new LinkedHashMap<String, Map<String, ClusterAssignment>>();
-        for (Row row : rows) {
-            String recordType = row.getAs("record_type");
-            if (CLUSTER_SUMMARY.equals(recordType)) {
-                summaries.put(clusterKey(row), row);
-            } else if (CLUSTER_ASSIGNMENT.equals(recordType)) {
-                String key = clusterKey(row);
-                if (!assignmentGroups.containsKey(key)) {
-                    assignmentGroups.put(key,
-                            new LinkedHashMap<String, ClusterAssignment>());
+        for (Row row : metadataRows) {
+            if (CLUSTER_SUMMARY.equals(row.getAs("record_type"))) {
+                String column = row.getAs("column_name");
+                if (includedColumns.isEmpty()
+                        || includedColumns.contains(column)) {
+                    summaries.put(clusterKey(column,
+                            (String) row.getAs("cluster_version")), row);
                 }
-                ClusterAssignment assignment = assignment(row, dataset);
-                assignmentGroups.get(key).put(assignment.getCellId(), assignment);
             }
+        }
+        Map<String, List<ClusterAssignment>> members =
+                new LinkedHashMap<String, List<ClusterAssignment>>();
+        for (Row row : detailRows) {
+            String column = row.getAs("column_name");
+            String version = row.getAs("cluster_version");
+            String key = clusterKey(column, version);
+            if (!members.containsKey(key)) {
+                members.put(key, new ArrayList<ClusterAssignment>());
+            }
+            CellCoordinate coordinate = new CellCoordinate(dataset.getDatasetId(),
+                    dataset.getSnapshotId(), (String) row.getAs("row_id"), column);
+            members.get(key).add(new ClusterAssignment(
+                    (String) row.getAs("cell_id"), column, coordinate,
+                    (String) row.getAs("cluster_id"), "RESTORED_CLUSTER",
+                    version, null));
         }
         Map<String, ColumnClusteringResult> results =
                 new LinkedHashMap<String, ColumnClusteringResult>();
-        long assignments = 0L;
+        long assignmentCount = 0L;
         long clusteredColumns = 0L;
         for (Map.Entry<String, Row> entry : summaries.entrySet()) {
+            List<ClusterAssignment> assignments = members.containsKey(entry.getKey())
+                    ? members.get(entry.getKey())
+                    : new ArrayList<ClusterAssignment>();
+            Collections.sort(assignments,
+                    Comparator.comparing(ClusterAssignment::getCellId));
             Row summary = entry.getValue();
-            List<ClusterAssignment> members = new ArrayList<ClusterAssignment>(
-                    assignmentGroups.containsKey(entry.getKey())
-                            ? assignmentGroups.get(entry.getKey()).values()
-                            : Collections.<ClusterAssignment>emptyList());
-            Collections.sort(members, Comparator.comparing(
-                    ClusterAssignment::getCellId));
             ColumnClusteringResult result = FmdbClusterSummaryCodec.read(
                     (String) summary.getAs("column_name"),
                     (String) summary.getAs("cluster_version"),
-                    (String) summary.getAs("cluster_summary_json"), members);
+                    (String) summary.getAs("cluster_summary_json"), assignments);
             results.put(result.getColumnName(), result);
-            assignments += members.size();
-            if (!members.isEmpty()) {
+            assignmentCount += assignments.size();
+            if (!assignments.isEmpty()) {
                 clusteredColumns++;
             }
         }
         return new ClusteringBatchResult(results, new ClusteringMetrics(
-                results.size(), clusteredColumns, assignments,
+                results.size(), clusteredColumns, assignmentCount,
                 results.size() - clusteredColumns));
     }
 
-    private static ClusterAssignment assignment(Row row, RahaDataset dataset) {
-        String rowId = row.getAs("row_id");
-        String columnName = row.getAs("column_name");
-        CellCoordinate coordinate = rowId == null ? null
-                : new CellCoordinate(dataset.getDatasetId(),
-                dataset.getSnapshotId(), rowId, columnName);
-        Object distance = row.getAs("cluster_distance");
-        return new ClusterAssignment((String) row.getAs("cell_id"), columnName,
-                coordinate, (String) row.getAs("cluster_id"),
-                algorithm(row), (String) row.getAs("cluster_version"),
-                distance == null ? null : ((Number) distance).doubleValue());
+    private static Map<String, List<SparseFeatureRow>> featuresByColumn(
+            List<SparseFeatureRow> rows) {
+        Map<String, List<SparseFeatureRow>> result =
+                new LinkedHashMap<String, List<SparseFeatureRow>>();
+        for (SparseFeatureRow row : rows) {
+            if (!result.containsKey(row.getColumnName())) {
+                result.put(row.getColumnName(), new ArrayList<SparseFeatureRow>());
+            }
+            result.get(row.getColumnName()).add(row);
+        }
+        return result;
     }
 
-    private static String algorithm(Row row) {
-        return "RESTORED_CLUSTER";
+    private static Map<String, Map<String, ClusterAssignment>> assignmentsByColumn(
+            ClusteringBatchResult clustering) {
+        Map<String, Map<String, ClusterAssignment>> result =
+                new LinkedHashMap<String, Map<String, ClusterAssignment>>();
+        for (ColumnClusteringResult column : clustering.getResults().values()) {
+            Map<String, ClusterAssignment> assignments =
+                    new HashMap<String, ClusterAssignment>();
+            for (ClusterAssignment assignment : column.getAssignments()) {
+                assignments.put(assignment.getCellId(), assignment);
+            }
+            result.put(column.getColumnName(), assignments);
+        }
+        return result;
     }
 
-    private static String clusterKey(Row row) {
-        return String.valueOf((Object) row.getAs("column_name")) + "|"
-                + String.valueOf((Object) row.getAs("cluster_version"));
+    private PendingCheckpoint requiredPending(
+            SnapshotCheckpointWriteSession session) {
+        PendingCheckpoint pending = pendingCheckpoints.get(
+                session.getCheckpointId());
+        if (pending == null) {
+            throw new IllegalStateException("检查点写会话不存在或已经完成："
+                    + session.getCheckpointId());
+        }
+        return pending;
     }
 
-    private static DatasetSnapshot snapshot(Map<String, Object> payload, Row row) {
+    private void commitPath(String temporaryPath, String finalPath) {
+        try {
+            Path temporary = new Path(temporaryPath);
+            Path target = new Path(finalPath);
+            FileSystem fileSystem = temporary.getFileSystem(
+                    sparkSession.sparkContext().hadoopConfiguration());
+            if (fileSystem.exists(target)) {
+                throw new IllegalStateException("检查点 HDFS 目标路径已存在：" + finalPath);
+            }
+            if (!fileSystem.rename(temporary, target)) {
+                throw new IllegalStateException("检查点 HDFS 原子提交失败：" + finalPath);
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("检查点 HDFS 原子提交异常：" + finalPath,
+                    exception);
+        }
+    }
+
+    private void deletePath(String path) {
+        try {
+            Path target = new Path(path);
+            FileSystem fileSystem = target.getFileSystem(
+                    sparkSession.sparkContext().hadoopConfiguration());
+            if (fileSystem.exists(target) && !fileSystem.delete(target, true)) {
+                throw new IllegalStateException("检查点 HDFS 路径清理失败：" + path);
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("检查点 HDFS 路径清理异常：" + path,
+                    exception);
+        }
+    }
+
+    private void deletePathQuietly(String path) {
+        try {
+            deletePath(path);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("检查点 HDFS 临时路径清理失败，path={}", path, exception);
+        }
+    }
+
+    private String checkpointRoot(String checkpointId,
+                                  DatasetSnapshot snapshot) {
+        return trimTrailingSlash(
+                persistenceConfig.getSnapshotCheckpointDetailBasePath())
+                + "/dataset=" + HashUtils.md5Hex(snapshot.getDatasetId())
+                + "/snapshot=" + HashUtils.md5Hex(snapshot.getSnapshotId())
+                + "/checkpoint=" + checkpointId;
+    }
+
+    private String batchPath(String checkpointId,
+                             DatasetSnapshot snapshot,
+                             int batchIndex) {
+        return checkpointRoot(checkpointId, snapshot) + "/column_batch="
+                + String.format("%04d", Integer.valueOf(batchIndex));
+    }
+
+    private static String trimTrailingSlash(String path) {
+        String result = ValueUtils.requireNotBlank(path, "检查点 HDFS 明细根目录");
+        while (result.length() > 1 && result.endsWith("/")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
+    }
+
+    private static Row latestActiveManifest(List<Row> rows) {
+        Set<String> cleaned = new LinkedHashSet<String>();
+        for (Row row : rows) {
+            if (CLEANED.equals(row.getAs("record_type"))) {
+                cleaned.add((String) row.getAs("checkpoint_id"));
+            }
+        }
+        for (Row row : rows) {
+            if (MANIFEST.equals(row.getAs("record_type"))
+                    && !cleaned.contains((String) row.getAs("checkpoint_id"))) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private static Row requiredManifest(List<Row> rows) {
+        for (Row row : rows) {
+            if (MANIFEST.equals(row.getAs("record_type"))) {
+                return row;
+            }
+        }
+        throw new IllegalStateException("快照检查点缺少最终清单");
+    }
+
+    private static FmdbTableRecord cleanedRecord(Row manifest,
+                                                  long cleanedAt,
+                                                  String detailRootPath) {
+        Map<String, Object> values = new LinkedHashMap<String, Object>();
+        for (String column : FmdbTableSchemas.columns(
+                FmdbPhysicalTable.SNAPSHOT_CHECKPOINT)) {
+            values.put(column, manifest.getAs(column));
+        }
+        values.put("record_type", CLEANED);
+        values.put("record_scope", SCOPE_CHECKPOINT);
+        values.put("payload_json", FmdbJsonCodec.write(Collections.singletonMap(
+                "detailRootPath", detailRootPath)));
+        values.put("created_at", Long.valueOf(cleanedAt));
+        values.put("partition_month", FmdbPartitionUtils.month(cleanedAt));
+        return FmdbTableRecord.of(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT, values);
+    }
+
+    private static Map<String, Object> detailPayload(
+            DetailBatch detail,
+            List<String> columns) {
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("schemaVersion", DETAIL_SCHEMA_VERSION);
+        payload.put("batchIndex", Integer.valueOf(detail.batchIndex));
+        payload.put("path", detail.path);
+        payload.put("columns", new ArrayList<String>(columns));
+        payload.put("recordCount", Long.valueOf(detail.recordCount));
+        payload.put("fingerprint", detail.fingerprint);
+        return payload;
+    }
+
+    private static Map<String, Object> manifestPayload(
+            RahaDataset dataset,
+            DatasetSnapshot snapshot,
+            String strategyPlanVersion,
+            List<Map<String, Object>> batches,
+            String detailRootPath) {
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("schemaVersion", DETAIL_SCHEMA_VERSION);
+        payload.put("datasetId", snapshot.getDatasetId());
+        payload.put("snapshotId", snapshot.getSnapshotId());
+        payload.put("inputReference", snapshot.getInputReference());
+        payload.put("tableName", snapshot.getTableName());
+        payload.put("rowIdColumn", snapshot.getRowIdColumn());
+        payload.put("schemaHash", snapshot.getSchemaHash());
+        payload.put("rowCount", Long.valueOf(snapshot.getRowCount()));
+        payload.put("columnCount", Integer.valueOf(snapshot.getColumnCount()));
+        payload.put("createdAt", Long.valueOf(snapshot.getCreatedAt()));
+        payload.put("strategyPlanVersion", strategyPlanVersion);
+        payload.put("detailRootPath", detailRootPath);
+        payload.put("detailBatches", batches);
+        List<Map<String, Object>> columns =
+                new ArrayList<Map<String, Object>>();
+        for (ColumnMetadata column : dataset.getColumns()) {
+            Map<String, Object> item = new LinkedHashMap<String, Object>();
+            item.put("name", column.getName());
+            item.put("ordinal", Integer.valueOf(column.getOrdinal()));
+            item.put("dataType", column.getDataType());
+            item.put("nullable", Boolean.valueOf(column.isNullable()));
+            item.put("detectable", Boolean.valueOf(column.isDetectable()));
+            item.put("sensitive", Boolean.valueOf(column.isSensitive()));
+            columns.add(item);
+        }
+        payload.put("columns", columns);
+        return FmdbJsonCodec.readObject(FmdbJsonCodec.write(payload));
+    }
+
+    private static DatasetSnapshot snapshot(Map<String, Object> payload,
+                                            Row row) {
         return new DatasetSnapshot(
                 FmdbJsonValue.requiredText(payload, "datasetId"),
                 FmdbJsonValue.requiredText(payload, "snapshotId"),
@@ -505,7 +1031,7 @@ public final class FmdbSnapshotCheckpointRepository
                 (String) row.getAs("schema_hash"),
                 FmdbJsonValue.requiredNumber(payload, "rowCount").longValue(),
                 FmdbJsonValue.requiredNumber(payload, "columnCount").intValue(),
-                row.getAs("source_version"),
+                (String) row.getAs("source_version"),
                 FmdbJsonValue.requiredNumber(payload, "createdAt").longValue());
     }
 
@@ -521,9 +1047,44 @@ public final class FmdbSnapshotCheckpointRepository
                     booleanValue(item, "detectable"),
                     booleanValue(item, "sensitive")));
         }
-        Collections.sort(columns, Comparator.comparingInt(
-                ColumnMetadata::getOrdinal));
+        Collections.sort(columns,
+                Comparator.comparingInt(ColumnMetadata::getOrdinal));
         return columns;
+    }
+
+    private static List<ColumnMetadata> selectedColumns(
+            List<ColumnMetadata> available,
+            Set<String> includedColumns) {
+        if (includedColumns.isEmpty()) {
+            return available;
+        }
+        List<ColumnMetadata> selected = new ArrayList<ColumnMetadata>();
+        for (ColumnMetadata column : available) {
+            if (!column.isDetectable()
+                    || includedColumns.contains(column.getName())) {
+                selected.add(column);
+            }
+        }
+        return selected;
+    }
+
+    private static void validateRequestedColumns(
+            List<ColumnMetadata> available,
+            Set<String> requested) {
+        if (requested.isEmpty()) {
+            return;
+        }
+        Set<String> detectable = new LinkedHashSet<String>();
+        for (ColumnMetadata column : available) {
+            if (column.isDetectable()) {
+                detectable.add(column.getName());
+            }
+        }
+        if (!detectable.containsAll(requested)) {
+            Set<String> missing = new LinkedHashSet<String>(requested);
+            missing.removeAll(detectable);
+            throw new IllegalArgumentException("检查点不包含请求字段：" + missing);
+        }
     }
 
     private static Set<String> normalizedColumns(Set<String> source) {
@@ -537,81 +1098,6 @@ public final class FmdbSnapshotCheckpointRepository
         return Collections.unmodifiableSet(result);
     }
 
-    private static void validateRequestedColumns(
-            List<ColumnMetadata> availableColumns,
-            Set<String> requestedColumns) {
-        if (requestedColumns.isEmpty()) {
-            return;
-        }
-        Set<String> detectableColumns = new LinkedHashSet<String>();
-        for (ColumnMetadata column : availableColumns) {
-            if (column.isDetectable()) {
-                detectableColumns.add(column.getName());
-            }
-        }
-        if (!detectableColumns.containsAll(requestedColumns)) {
-            Set<String> missing = new LinkedHashSet<String>(requestedColumns);
-            missing.removeAll(detectableColumns);
-            throw new IllegalArgumentException("检查点不包含请求的可检测字段：" + missing);
-        }
-    }
-
-    private static List<ColumnMetadata> selectedColumns(
-            List<ColumnMetadata> availableColumns,
-            Set<String> includedColumns) {
-        if (includedColumns.isEmpty()) {
-            return availableColumns;
-        }
-        List<ColumnMetadata> selected = new ArrayList<ColumnMetadata>();
-        for (ColumnMetadata column : availableColumns) {
-            // 行标识等不可检测字段必须保留，后续可继续构造稳定单元格坐标。
-            if (!column.isDetectable()
-                    || includedColumns.contains(column.getName())) {
-                selected.add(column);
-            }
-        }
-        return selected;
-    }
-
-    private static Boolean booleanValue(Map<String, Object> values, String key) {
-        Object value = values.get(key);
-        if (!(value instanceof Boolean)) {
-            throw new IllegalArgumentException("检查点列元数据缺少布尔字段：" + key);
-        }
-        return (Boolean) value;
-    }
-
-    private static Map<String, Object> manifestPayload(
-            RahaDataset dataset,
-            DatasetSnapshot snapshot,
-            String strategyPlanVersion) {
-        Map<String, Object> payload = new LinkedHashMap<String, Object>();
-        payload.put("datasetId", snapshot.getDatasetId());
-        payload.put("snapshotId", snapshot.getSnapshotId());
-        payload.put("inputReference", snapshot.getInputReference());
-        payload.put("tableName", snapshot.getTableName());
-        payload.put("rowIdColumn", snapshot.getRowIdColumn());
-        payload.put("schemaHash", snapshot.getSchemaHash());
-        payload.put("rowCount", snapshot.getRowCount());
-        payload.put("columnCount", snapshot.getColumnCount());
-        payload.put("createdAt", snapshot.getCreatedAt());
-        payload.put("strategyPlanVersion", strategyPlanVersion);
-        List<Map<String, Object>> columns =
-                new ArrayList<Map<String, Object>>();
-        for (ColumnMetadata column : dataset.getColumns()) {
-            Map<String, Object> item = new LinkedHashMap<String, Object>();
-            item.put("name", column.getName());
-            item.put("ordinal", column.getOrdinal());
-            item.put("dataType", column.getDataType());
-            item.put("nullable", column.isNullable());
-            item.put("detectable", column.isDetectable());
-            item.put("sensitive", column.isSensitive());
-            columns.add(item);
-        }
-        payload.put("columns", columns);
-        return FmdbJsonCodec.readObject(FmdbJsonCodec.write(payload));
-    }
-
     private static Map<String, Object> base(String checkpointId,
                                             String sourceJobId,
                                             DatasetSnapshot snapshot,
@@ -623,23 +1109,14 @@ public final class FmdbSnapshotCheckpointRepository
         values.put("dataset_id", snapshot.getDatasetId());
         values.put("snapshot_id", snapshot.getSnapshotId());
         values.put("source_job_id", sourceJobId);
-        values.put("sample_batch_id", null);
         values.put("record_type", null);
         values.put("record_scope", null);
         values.put("column_name", null);
-        values.put("row_id", null);
-        values.put("cell_id", null);
-        values.put("cell_value", null);
         values.put("artifact_version", null);
         values.put("profile_json", null);
         values.put("strategy_plan_json", null);
-        values.put("strategy_hit_json", null);
         values.put("feature_dictionary_json", null);
-        values.put("feature_vector_json", null);
-        values.put("feature_summary_json", null);
         values.put("cluster_version", null);
-        values.put("cluster_id", null);
-        values.put("cluster_distance", null);
         values.put("cluster_summary_json", null);
         values.put("payload_json", null);
         values.put("row_set_fingerprint", rowSetFingerprint);
@@ -676,43 +1153,98 @@ public final class FmdbSnapshotCheckpointRepository
         return summaries;
     }
 
-    private static String featureValues(Map<Integer, Double> values) {
-        Map<String, Object> encoded = new LinkedHashMap<String, Object>();
-        for (Map.Entry<Integer, Double> entry : values.entrySet()) {
-            encoded.put(String.valueOf(entry.getKey()), entry.getValue());
-        }
-        return FmdbJsonCodec.write(encoded);
-    }
-
-    private static Map<Integer, Double> featureValues(String json) {
+    private static Map<Integer, Double> integerDoubleMap(Map<?, ?> source) {
         Map<Integer, Double> values = new LinkedHashMap<Integer, Double>();
-        for (Map.Entry<String, Object> entry : FmdbJsonCodec.readObject(json).entrySet()) {
-            if (!(entry.getValue() instanceof Number)) {
-                throw new IllegalArgumentException("检查点特征向量包含非数值字段");
-            }
-            values.put(Integer.valueOf(entry.getKey()),
+        for (Map.Entry<?, ?> entry : source.entrySet()) {
+            values.put(((Number) entry.getKey()).intValue(),
                     ((Number) entry.getValue()).doubleValue());
         }
         return values;
     }
 
-    private static Map<String, String> stringValues(String json) {
-        Map<String, String> values = new LinkedHashMap<String, String>();
-        for (Map.Entry<String, Object> entry : FmdbJsonCodec.readObject(json).entrySet()) {
-            if (!(entry.getValue() instanceof String)) {
-                throw new IllegalArgumentException("检查点特征摘要包含非文本字段");
-            }
-            values.put(entry.getKey(), (String) entry.getValue());
+    private static List<String> stringList(Map<String, Object> values,
+                                           String key) {
+        Object raw = values.get(key);
+        if (!(raw instanceof List)) {
+            throw new IllegalArgumentException("检查点批次清单缺少字段：" + key);
         }
-        return values;
+        List<String> result = new ArrayList<String>();
+        for (Object item : (List<?>) raw) {
+            result.add(String.valueOf(item));
+        }
+        return result;
+    }
+
+    private static boolean intersects(List<String> columns,
+                                      Set<String> requested) {
+        for (String column : columns) {
+            if (requested.contains(column)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean booleanValue(Map<String, Object> values,
+                                        String key) {
+        Object value = values.get(key);
+        if (!(value instanceof Boolean)) {
+            throw new IllegalArgumentException("检查点列元数据缺少布尔字段：" + key);
+        }
+        return ((Boolean) value).booleanValue();
+    }
+
+    private static String clusterKey(String columnName, String clusterVersion) {
+        return columnName + "|" + clusterVersion;
+    }
+
+    private static MessageDigest messageDigest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("运行环境缺少 SHA-256 摘要算法", exception);
+        }
+    }
+
+    private static void updateChecksum(MessageDigest digest,
+                                       SparseFeatureRow feature,
+                                       ClusterAssignment assignment) {
+        update(digest, feature.getColumnName());
+        update(digest, assignment.getCoordinate().getRowId());
+        update(digest, feature.getCellId());
+        update(digest, feature.getValueHash());
+        update(digest, feature.getFeatureDictionaryVersion());
+        List<Integer> indexes = new ArrayList<Integer>(
+                feature.getValues().keySet());
+        Collections.sort(indexes);
+        for (Integer index : indexes) {
+            update(digest, String.valueOf(index));
+            update(digest, String.valueOf(feature.getValues().get(index)));
+        }
+        update(digest, assignment.getClusterVersion());
+        update(digest, assignment.getClusterId());
+    }
+
+    private static void update(MessageDigest digest, String value) {
+        digest.update(String.valueOf(value).getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+    }
+
+    private static String hex(byte[] values) {
+        StringBuilder result = new StringBuilder(values.length * 2);
+        for (byte value : values) {
+            result.append(String.format("%02x", Integer.valueOf(value & 0xff)));
+        }
+        return result.toString();
     }
 
     private static String checkpointId(String sourceJobId,
                                        DatasetSnapshot snapshot,
-                                       String configFingerprint) {
+                                       String configFingerprint,
+                                       long createdAt) {
         return "snapshot_" + HashUtils.md5Hex(snapshot.getDatasetId() + "|"
                 + snapshot.getSnapshotId() + "|" + configFingerprint + "|"
-                + sourceJobId);
+                + sourceJobId + "|" + createdAt);
     }
 
     private static String rowSetFingerprint(DatasetSnapshot snapshot) {
@@ -721,60 +1253,70 @@ public final class FmdbSnapshotCheckpointRepository
                 + "|" + snapshot.getRowCount() + "|" + snapshot.getColumnCount());
     }
 
-    /**
-     * 将检查点记录限制在固定大小缓冲区内，并在全部明细成功后提交清单。
-     */
-    private final class CheckpointBatchWriter {
+    /** 尚未提交最终清单的检查点写状态。 */
+    private static final class PendingCheckpoint {
 
-        /** 当前检查点标识。 */
-        private final String checkpointId;
-        /** 单次追加记录数上限。 */
-        private final int batchSize;
-        /** 当前尚未提交的记录。 */
-        private final List<FmdbTableRecord> buffer;
-        /** 已经成功提交的记录总数。 */
-        private long writtenCount;
-        /** 已经成功提交的明细批次数。 */
-        private int batchIndex;
+        /** 首个列批需要一并提交的全局元数据。 */
+        private final List<FmdbTableRecord> globalRecords;
+        /** 输入行集合指纹。 */
+        private final String rowSetFingerprint;
+        /** 已成功提交的列批清单。 */
+        private final List<Map<String, Object>> batchPayloads =
+                new ArrayList<Map<String, Object>>();
+        /** 已成功提交的字段集合。 */
+        private final Set<String> completedColumns =
+                new LinkedHashSet<String>();
+        /** 下一个允许提交的列批序号。 */
+        private int nextBatchIndex = 1;
+        /** 已成功提交的 HDFS 明细总数。 */
+        private long detailRecordCount;
 
-        private CheckpointBatchWriter(String checkpointId, int batchSize) {
-            this.checkpointId = checkpointId;
-            this.batchSize = batchSize;
-            this.buffer = new ArrayList<FmdbTableRecord>(batchSize);
+        private PendingCheckpoint(List<FmdbTableRecord> globalRecords,
+                                  String rowSetFingerprint) {
+            this.globalRecords = new ArrayList<FmdbTableRecord>(globalRecords);
+            this.rowSetFingerprint = rowSetFingerprint;
+        }
+    }
+
+    /** HDFS 明细列批提交结果。 */
+    private static final class DetailBatch {
+
+        /** 列批序号。 */
+        private final int batchIndex;
+        /** 已原子提交的 HDFS 路径。 */
+        private final String path;
+        /** 列批单元格记录数。 */
+        private final long recordCount;
+        /** 列批内容指纹。 */
+        private final String fingerprint;
+
+        private DetailBatch(int batchIndex,
+                            String path,
+                            long recordCount,
+                            String fingerprint) {
+            this.batchIndex = batchIndex;
+            this.path = path;
+            this.recordCount = recordCount;
+            this.fingerprint = fingerprint;
+        }
+    }
+
+    /** 恢复前需要校验的 HDFS 明细引用。 */
+    private static final class DetailReference {
+
+        /** ORC 列批路径。 */
+        private final String path;
+        /** 清单声明的记录数。 */
+        private final long recordCount;
+
+        private DetailReference(String path, long recordCount) {
+            this.path = path;
+            this.recordCount = recordCount;
         }
 
-        private void add(FmdbTableRecord record) {
-            buffer.add(record);
-            if (buffer.size() >= batchSize) {
-                flush();
-            }
-        }
-
-        private void finish(FmdbTableRecord manifest) {
-            flush();
-            append(Collections.singletonList(manifest));
-            writtenCount++;
-            LOGGER.info("FMDB 快照检查点清单提交完成，checkpointId={}，"
-                            + "detailBatchCount={}，recordCount={}",
-                    checkpointId, batchIndex, writtenCount);
-        }
-
-        private void flush() {
-            if (buffer.isEmpty()) {
-                return;
-            }
-            int currentSize = buffer.size();
-            append(buffer);
-            writtenCount += currentSize;
-            batchIndex++;
-            LOGGER.info("FMDB 快照检查点明细批次写入完成，checkpointId={}，"
-                            + "batchIndex={}，batchRecordCount={}，writtenCount={}",
-                    checkpointId, batchIndex, currentSize, writtenCount);
-            buffer.clear();
-        }
-
-        private long getWrittenCount() {
-            return writtenCount;
+        @Override
+        public String toString() {
+            return path + "#" + recordCount;
         }
     }
 

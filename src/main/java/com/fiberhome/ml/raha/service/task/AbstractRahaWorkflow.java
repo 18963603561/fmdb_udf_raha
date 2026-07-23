@@ -47,13 +47,31 @@ abstract class AbstractRahaWorkflow implements RahaWorkflow {
     }
 
     final List<StageHandler> preparationStages(RahaTaskExecutionRequest request) {
+        List<StageHandler> handlers = basePreparationStages(request);
+        handlers.add(new FeatureStageHandler(featureService));
+        return handlers;
+    }
+
+    /**
+     * 创建截至策略执行的公共准备阶段，供采样按列批生成特征。
+     */
+    final List<StageHandler> basePreparationStages(
+            RahaTaskExecutionRequest request) {
+        List<StageHandler> handlers = planningStages(request);
+        handlers.add(new StrategyRunStageHandler(executionService));
+        return handlers;
+    }
+
+    /**
+     * 创建截至策略计划生成的公共准备阶段。
+     */
+    final List<StageHandler> planningStages(
+            RahaTaskExecutionRequest request) {
         List<StageHandler> handlers = new ArrayList<StageHandler>();
         handlers.add(new DataLoadStageHandler(datasetLoader, request.getDataLoadRequest()));
         handlers.add(new ColumnProfileStageHandler(profileService,
                 request.isColumnBatchChild()));
         handlers.add(new StrategyPlanStageHandler(planService));
-        handlers.add(new StrategyRunStageHandler(executionService));
-        handlers.add(new FeatureStageHandler(featureService));
         return handlers;
     }
 }

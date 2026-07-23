@@ -9,6 +9,7 @@ import com.fiberhome.ml.raha.label.CellLabel;
 import com.fiberhome.ml.raha.repository.core.ArtifactVersion;
 import com.fiberhome.ml.raha.repository.port.AnnotationTaskRepository;
 import com.fiberhome.ml.raha.sampling.ClusterCoverageScorer;
+import com.fiberhome.ml.raha.sampling.ClusterCoverageAccumulator;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTask;
 import com.fiberhome.ml.raha.sampling.domain.AnnotationTaskStatus;
 import com.fiberhome.ml.raha.sampling.domain.TupleSamplingScore;
@@ -112,7 +113,70 @@ public final class SamplingService {
                         + "excludedCount={}，taskCount={}，randomSeed={}",
                 jobId, samplingRound, metrics.getCandidateTupleCount(),
                 metrics.getExcludedTupleCount(), metrics.getCreatedTaskCount(), randomSeed);
-        return new SamplingBatchResult(effectiveScores, tasks, samplingVersion, metrics);
+        return new SamplingBatchResult(selected, tasks, samplingVersion, metrics);
+    }
+
+    /**
+     * 从分批聚类形成的紧凑行级覆盖分数生成标注任务。
+     *
+     * @param compactScores 全部候选行的紧凑覆盖分数
+     * @param directlyLabeledRows 已有直接标签的行
+     * @param clusterVersions 按字段保存的聚类版本
+     * @return 采样分数、任务、版本和指标
+     */
+    public SamplingBatchResult createTasksFromCompactScores(
+            String jobId,
+            int samplingRound,
+            ClusterCoverageAccumulator coverage,
+            SamplingConfig config,
+            long randomSeed,
+            ArtifactVersion version) {
+        if (coverage == null || config == null || version == null
+                || samplingRound <= 0) {
+            throw new IllegalArgumentException("紧凑采样输入、配置、版本和轮次必须有效");
+        }
+        List<AnnotationTask> existingTasks = repository.findByJob(jobId);
+        Set<String> excludedRowIds = new LinkedHashSet<String>();
+        if (!config.isReviewEnabled()) {
+            excludedRowIds.addAll(coverage.getDirectlyLabeledRows());
+        }
+        for (AnnotationTask task : existingTasks) {
+            // 待标注任务始终排除；非复核模式还排除所有历史终态任务。
+            if (task.getStatus() == AnnotationTaskStatus.PENDING
+                    || !config.isReviewEnabled()) {
+                excludedRowIds.add(task.getRowId());
+            }
+        }
+        List<TupleSamplingScore> available = filterScores(coverage.scores(),
+                excludedRowIds);
+        List<TupleSamplingScore> effectiveScores =
+                config.isClusteringBasedSampling()
+                ? available : uniformScores(available);
+        List<TupleSamplingScore> selected = sampler.select(effectiveScores,
+                config.getLabelingBudget(), randomSeed);
+        String samplingVersion = versioner.versionOf(
+                coverage.getClusterVersions(), config,
+                samplingRound, randomSeed, excludedRowIds);
+        long createdAt = clock.millis();
+        long expiresAt = safeAdd(createdAt, config.getTaskTtlMillis());
+        List<AnnotationTask> tasks = new ArrayList<AnnotationTask>(selected.size());
+        for (TupleSamplingScore score : selected) {
+            String taskId = HashUtils.md5Hex(jobId + "|" + samplingRound + "|"
+                    + score.getRowId() + "|" + samplingVersion);
+            tasks.add(new AnnotationTask(taskId, jobId, score.getRowId(),
+                    samplingRound, score.getScore(),
+                    coverage.coveredClusters(score.getRowId()),
+                    samplingVersion, createdAt, expiresAt));
+        }
+        repository.saveAll(jobId, tasks, version, createdAt);
+        SamplingMetrics metrics = new SamplingMetrics(effectiveScores.size(),
+                excludedRowIds.size(), tasks.size());
+        LOGGER.info("紧凑聚类覆盖采样完成，jobId={}，samplingRound={}，"
+                        + "candidateCount={}，excludedCount={}，taskCount={}",
+                jobId, samplingRound, metrics.getCandidateTupleCount(),
+                metrics.getExcludedTupleCount(), metrics.getCreatedTaskCount());
+        return new SamplingBatchResult(selected, tasks, samplingVersion,
+                metrics);
     }
 
     /**
@@ -185,6 +249,18 @@ public final class SamplingService {
                     score.getCoveredClusters(), Collections.<String, Double>emptyMap()));
         }
         return uniform;
+    }
+
+    private static List<TupleSamplingScore> filterScores(
+            List<TupleSamplingScore> scores,
+            Set<String> excludedRowIds) {
+        List<TupleSamplingScore> result = new ArrayList<TupleSamplingScore>();
+        for (TupleSamplingScore score : scores) {
+            if (!excludedRowIds.contains(score.getRowId())) {
+                result.add(score);
+            }
+        }
+        return result;
     }
 
     private static long safeAdd(long value, long increment) {

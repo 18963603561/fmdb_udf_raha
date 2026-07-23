@@ -17,6 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.Iterator;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.functions;
 import org.slf4j.Logger;
@@ -92,6 +94,26 @@ public final class FmdbClusterRepository implements ClusterRepository {
         LOGGER.debug("训练聚类成员仅使用当前任务缓存，未命中缓存，jobId={}，columnName={}，clusterVersion={}",
                 jobId, columnName, clusterVersion);
         return Collections.emptyList();
+    }
+
+    @Override
+    public synchronized void release(String jobId, Set<String> columns) {
+        String validatedJobId = ValueUtils.requireNotBlank(jobId, "任务标识");
+        if (columns == null) {
+            throw new IllegalArgumentException("待释放聚类字段不能为空");
+        }
+        Iterator<Map.Entry<String, ColumnClusteringResult>> iterator =
+                pendingResults.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, ColumnClusteringResult> entry = iterator.next();
+            if (entry.getKey().startsWith(validatedJobId.length() + ":"
+                    + validatedJobId)
+                    && columns.contains(entry.getValue().getColumnName())) {
+                iterator.remove();
+            }
+        }
+        LOGGER.debug("任务级列聚类缓存已释放，jobId={}，columns={}",
+                validatedJobId, columns);
     }
 
     private static String key(String jobId, String columnName, String clusterVersion) {

@@ -7,6 +7,7 @@ import com.fiberhome.ml.raha.data.profile.ColumnProfileService;
 import com.fiberhome.ml.raha.data.type.JobType;
 import com.fiberhome.ml.raha.feature.FeatureService;
 import com.fiberhome.ml.raha.job.stage.checkpoint.RestoreSnapshotCheckpointStageHandler;
+import com.fiberhome.ml.raha.job.stage.checkpoint.SnapshotCheckpointCleanupStageHandler;
 import com.fiberhome.ml.raha.job.stage.feature.ClusterStageHandler;
 import com.fiberhome.ml.raha.job.stage.data.TrainingInputMergeStageHandler;
 import com.fiberhome.ml.raha.job.stage.label.DirectLabelStageHandler;
@@ -156,6 +157,8 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
             handlers.add(new ResultPersistenceStageHandler(
                     StageAttributeKeys.TRAIN_SERVICE_RESULT,
                     resultPersistenceVerifier));
+            handlers.add(new SnapshotCheckpointCleanupStageHandler(
+                    snapshotCheckpointRepository));
             return Collections.unmodifiableList(handlers);
         }
         List<StageHandler> handlers = preparationStages(request);
@@ -184,6 +187,10 @@ public final class TrainingWorkflow extends AbstractRahaWorkflow {
         handlers.add(new ResultPersistenceStageHandler(
                 StageAttributeKeys.TRAIN_SERVICE_RESULT,
                 resultPersistenceVerifier));
+        if (snapshotCheckpointRepository != null) {
+            handlers.add(new SnapshotCheckpointCleanupStageHandler(
+                    snapshotCheckpointRepository));
+        }
         return Collections.unmodifiableList(handlers);
     }
 }

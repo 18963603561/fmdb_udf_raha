@@ -237,4 +237,19 @@ public final class StrategyExecutionService {
         }
         return timeoutMillis * count;
     }
+
+    /**
+     * 释放已经转换为特征的任务级策略命中缓存，保留运行摘要。
+     */
+    public void releaseCachedHits(String jobId,
+                                  List<StrategyPlan> plans) {
+        if (plans == null) {
+            throw new IllegalArgumentException("待释放策略计划不能为空");
+        }
+        Set<String> strategyIds = new HashSet<String>();
+        for (StrategyPlan plan : plans) {
+            strategyIds.add(plan.getStrategyId());
+        }
+        repository.releaseHits(jobId, strategyIds);
+    }
 }

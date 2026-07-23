@@ -61,25 +61,16 @@ CREATE TABLE IF NOT EXISTS dw.raha_snapshot_checkpoint (
     dataset_id STRING NOT NULL COMMENT '数据集唯一标识，也是表分区字段。',
     snapshot_id STRING NOT NULL COMMENT '采样或训练快照标识。',
     source_job_id STRING NOT NULL COMMENT '产生该检查点的任务标识。',
-    sample_batch_id STRING COMMENT '关联的采样批次标识，非采样来源时可为空。',
-    record_type STRING NOT NULL COMMENT '检查点记录类型，例如画像、策略、特征或聚类。',
-    record_scope STRING NOT NULL COMMENT '检查点作用范围，例如数据集、列、行或单元格。',
-    column_name STRING COMMENT '字段名称，列级或单元格级记录使用。',
-    row_id STRING COMMENT '行唯一标识，行级或单元格级记录使用。',
-    cell_id STRING COMMENT '单元格唯一标识，单元格级记录使用。',
-    cell_value STRING COMMENT '单元格原始值或快照值。',
+    record_type STRING NOT NULL COMMENT '检查点记录类型，例如画像、策略、批次清单或最终清单。',
+    record_scope STRING NOT NULL COMMENT '检查点作用范围，例如检查点、列批或字段。',
+    column_name STRING COMMENT '字段名称，列级元数据记录使用。',
     artifact_version STRING COMMENT '产物版本，用于区分同一类型产物的不同生成逻辑。',
     profile_json STRING COMMENT '字段画像产物，使用 JSON 保存统计信息。',
     strategy_plan_json STRING COMMENT '策略计划产物，使用 JSON 保存候选检测策略。',
-    strategy_hit_json STRING COMMENT '策略命中明细，使用 JSON 保存规则命中结果。',
     feature_dictionary_json STRING COMMENT '特征字典内容，使用 JSON 保存特征索引和定义。',
-    feature_vector_json STRING COMMENT '特征向量内容，使用 JSON 保存单元格特征值。',
-    feature_summary_json STRING COMMENT '特征摘要信息，使用 JSON 保存特征覆盖和分布。',
     cluster_version STRING COMMENT '聚类算法或聚类结果版本。',
-    cluster_id STRING COMMENT '聚类簇标识。',
-    cluster_distance DOUBLE COMMENT '样本到聚类中心或代表点的距离。',
     cluster_summary_json STRING COMMENT '聚类摘要信息，使用 JSON 保存簇统计结果。',
-    payload_json STRING COMMENT '扩展载荷，保存当前 record_type 未显式建模的内容。',
+    payload_json STRING COMMENT '批次路径、校验信息或最终清单载荷。',
     row_set_fingerprint STRING NOT NULL COMMENT '记录集合指纹，用于判断快照输入行集合是否一致。',
     config_fingerprint STRING NOT NULL COMMENT '任务配置指纹，用于判断检查点是否可复用。',
     schema_hash STRING NOT NULL COMMENT '数据模式哈希值。',
@@ -89,8 +80,8 @@ CREATE TABLE IF NOT EXISTS dw.raha_snapshot_checkpoint (
 )
 USING ORC
 PARTITIONED BY (dataset_id, partition_month)
-COMMENT 'Raha 快照检查点表，保存画像、策略、特征和聚类等中间产物。'
-TBLPROPERTIES ('raha.schema.version' = '1');
+COMMENT 'Raha 快照检查点元数据表，重明细按列批保存到 HDFS ORC。'
+TBLPROPERTIES ('raha.schema.version' = '2');
 
 -- 保存列级训练产物，包括画像、策略、特征字典、聚类摘要和传播摘要。
 CREATE TABLE IF NOT EXISTS dw.raha_training_column_artifact (

@@ -1,6 +1,7 @@
 package com.fiberhome.ml.raha.repository.adapter;
 
 import com.fiberhome.ml.raha.checkpoint.SnapshotPreparedArtifacts;
+import com.fiberhome.ml.raha.checkpoint.SnapshotCheckpointWriteSession;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringMetrics;
 import com.fiberhome.ml.raha.cluster.domain.ColumnClusteringResult;
@@ -36,6 +37,97 @@ public final class DefaultSnapshotCheckpointRepository
     /** 按数据集、快照和配置指纹索引的最新检查点。 */
     private final Map<String, SnapshotPreparedArtifacts> checkpoints =
             new LinkedHashMap<String, SnapshotPreparedArtifacts>();
+    /** 当前进程尚未完成的分批检查点。 */
+    private final Map<String, PendingCheckpoint> pendingCheckpoints =
+            new LinkedHashMap<String, PendingCheckpoint>();
+
+    @Override
+    public synchronized SnapshotCheckpointWriteSession begin(
+            String sourceJobId,
+            RahaDataset dataset,
+            DatasetSnapshot snapshot,
+            List<StrategyPlan> strategyPlans,
+            String strategyPlanVersion,
+            String configFingerprint,
+            long createdAt) {
+        String checkpointId = "snapshot_" + HashUtils.md5Hex(
+                key(dataset.getDatasetId(), snapshot.getSnapshotId(),
+                        configFingerprint) + "|" + sourceJobId + "|" + createdAt);
+        SnapshotCheckpointWriteSession session =
+                new SnapshotCheckpointWriteSession(checkpointId, sourceJobId,
+                        dataset, snapshot, strategyPlans, strategyPlanVersion,
+                        configFingerprint, createdAt);
+        pendingCheckpoints.put(checkpointId, new PendingCheckpoint());
+        return session;
+    }
+
+    @Override
+    public synchronized void saveColumnBatch(
+            SnapshotCheckpointWriteSession session,
+            int batchIndex,
+            List<String> columns,
+            FeatureAssemblyResult features,
+            ClusteringBatchResult clustering) {
+        if (session == null || batchIndex <= 0 || columns == null
+                || columns.isEmpty() || features == null || clustering == null) {
+            throw new IllegalArgumentException("进程内检查点列批参数不能为空");
+        }
+        PendingCheckpoint pending = requiredPending(session.getCheckpointId());
+        if (batchIndex != pending.nextBatchIndex) {
+            throw new IllegalStateException("进程内检查点列批序号不连续");
+        }
+        pending.dictionaries.putAll(features.getDictionaries());
+        pending.featureRows.addAll(features.getRows());
+        pending.clusteringResults.putAll(clustering.getResults());
+        pending.nextBatchIndex++;
+    }
+
+    @Override
+    public synchronized void complete(SnapshotCheckpointWriteSession session,
+                                      StrategyBatchResult strategyBatch) {
+        if (strategyBatch == null) {
+            throw new IllegalArgumentException("检查点策略执行摘要不能为空");
+        }
+        PendingCheckpoint pending = requiredPending(session.getCheckpointId());
+        long retained = 0L;
+        for (FeatureDictionary dictionary : pending.dictionaries.values()) {
+            retained += dictionary.getDefinitions().size();
+        }
+        FeatureAssemblyResult features = new FeatureAssemblyResult(
+                pending.dictionaries, pending.featureRows,
+                new FeatureAssemblyMetrics(pending.featureRows.size(), retained,
+                        retained, 0L));
+        long assignments = 0L;
+        long clusteredColumns = 0L;
+        for (ColumnClusteringResult result
+                : pending.clusteringResults.values()) {
+            assignments += result.getAssignments().size();
+            if (!result.getAssignments().isEmpty()) {
+                clusteredColumns++;
+            }
+        }
+        ClusteringBatchResult clustering = new ClusteringBatchResult(
+                pending.clusteringResults, new ClusteringMetrics(
+                pending.clusteringResults.size(), clusteredColumns,
+                assignments,
+                pending.clusteringResults.size() - clusteredColumns));
+        checkpoints.put(key(session.getDataset().getDatasetId(),
+                        session.getSnapshot().getSnapshotId(),
+                        session.getConfigFingerprint()),
+                new SnapshotPreparedArtifacts(session.getCheckpointId(),
+                        session.getDataset(), session.getSnapshot(),
+                        session.getStrategyPlans(), strategyBatch,
+                        features, session.getStrategyPlanVersion(), clustering,
+                        session.getConfigFingerprint()));
+        pendingCheckpoints.remove(session.getCheckpointId());
+    }
+
+    @Override
+    public synchronized void abort(SnapshotCheckpointWriteSession session) {
+        if (session != null) {
+            pendingCheckpoints.remove(session.getCheckpointId());
+        }
+    }
 
     @Override
     public synchronized void save(String sourceJobId,
@@ -193,5 +285,29 @@ public final class DefaultSnapshotCheckpointRepository
         return dataset.length() + ":" + dataset
                 + snapshot.length() + ":" + snapshot
                 + fingerprint.length() + ":" + fingerprint;
+    }
+
+    private PendingCheckpoint requiredPending(String checkpointId) {
+        PendingCheckpoint pending = pendingCheckpoints.get(checkpointId);
+        if (pending == null) {
+            throw new IllegalStateException("进程内检查点写会话不存在：" + checkpointId);
+        }
+        return pending;
+    }
+
+    /** 进程内分批检查点累积状态。 */
+    private static final class PendingCheckpoint {
+
+        /** 分批累积的特征字典。 */
+        private final Map<String, FeatureDictionary> dictionaries =
+                new LinkedHashMap<String, FeatureDictionary>();
+        /** 分批累积的单元格特征。 */
+        private final List<SparseFeatureRow> featureRows =
+                new ArrayList<SparseFeatureRow>();
+        /** 分批累积的列聚类结果。 */
+        private final Map<String, ColumnClusteringResult> clusteringResults =
+                new LinkedHashMap<String, ColumnClusteringResult>();
+        /** 下一个允许提交的列批序号。 */
+        private int nextBatchIndex = 1;
     }
 }

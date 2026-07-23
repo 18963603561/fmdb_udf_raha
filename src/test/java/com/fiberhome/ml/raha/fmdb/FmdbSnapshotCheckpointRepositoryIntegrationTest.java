@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.fiberhome.ml.raha.checkpoint.SnapshotPreparedArtifacts;
+import com.fiberhome.ml.raha.checkpoint.SnapshotCheckpointWriteSession;
 import com.fiberhome.ml.raha.cluster.domain.ClusterAssignment;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringBatchResult;
 import com.fiberhome.ml.raha.cluster.domain.ClusteringDistanceMetric;
@@ -41,6 +42,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -60,25 +63,36 @@ class FmdbSnapshotCheckpointRepositoryIntegrationTest {
     }
 
     @Test
-    void shouldSaveInBoundedBatchesAndRestoreOneColumn() {
+    void shouldSaveOrcColumnBatchesAndRestoreOneColumn() throws Exception {
         SparkSession spark = SparkTestSession.get();
         RecordingGateway gateway = new RecordingGateway(spark);
+        Path detailPath = Files.createTempDirectory("raha-checkpoint-");
         FmdbPersistenceConfig config = FmdbPersistenceConfig.builder()
-                .snapshotCheckpointAppendBatchSize(3)
+                .snapshotCheckpointDetailBasePath(detailPath.toUri().toString())
+                .snapshotCheckpointColumnBatchSize(1)
+                .snapshotCheckpointOrcPartitionCount(1)
                 .build();
         FmdbSnapshotCheckpointRepository repository =
                 new FmdbSnapshotCheckpointRepository(spark, gateway, config);
         PreparedInput input = preparedInput();
 
-        repository.save("job-sample", input.dataset, input.snapshot,
-                input.plans, "strategy-plan-v1", input.strategyBatch,
-                input.features, input.clustering, "config-v1", CREATED_AT);
+        SnapshotCheckpointWriteSession session = repository.begin(
+                "job-sample", input.dataset, input.snapshot, input.plans,
+                "strategy-plan-v1", "config-v1",
+                CREATED_AT);
+        repository.saveColumnBatch(session, 1,
+                Collections.singletonList("c01"),
+                features(input, "c01"), clustering(input, "c01"));
+        repository.saveColumnBatch(session, 2,
+                Collections.singletonList("c02"),
+                features(input, "c02"), clustering(input, "c02"));
+        repository.complete(session, input.strategyBatch);
 
-        assertEquals(Arrays.asList(3L, 3L, 3L, 3L, 3L, 1L),
+        assertEquals(Arrays.asList(5L, 3L, 2L),
                 gateway.getAppendSizes());
-        assertEquals(Collections.singletonList("MANIFEST"),
+        assertEquals(Arrays.asList("STRATEGY_PLAN", "MANIFEST"),
                 gateway.getLastRecordTypes());
-        assertEquals(16L, gateway.read(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT
+        assertEquals(10L, gateway.read(FmdbPhysicalTable.SNAPSHOT_CHECKPOINT
                 .getTableName()).count());
 
         SnapshotPreparedArtifacts full = repository.restore(
@@ -106,6 +120,30 @@ class FmdbSnapshotCheckpointRepositoryIntegrationTest {
                 partial.getStrategyPlans().get(0).getTargetColumns());
         assertFalse(partial.getStrategyPlans().stream().anyMatch(
                 plan -> plan.getStrategyFamily() == StrategyFamily.RVD));
+    }
+
+    private static FeatureAssemblyResult features(PreparedInput input,
+                                                   String column) {
+        Map<String, FeatureDictionary> dictionaries =
+                Collections.singletonMap(column,
+                        input.features.getDictionaries().get(column));
+        List<SparseFeatureRow> rows = new ArrayList<SparseFeatureRow>();
+        for (SparseFeatureRow row : input.features.getRows()) {
+            if (column.equals(row.getColumnName())) {
+                rows.add(row);
+            }
+        }
+        return new FeatureAssemblyResult(dictionaries, rows,
+                new FeatureAssemblyMetrics(rows.size(), 1L, 1L, 0L));
+    }
+
+    private static ClusteringBatchResult clustering(PreparedInput input,
+                                                     String column) {
+        ColumnClusteringResult result =
+                input.clustering.getResults().get(column);
+        return new ClusteringBatchResult(Collections.singletonMap(column,
+                result), new ClusteringMetrics(1L, 1L,
+                result.getAssignments().size(), 0L));
     }
 
     private static PreparedInput preparedInput() {

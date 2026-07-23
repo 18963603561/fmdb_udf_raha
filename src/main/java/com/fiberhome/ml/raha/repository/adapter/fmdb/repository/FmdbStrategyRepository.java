@@ -18,6 +18,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Iterator;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.functions;
 import org.slf4j.Logger;
@@ -143,6 +145,32 @@ public final class FmdbStrategyRepository implements StrategyRepository {
         Collections.sort(result, Comparator.comparing(
                 StrategyRunSummary::getStrategyId));
         return Collections.unmodifiableList(result);
+    }
+
+    @Override
+    public synchronized void releaseHits(String jobId,
+                                         Set<String> strategyIds) {
+        String validatedJobId = ValueUtils.requireNotBlank(jobId, "任务标识");
+        if (strategyIds == null) {
+            throw new IllegalArgumentException("待释放策略标识不能为空");
+        }
+        Map<String, StrategyHit> hits = pendingHits.get(validatedJobId);
+        if (hits == null) {
+            return;
+        }
+        Iterator<Map.Entry<String, StrategyHit>> iterator =
+                hits.entrySet().iterator();
+        while (iterator.hasNext()) {
+            if (strategyIds.contains(
+                    iterator.next().getValue().getStrategyId())) {
+                iterator.remove();
+            }
+        }
+        if (hits.isEmpty()) {
+            pendingHits.remove(validatedJobId);
+        }
+        LOGGER.debug("任务级策略命中缓存已释放，jobId={}，strategyCount={}",
+                validatedJobId, strategyIds.size());
     }
 
     private List<Row> artifactRowsBySnapshot(String datasetId, String snapshotId) {
