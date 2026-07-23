@@ -1,5 +1,10 @@
 package com.fiberhome.ml.raha.udf;
 
+import com.fiberhome.ml.raha.annotation.auto.AutoAnnotationConfig;
+import com.fiberhome.ml.raha.annotation.auto.AutoAnnotationRequest;
+import com.fiberhome.ml.raha.annotation.auto.AutoAnnotationResult;
+import com.fiberhome.ml.raha.annotation.auto.AutoAnnotationStatus;
+import com.fiberhome.ml.raha.annotation.auto.LlmAutoAnnotationService;
 import com.fiberhome.ml.raha.annotation.domain.AnnotationBatch;
 import com.fiberhome.ml.raha.annotation.domain.AnnotationBatchStatus;
 import com.fiberhome.ml.raha.annotation.domain.AnnotationRecord;
@@ -108,6 +113,8 @@ public final class RahaDetectionUdfService {
     private final AnnotationRecordRepository annotationRepository;
     /** 标注模板导出服务。 */
     private final AnnotationTemplateService annotationTemplateService;
+    /** 大模型自动标注编排服务。 */
+    private final LlmAutoAnnotationService autoAnnotationService;
     /** 标注 Excel 导入服务。 */
     private final AnnotationImportService annotationImportService;
     /** 标注上传文件定位器。 */
@@ -143,6 +150,8 @@ public final class RahaDetectionUdfService {
         this.zipPublisher = new RahaZipWebPublisher();
         this.xlsReportWriter = new RahaXlsReportWriter();
         this.clock = clock;
+        this.autoAnnotationService = new LlmAutoAnnotationService(
+                workbookAdapter, clock);
     }
 
     public static RahaDetectionUdfService create(SparkSession spark) {
@@ -189,6 +198,29 @@ public final class RahaDetectionUdfService {
                 sampleBatch.getSampleBatchId(), sampleBatch.getSnapshotId(),
                 excelPath));
 
+        AutoAnnotationConfig autoConfig = autoAnnotationConfig(parser);
+        AutoAnnotationResult autoResult = AutoAnnotationResult.disabled();
+        if (autoConfig.isEnabled()) {
+            String autoExcelName = excelName.substring(0,
+                    excelName.length() - ".xls".length()) + "_auto.xls";
+            AutoAnnotationRequest autoRequest = new AutoAnnotationRequest(
+                    excelPath, workDir.resolve(autoExcelName),
+                    workDir.resolve("auto-label"), sampleBatch.getDatasetId(),
+                    sampleBatch.getSampleBatchId(), input.getSensitiveColumns());
+            try {
+                // 外部模型调用失败是否影响采集由 autoLabelFailPolicy 明确控制。
+                autoResult = autoAnnotationService.autoLabel(autoRequest,
+                        autoConfig);
+            } catch (RuntimeException exception) {
+                LOGGER.error("采集自动标注失败，sampleBatchId={}，failPolicy={}",
+                        sampleBatch.getSampleBatchId(), autoConfig.getFailPolicy(),
+                        exception);
+                throw new RahaUdfException("AUTO_ANNOTATION_FAILED",
+                        "自动标注失败：" + safeExceptionMessage(exception),
+                        exception);
+            }
+        }
+
         Map<String, Object> row = successBase(parser, input, snapshot);
         enrichExecutionMetadata(row, taskResult);
         row.put("sourceVersion", firstNonBlank(sampleBatch.getSourceVersion(),
@@ -210,6 +242,7 @@ public final class RahaDetectionUdfService {
                 Integer.valueOf(clusteredFieldCount(output)));
         row.put("annotationExcelName", excelName);
         row.put("partitionMonth", sampleBatch.getPartitionMonth());
+        row.putAll(autoResult.toUdfFields());
 
         String zipName = null;
         String zipUrl = null;
@@ -217,7 +250,7 @@ public final class RahaDetectionUdfService {
             zipName = AnnotationUploadFileLocator.collectZipName(
                     sampleBatch.getSampleBatchId(), fileTime);
             List<RahaZipEntrySource> files = collectPackageFiles(workDir,
-                    excelPath, row, sampleBatch, output);
+                    excelPath, autoResult, row, sampleBatch, output);
             try {
                 zipUrl = zipPublisher.publish(spark.sqlContext(), files,
                         workDir, zipName, publishConfig);
@@ -539,6 +572,7 @@ public final class RahaDetectionUdfService {
 
     private List<RahaZipEntrySource> collectPackageFiles(Path workDir,
                                                          Path excelPath,
+                                                         AutoAnnotationResult autoResult,
                                                          Map<String, Object> row,
                                                          SampleBatch sampleBatch,
                                                          RahaSampleOutput output) {
@@ -547,12 +581,36 @@ public final class RahaDetectionUdfService {
                 collectManifest(sampleBatch));
         Path clusters = writeText(workDir.resolve("column-clusters.csv"),
                 clusterCsv(output));
-        return Arrays.asList(
-                new RahaZipEntrySource(excelPath,
-                        "annotation/" + excelPath.getFileName()),
-                new RahaZipEntrySource(summary, "summary.json"),
-                new RahaZipEntrySource(manifest, "manifest.json"),
-                new RahaZipEntrySource(clusters, "column-clusters.csv"));
+        List<RahaZipEntrySource> files = new ArrayList<RahaZipEntrySource>();
+        files.add(new RahaZipEntrySource(excelPath,
+                "annotation/" + excelPath.getFileName()));
+        if (autoResult != null
+                && autoResult.getStatus()
+                != AutoAnnotationStatus.DISABLED) {
+            files.add(new RahaZipEntrySource(excelPath,
+                    "annotation/raw/" + excelPath.getFileName()));
+            if (autoResult.getWorkbookPath() != null) {
+                files.add(new RahaZipEntrySource(autoResult.getWorkbookPath(),
+                        "annotation/auto/"
+                                + autoResult.getWorkbookPath().getFileName()));
+            }
+            if (autoResult.getSummaryPath() != null) {
+                files.add(new RahaZipEntrySource(autoResult.getSummaryPath(),
+                        "auto-label/summary.json"));
+            }
+            if (autoResult.getDecisionsPath() != null) {
+                files.add(new RahaZipEntrySource(autoResult.getDecisionsPath(),
+                        "auto-label/decisions.jsonl"));
+            }
+            if (autoResult.getBatchesPath() != null) {
+                files.add(new RahaZipEntrySource(autoResult.getBatchesPath(),
+                        "auto-label/batches.jsonl"));
+            }
+        }
+        files.add(new RahaZipEntrySource(summary, "summary.json"));
+        files.add(new RahaZipEntrySource(manifest, "manifest.json"));
+        files.add(new RahaZipEntrySource(clusters, "column-clusters.csv"));
+        return files;
     }
 
     private List<Map<String, Object>> detectionDetailRows(
@@ -1117,5 +1175,30 @@ public final class RahaDetectionUdfService {
         }
         throw new RahaUdfException("INVALID_CONFIGURATION",
                 key + " 必须为 true 或 false");
+    }
+
+    /**
+     * 解析自动标注参数并统一转换为 UDF 参数错误。
+     */
+    private static AutoAnnotationConfig autoAnnotationConfig(
+            RahaUdfRequestParser parser) {
+        try {
+            return AutoAnnotationConfig.from(parser.values());
+        } catch (IllegalArgumentException exception) {
+            throw new RahaUdfException("INVALID_ARGUMENT",
+                    exception.getMessage(), exception);
+        }
+    }
+
+    /**
+     * 生成不含多行内容的安全异常摘要，避免外部响应进入 UDF 返回值。
+     */
+    private static String safeExceptionMessage(Throwable exception) {
+        String message = exception.getMessage();
+        if (message == null || message.trim().isEmpty()) {
+            return exception.getClass().getSimpleName();
+        }
+        String compact = message.replaceAll("[\\r\\n\\t]+", " ").trim();
+        return compact.length() <= 500 ? compact : compact.substring(0, 500);
     }
 }

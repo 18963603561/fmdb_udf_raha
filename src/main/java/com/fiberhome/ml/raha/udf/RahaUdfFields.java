@@ -45,7 +45,14 @@ public final class RahaUdfFields {
             RahaUdfField.string("annotationExcelName"),
             RahaUdfField.string("annotationZipName"),
             RahaUdfField.string("annotationZipUrl"),
-            RahaUdfField.string("partitionMonth"));
+            RahaUdfField.string("partitionMonth"),
+            RahaUdfField.string("autoAnnotationStatus"),
+            RahaUdfField.string("autoAnnotationExcelName"),
+            RahaUdfField.longField("autoAnnotationRecordCount"),
+            RahaUdfField.longField("autoAnnotationLabeledCount"),
+            RahaUdfField.longField("autoAnnotationFailedCount"),
+            RahaUdfField.intField("autoAnnotationBatchCount"),
+            RahaUdfField.string("autoAnnotationReportName"));
 
     /** 训练函数输出字段。 */
     public static final List<RahaUdfField> TRAIN = append(COMMON,

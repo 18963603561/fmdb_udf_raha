@@ -121,6 +121,7 @@ public final class BatchedSnapshotCheckpointStageHandler
                 (String) planVersionValue,
                 context.getConfig().getExecutionConfigFingerprint(),
                 createdAt(context));
+        try {
         List<ColumnMetadata> detectableColumns = detectableColumns(dataset);
         ClusterCoverageAccumulator accumulator =
                 new ClusterCoverageAccumulator(labels,
@@ -151,38 +152,41 @@ public final class BatchedSnapshotCheckpointStageHandler
                     context.getStage().getStageId(),
                     context.getStage().getAttemptId());
             List<StrategyPlan> batchPlans = plansForColumns(plans, columnNames);
-            StrategyBatchResult strategyBatch = executeStrategies(context,
-                    batchDataset, batchPlans, version);
-            FeatureAssemblyResult features = assemble(context, batchDataset,
-                    batchPlans, strategyBatch.getHits(), version);
-            ClusteringBatchResult clustering = cluster(context, features,
-                    version);
-            repository.saveColumnBatch(session, batchIndex,
-                    new ArrayList<String>(columnNames), features, clustering);
-            accumulator.addBatch(clustering);
-            strategyExecutions.addAll(
-                    strategyBatch.withoutHits().getExecutions());
-            assignmentCount += clustering.getMetrics().getAssignmentCount();
-            clusteredColumnCount += clustering.getMetrics()
-                    .getClusteredColumnCount();
-            exceptionalColumnCount += clustering.getMetrics()
-                    .getExceptionalColumnCount();
-            for (ColumnClusteringResult result
-                    : clustering.getResults().values()) {
-                summaries.put(result.getColumnName(), summaryOnly(result));
+            try {
+                StrategyBatchResult strategyBatch = executeStrategies(context,
+                        batchDataset, batchPlans, version);
+                FeatureAssemblyResult features = assemble(context, batchDataset,
+                        batchPlans, strategyBatch.getHits(), version);
+                ClusteringBatchResult clustering = cluster(context, features,
+                        version);
+                repository.saveColumnBatch(session, batchIndex,
+                        new ArrayList<String>(columnNames), features, clustering);
+                accumulator.addBatch(clustering);
+                strategyExecutions.addAll(
+                        strategyBatch.withoutHits().getExecutions());
+                assignmentCount += clustering.getMetrics().getAssignmentCount();
+                clusteredColumnCount += clustering.getMetrics()
+                        .getClusteredColumnCount();
+                exceptionalColumnCount += clustering.getMetrics()
+                        .getExceptionalColumnCount();
+                for (ColumnClusteringResult result
+                        : clustering.getResults().values()) {
+                    summaries.put(result.getColumnName(), summaryOnly(result));
+                }
+                LOGGER.info("采样前置列批已保存，jobId={}，batchIndex={}，"
+                                + "columns={}，featureRowCount={}，assignmentCount={}",
+                        context.getJob().getJobId(), batchIndex, columnNames,
+                        features.getRows().size(),
+                        clustering.getMetrics().getAssignmentCount());
+            } finally {
+                // 无论列批成功还是失败，都清理三个任务级明细缓存，避免异常重试持续占用堆内存。
+                executionService.releaseCachedHits(
+                        context.getJob().getJobId(), batchPlans);
+                featureService.releaseCachedBatch(
+                        context.getJob().getJobId(), columnNames);
+                clusteringService.releaseCachedBatch(
+                        context.getJob().getJobId(), columnNames);
             }
-            // 当前批已完成 ORC、清单和覆盖累积，立即释放三个任务级明细缓存。
-            executionService.releaseCachedHits(
-                    context.getJob().getJobId(), batchPlans);
-            featureService.releaseCachedBatch(
-                    context.getJob().getJobId(), columnNames);
-            clusteringService.releaseCachedBatch(
-                    context.getJob().getJobId(), columnNames);
-            LOGGER.info("采样前置列批已保存并释放，jobId={}，batchIndex={}，"
-                            + "columns={}，featureRowCount={}，assignmentCount={}",
-                    context.getJob().getJobId(), batchIndex, columnNames,
-                    features.getRows().size(),
-                    clustering.getMetrics().getAssignmentCount());
         }
         StrategyBatchResult strategySummary =
                 new StrategyBatchResult(strategyExecutions);
@@ -203,7 +207,6 @@ public final class BatchedSnapshotCheckpointStageHandler
                     context.getJob().getJobId(),
                     strategySummary.getFailedCount(), plans.size(), failedRatio);
         }
-        repository.complete(session, strategySummary);
         ClusteringBatchResult summary = new ClusteringBatchResult(summaries,
                 new ClusteringMetrics(summaries.size(), clusteredColumnCount,
                         assignmentCount, exceptionalColumnCount));
@@ -217,6 +220,13 @@ public final class BatchedSnapshotCheckpointStageHandler
                         accumulator,
                         context.getConfig().getSamplingConfig(),
                         context.getConfig().getRandomSeed(), samplingVersion);
+        if (result.getStatus() != JobStatus.SUCCEEDED) {
+            repository.abort(session);
+            return StageResult.failure(result.getErrorCode(),
+                    result.getErrorMessage(), false, 0L, 0L);
+        }
+        // 只有采样任务生成成功后才提交最终清单，避免训练恢复未完成业务快照。
+        repository.complete(session, strategySummary);
         context.getAttributes().put(StageAttributeKeys.CLUSTERING_BATCH_RESULT,
                 summary);
         context.getAttributes().put(StageAttributeKeys.STRATEGY_BATCH_RESULT,
@@ -229,11 +239,22 @@ public final class BatchedSnapshotCheckpointStageHandler
                         + "candidateRowCount={}，assignmentCount={}",
                 context.getJob().getJobId(), batchIndex,
                 accumulator.getCandidateRowCount(), assignmentCount);
-        if (result.getStatus() != JobStatus.SUCCEEDED) {
-            return StageResult.failure(result.getErrorCode(),
-                    result.getErrorMessage(), false, 0L, 0L);
-        }
         return StageResult.success();
+        } catch (RuntimeException exception) {
+            try {
+                repository.abort(session);
+            } catch (RuntimeException abortException) {
+                exception.addSuppressed(abortException);
+                LOGGER.error("采样前置检查点中止失败，jobId={}，checkpointId={}",
+                        context.getJob().getJobId(), session.getCheckpointId(),
+                        abortException);
+            }
+            LOGGER.error("采样前置产物分批处理失败，jobId={}，checkpointId={}",
+                    context.getJob().getJobId(), session.getCheckpointId(),
+                    exception);
+            return StageResult.failure("BATCHED_CHECKPOINT_EXECUTION_FAILED",
+                    exception.getClass().getSimpleName(), false, 1L, 1L);
+        }
     }
 
     private StrategyBatchResult executeStrategies(

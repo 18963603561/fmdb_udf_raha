@@ -53,4 +53,16 @@ class AnnotationUploadFileLocatorTest {
         assertFalse(AnnotationUploadFileLocator.matches(fileName,
                 sampleBatchId));
     }
+
+    @Test
+    void shouldAcceptAutoAndReviewedAnnotationFiles() {
+        String sampleBatchId = "sample_dw.person_info@20260721090041.862";
+        String prefix = "raha-annotation_sample_dw.person_info_"
+                + "20260721090041.862_20260721171443";
+
+        assertTrue(AnnotationUploadFileLocator.matches(prefix + "_auto.xls",
+                sampleBatchId));
+        assertTrue(AnnotationUploadFileLocator.matches(prefix + "_reviewed.xls",
+                sampleBatchId));
+    }
 }
